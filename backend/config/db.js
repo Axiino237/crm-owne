@@ -57,11 +57,13 @@ const connectDB = async () => {
       await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"completedModelUrl\" TEXT");
       await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"completedAt\" TIMESTAMP WITH TIME ZONE");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'completed-models-list'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_module ADD VALUE IF NOT EXISTS 'attendance'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'attendance-list'");
     } catch (err) {
       // Silently ignore if types do not exist yet (will be created by sync)
     }
 
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log('✅ Database tables synced');
   } catch (error) {
     console.error('❌ PostgreSQL Connection Error:', error.message);

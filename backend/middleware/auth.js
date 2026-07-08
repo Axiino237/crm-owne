@@ -22,6 +22,9 @@ const protect = async (req, res, next) => {
     if (!req.user.isActive)
       return res.status(401).json({ success: false, message: 'Account is deactivated' });
 
+    // Asynchronously update last active timestamp (heartbeat)
+    User.update({ lastActiveAt: new Date() }, { where: { id: req.user.id } }).catch(() => {});
+
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Not authorized, token failed' });

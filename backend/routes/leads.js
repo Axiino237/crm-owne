@@ -76,9 +76,44 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
     }
     if (source) baseWhere.source = source;
 
-    // Scope by org for non-super-admins
-    if (!req.user.isSuperAdmin && req.user.organizationId) {
-      baseWhere.organizationId = req.user.organizationId;
+    // Scope by org / role hierarchy
+    const userRole = req.user.role?.level;
+    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
+    const isOrgAdmin = userRole === 'org_admin';
+    const isCompanyAdmin = userRole === 'company_admin';
+
+    const { Department } = require('../models');
+    const managedDept = !isSuper && !isOrgAdmin && !isCompanyAdmin
+      ? await Department.findOne({ where: { headId: req.user.id }, attributes: ['id'] })
+      : null;
+    const isDeptHead = !!managedDept;
+    const hasTeamScope = (userRole === 'dept_manager') || isDeptHead;
+    const scopedDeptId = managedDept?.id || req.user.departmentId;
+
+    if (!isSuper) {
+      if (isOrgAdmin && req.user.organizationId) {
+        baseWhere.organizationId = req.user.organizationId;
+      } else if (isCompanyAdmin && req.user.companyId) {
+        // Company admin sees leads assigned to company users or unassigned in company scope
+        const companyUserIds = (await User.findAll({
+          where: { companyId: req.user.companyId },
+          attributes: ['id']
+        })).map(u => u.id);
+        baseWhere.organizationId = req.user.organizationId;
+        baseWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
+      } else if (hasTeamScope && scopedDeptId) {
+        // Team head / dept manager sees leads of department users or unassigned in department scope
+        const deptUserIds = (await User.findAll({
+          where: { departmentId: scopedDeptId },
+          attributes: ['id']
+        })).map(u => u.id);
+        baseWhere.organizationId = req.user.organizationId;
+        baseWhere.assignedTo = { [Op.or]: [{ [Op.in]: deptUserIds }, null] };
+      } else {
+        // Regular user sees only leads assigned directly to them
+        baseWhere.organizationId = req.user.organizationId;
+        baseWhere.assignedTo = req.user.id;
+      }
     }
 
     // Table query — includes status filter if provided
@@ -140,6 +175,50 @@ router.get('/:id', checkPermission('leads', 'leads-list', 'canView'), async (req
       ]
     });
     if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+
+    // Scoping check for read authorization
+    const userRole = req.user.role?.level;
+    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
+    const isOrgAdmin = userRole === 'org_admin';
+    const isCompanyAdmin = userRole === 'company_admin';
+
+    const { Department } = require('../models');
+    const managedDept = !isSuper && !isOrgAdmin && !isCompanyAdmin
+      ? await Department.findOne({ where: { headId: req.user.id }, attributes: ['id'] })
+      : null;
+    const isDeptHead = !!managedDept;
+    const hasTeamScope = (userRole === 'dept_manager') || isDeptHead;
+    const scopedDeptId = managedDept?.id || req.user.departmentId;
+
+    let isAuthorized = false;
+    if (isSuper) {
+      isAuthorized = true;
+    } else if (lead.organizationId === req.user.organizationId) {
+      if (isOrgAdmin) {
+        isAuthorized = true;
+      } else if (lead.assignedTo === req.user.id) {
+        isAuthorized = true;
+      } else if (isCompanyAdmin && req.user.companyId) {
+        if (lead.assignedTo) {
+          const assigneeUser = await User.findByPk(lead.assignedTo, { attributes: ['companyId'] });
+          if (assigneeUser && assigneeUser.companyId === req.user.companyId) isAuthorized = true;
+        } else {
+          isAuthorized = true; // Company Admin sees unassigned
+        }
+      } else if (hasTeamScope && scopedDeptId) {
+        if (lead.assignedTo) {
+          const assigneeUser = await User.findByPk(lead.assignedTo, { attributes: ['departmentId'] });
+          if (assigneeUser && assigneeUser.departmentId === scopedDeptId) isAuthorized = true;
+        } else {
+          isAuthorized = true; // Manager/Head sees unassigned
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, message: 'Access denied: You are not authorized to view this lead' });
+    }
+
     res.json({ success: true, lead });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -166,7 +245,7 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
       source: source || 'other',
       value: value || 0,
       notes: notes || null,
-      assignedTo: assignedTo || null,
+      assignedTo: assignedTo || (req.user.role?.level === 'user' ? req.user.id : null),
       designation: designation || null,
       sourceType: sourceType || null,
       sourceName: sourceName || null,
@@ -395,6 +474,8 @@ router.post('/bulk-upload', checkPermission('leads', 'leads-list', 'canCreate'),
         if (found) {
           assignedToId = found.id;
         }
+      } else if (req.user.role?.level === 'user') {
+        assignedToId = req.user.id;
       }
 
       try {

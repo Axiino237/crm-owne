@@ -10,7 +10,7 @@ router.use(protect);
 // GET /api/uam/users
 router.get('/users', checkPermission('uam', 'users-list', 'canView'), async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
+    const { page = 1, limit = 10, search = '', companyId, departmentId } = req.query;
     const where = {};
     if (search) {
       where[Op.or] = [
@@ -18,8 +18,13 @@ router.get('/users', checkPermission('uam', 'users-list', 'canView'), async (req
         { email: { [Op.iLike]: `%${search}%` } }
       ];
     }
+    // Scope: super admin sees all, others scoped to their org
     if (!req.user.isSuperAdmin && req.user.organizationId)
       where.organizationId = req.user.organizationId;
+
+    // Optional filters for dropdowns (e.g. dept head selection)
+    if (companyId) where.companyId = companyId;
+    if (departmentId) where.departmentId = departmentId;
 
     const { count, rows } = await User.findAndCountAll({
       where,

@@ -7,16 +7,18 @@ import {
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import defaultLogoImg from '../../assets/qutation image.jpeg';
+
 
 // ── Predefined Plans ─────────────────────────────────────────────────────────
 const PRESET_PLANS = [
-  { id: 'starter',    name: 'Starter Plan',    description: 'Basic CRM features for small teams', price: 999,   unit: 'month' },
-  { id: 'growth',     name: 'Growth Plan',      description: 'Advanced features + 5 users',        price: 2499,  unit: 'month' },
-  { id: 'pro',        name: 'Pro Plan',         description: 'Full features + 20 users + support', price: 4999,  unit: 'month' },
-  { id: 'enterprise', name: 'Enterprise Plan',  description: 'Unlimited users + dedicated support', price: 9999,  unit: 'month' },
-  { id: 'setup',      name: 'Setup & Onboarding', description: 'One-time implementation & training', price: 15000, unit: 'one-time' },
-  { id: 'support',    name: 'Priority Support',  description: 'Dedicated account manager',          price: 1499,  unit: 'month' },
-  { id: 'custom',     name: 'Custom Development', description: 'Per hour custom module development', price: 1500,  unit: 'hour' },
+  { id: 'starter', name: 'Starter Plan', description: 'Basic CRM features for small teams', price: 999, unit: 'month' },
+  { id: 'growth', name: 'Growth Plan', description: 'Advanced features + 5 users', price: 2499, unit: 'month' },
+  { id: 'pro', name: 'Pro Plan', description: 'Full features + 20 users + support', price: 4999, unit: 'month' },
+  { id: 'enterprise', name: 'Enterprise Plan', description: 'Unlimited users + dedicated support', price: 9999, unit: 'month' },
+  { id: 'setup', name: 'Setup & Onboarding', description: 'One-time implementation & training', price: 15000, unit: 'one-time' },
+  { id: 'support', name: 'Priority Support', description: 'Dedicated account manager', price: 1499, unit: 'month' },
+  { id: 'custom', name: 'Custom Development', description: 'Per hour custom module development', price: 1500, unit: 'hour' },
 ];
 
 const CURRENCIES = [
@@ -46,10 +48,11 @@ const QuotationPage = () => {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('quotations', 'quotations-list', 'canCreate');
   const canExport = hasPermission('quotations', 'quotations-list', 'canCreate') ||
-                    hasPermission('quotations', 'quotation-export', 'canCreate');
+    hasPermission('quotations', 'quotation-export', 'canCreate');
 
-  // Company info
-  const [logo, setLogo] = useState(null);
+  // Company info — default logo pre-loaded from assets
+  const [logo, setLogo] = useState(defaultLogoImg);
+
   const [companyName, setCompanyName] = useState('The First Step Solutions');
   const [companyAddress, setCompanyAddress] = useState('Flat No. 27, 1st Street, Kothari Nagar,\nAnnai Sathya Nagar Main Road,\nRamapuram, Chennai 600089');
   const [companyPhone, setCompanyPhone] = useState('+91 44 3153 6968, 9344983802');
@@ -76,7 +79,7 @@ const QuotationPage = () => {
   const [bankIFSC, setBankIFSC] = useState('UTIB0003450');
 
   // Quotation meta
-  const [quoteNo, setQuoteNo] = useState(`QT-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}`);
+  const [quoteNo, setQuoteNo] = useState(`QT-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`);
   const [quoteDate, setQuoteDate] = useState(todayStr());
   const [validUntil, setValidUntil] = useState(validityStr());
   const [currency, setCurrency] = useState('INR');
@@ -183,17 +186,22 @@ const QuotationPage = () => {
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const ratio = canvas.height / canvas.width;
-      const imgH = pageW * ratio;
 
-      let y = 0;
-      while (y < imgH) {
-        if (y > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
-        y += pageH;
+      let imgW = pageW;
+      let imgH = pageW * ratio;
+
+      // Force single page: if calculated height exceeds page height, scale it down to fit
+      if (imgH > pageH) {
+        imgH = pageH;
+        imgW = pageH / ratio;
       }
 
+      // Center the image horizontally
+      const xOffset = (pageW - imgW) / 2;
+      pdf.addImage(imgData, 'PNG', xOffset, 0, imgW, imgH);
+
       pdf.save(`${quoteNo || 'quotation'}.pdf`);
-      toast.success('PDF exported successfully!');
+      toast.success('PDF exported successfully on a single page!');
     } catch (err) {
       toast.error('Export failed: ' + err.message);
     }
@@ -590,11 +598,31 @@ const QuotationPage = () => {
           <div>
             <div ref={previewRef} style={{
               background: '#ffffff', color: '#000000', fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-              maxWidth: 820, margin: '0 auto', padding: '36px 44px', fontSize: 12,
-              boxShadow: '0 4px 40px rgba(0,0,0,0.3)', borderRadius: 4
+              maxWidth: 820, margin: '0 auto', padding: '20px 24px', fontSize: 11,
+              boxShadow: '0 4px 40px rgba(0,0,0,0.3)', borderRadius: 4,
+              position: 'relative', overflow: 'hidden'
             }}>
+              {/* Background Transparent Watermark */}
+              {logo && (
+                <div style={{
+                  position: 'absolute',
+                  top: '55%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  opacity: 0.15,
+                  width: '90%',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <img src={logo} alt="watermark" style={{ width: '100%', maxHeight: 500, objectFit: 'contain' }} />
+                </div>
+              )}
+
               {/* Quote Header */}
-              <div style={{ display: 'flex', gap: 20, alignItems: 'center', justifyContent: 'center', borderBottom: '2px solid #000000', paddingBottom: 15, marginBottom: 20 }}>
+              <div style={{ display: 'flex', gap: 20, alignItems: 'center', justifyContent: 'center', borderBottom: '2px solid #000000', paddingBottom: 10, marginBottom: 12, position: 'relative', zIndex: 1 }}>
                 <div style={{ flex: '0 0 200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   {logo ? (
                     <img src={logo} alt="Logo" style={{ maxHeight: 65, maxWidth: 180, objectFit: 'contain' }} />
@@ -627,39 +655,39 @@ const QuotationPage = () => {
               </div>
 
               {/* Title & Date */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 800, fontSize: 14, color: '#000000' }}>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontWeight: 800, fontSize: 12, color: '#000000' }}>
                   Quote: {clientCompany} And {companyName}
                 </div>
-                <div style={{ fontWeight: 800, fontSize: 12, color: '#000000', marginTop: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 11, color: '#000000', marginTop: 2 }}>
                   {quoteDate.split('-').reverse().join('.')}
                 </div>
               </div>
 
               {/* Bill To */}
-              <div style={{ marginBottom: 16, fontSize: 12, lineHeight: 1.4, color: '#000000' }}>
+              <div style={{ marginBottom: 10, fontSize: 11, lineHeight: 1.4, color: '#000000' }}>
                 <div style={{ fontWeight: 800 }}>M/s. {clientCompany}</div>
                 <div>{clientAddress}</div>
               </div>
 
               {/* Salutation & Opening Paragraph */}
-              <div style={{ marginBottom: 18, fontSize: 11, lineHeight: 1.4, color: '#000000' }}>
+              <div style={{ marginBottom: 12, fontSize: 10.5, lineHeight: 1.4, color: '#000000' }}>
                 <div style={{ fontWeight: 700, marginBottom: 2 }}>{salutation}</div>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>{greetings}</div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>{greetings}</div>
                 <p style={{ margin: 0 }}>{openingText}</p>
               </div>
 
               {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18, fontSize: 11, border: '1px solid #000000' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5, border: '1px solid #000000' }}>
                 <thead>
                   <tr style={{ background: '#81c784', border: '1px solid #000000' }}>
-                    <th colSpan={4} style={{ padding: '6px 10px', textAlign: 'center', color: '#000000', fontWeight: 800, fontSize: 12, textDecoration: 'underline', border: '1px solid #000000' }}>Quote</th>
+                    <th colSpan={4} style={{ padding: '4px 8px', textAlign: 'center', color: '#000000', fontWeight: 800, fontSize: 11, textDecoration: 'underline', border: '1px solid #000000' }}>Quote</th>
                   </tr>
                   <tr style={{ background: '#e2e8f0', color: '#000000', fontWeight: 700, border: '1px solid #000000' }}>
-                    <th style={{ padding: '6px 8px', textAlign: 'center', width: '8%', border: '1px solid #000000' }}>S.No</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'left', width: '56%', border: '1px solid #000000' }}>Description</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'center', width: '20%', border: '1px solid #000000' }}>Size</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'right', width: '16%', border: '1px solid #000000' }}>Charges</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'center', width: '8%', border: '1px solid #000000' }}>S.No</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'left', width: '56%', border: '1px solid #000000' }}>Description</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'center', width: '20%', border: '1px solid #000000' }}>Size</th>
+                    <th style={{ padding: '4px 6px', textAlign: 'right', width: '16%', border: '1px solid #000000' }}>Charges</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -667,67 +695,67 @@ const QuotationPage = () => {
                     const amt = Number(item.qty) * Number(item.rate) * (1 - Number(item.discount) / 100);
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid #000000' }}>
-                        <td style={{ padding: '6px 8px', textAlign: 'center', border: '1px solid #000000' }}>{idx + 1}</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'left', border: '1px solid #000000', whiteSpace: 'pre-line' }}>{item.description || '—'}</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'center', border: '1px solid #000000' }}>{item.unit || '—'}</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, border: '1px solid #000000' }}>{Number(amt).toFixed(2)}</td>
+                        <td style={{ padding: '4px 6px', textAlign: 'center', border: '1px solid #000000' }}>{idx + 1}</td>
+                        <td style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000', whiteSpace: 'pre-line' }}>{item.description || '—'}</td>
+                        <td style={{ padding: '4px 6px', textAlign: 'center', border: '1px solid #000000' }}>{item.unit || '—'}</td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 700, border: '1px solid #000000' }}>{Number(amt).toFixed(2)}</td>
                       </tr>
                     );
                   })}
-                  
+
                   {/* Totals */}
                   <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'left', border: '1px solid #000000' }}>Total</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', border: '1px solid #000000' }}>{Number(subtotal).toFixed(2)}</td>
+                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Total</td>
+                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(subtotal).toFixed(2)}</td>
                   </tr>
                   <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'left', border: '1px solid #000000' }}>Discount</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', border: '1px solid #000000' }}>{Number(discountAmt).toFixed(2)}</td>
+                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Discount</td>
+                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(discountAmt).toFixed(2)}</td>
                   </tr>
                   <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'left', border: '1px solid #000000' }}>Sub Total</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxableAmt).toFixed(2)}</td>
+                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Sub Total</td>
+                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxableAmt).toFixed(2)}</td>
                   </tr>
                   <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'left', border: '1px solid #000000' }}>CGST {(taxRate / 2)}%</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
+                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>CGST {(taxRate / 2)}%</td>
+                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
                   </tr>
                   <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'left', border: '1px solid #000000' }}>SGST {(taxRate / 2)}%</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
+                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>SGST {(taxRate / 2)}%</td>
+                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
                   </tr>
                   <tr style={{ fontWeight: 900, background: '#f8fafc' }}>
-                    <td colSpan={3} style={{ padding: '8px 8px', textAlign: 'left', fontSize: 12, border: '2px solid #000000' }}>Grand Total</td>
-                    <td style={{ padding: '8px 8px', textAlign: 'right', fontSize: 12, border: '2px solid #000000', color: '#2e7d32' }}>{Number(grandTotal).toFixed(2)}</td>
+                    <td colSpan={3} style={{ padding: '6px 6px', textAlign: 'left', fontSize: 11, border: '2px solid #000000' }}>Grand Total</td>
+                    <td style={{ padding: '6px 6px', textAlign: 'right', fontSize: 11, border: '2px solid #000000', color: '#2e7d32' }}>{Number(grandTotal).toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
 
               {/* Terms and Conditions */}
-              <div style={{ marginTop: 16, fontSize: 11, color: '#000000', lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 4 }}>Business Terms:</div>
+              <div style={{ marginTop: 10, fontSize: 10.5, color: '#000000', lineHeight: 1.35 }}>
+                <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 2 }}>Business Terms:</div>
                 {notes ? notes.split('\n').map((line, idx) => (
                   <div key={idx} style={{ paddingLeft: 10 }}>• {line}</div>
                 )) : '—'}
               </div>
 
-              <div style={{ marginTop: 12, fontSize: 11, color: '#000000', lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 4 }}>Payment Terms:</div>
+              <div style={{ marginTop: 8, fontSize: 10.5, color: '#000000', lineHeight: 1.35 }}>
+                <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 2 }}>Payment Terms:</div>
                 {terms ? terms.split('\n').map((line, idx) => (
                   <div key={idx} style={{ paddingLeft: 10 }}>{line}</div>
                 )) : '—'}
               </div>
 
               {/* Sign off and Bank Details */}
-              <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 11, color: '#000000' }}>
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: 10.5, color: '#000000' }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>Thanks & Regards</div>
-                  <div style={{ fontWeight: 800, marginTop: 4 }}>For M/s. {clientCompany} And {companyName}</div>
+                  <div style={{ fontWeight: 800, marginTop: 2 }}>For M/s. {clientCompany} And {companyName}</div>
                 </div>
 
                 {/* Account Details Box */}
-                <div style={{ border: '1px solid #000000', padding: '8px 14px', background: '#f8fafc', borderRadius: 4, minWidth: 260, fontSize: 10, lineHeight: 1.4 }}>
-                  <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 4 }}>Account Details</div>
+                <div style={{ border: '1px solid #000000', padding: '6px 12px', background: '#f8fafc', borderRadius: 4, minWidth: 260, fontSize: 9.5, lineHeight: 1.35 }}>
+                  <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 2 }}>Account Details</div>
                   <div><strong>Name of the bank :</strong> {bankName}</div>
                   <div><strong>Branch :</strong> {bankBranch}</div>
                   <div><strong>Acc No :</strong> {bankAccNo}</div>
@@ -737,14 +765,14 @@ const QuotationPage = () => {
               </div>
 
               {/* Signature Row */}
-              <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                 <div style={{ textAlign: 'center', minWidth: 160 }}>
                   {signature ? (
-                    <img src={signature} alt="Signature" style={{ height: 40, maxWidth: 120, objectFit: 'contain', marginBottom: 4 }} />
+                    <img src={signature} alt="Signature" style={{ height: 35, maxWidth: 120, objectFit: 'contain', marginBottom: 4 }} />
                   ) : (
-                    <div style={{ height: 35 }} />
+                    <div style={{ height: 30 }} />
                   )}
-                  <div style={{ borderTop: '1px solid #000000', paddingTop: 4, fontWeight: 700, fontSize: 10 }}>
+                  <div style={{ borderTop: '1px solid #000000', paddingTop: 2, fontWeight: 700, fontSize: 9.5 }}>
                     Authorised Signatory
                   </div>
                 </div>

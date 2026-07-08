@@ -28,6 +28,8 @@ app.use('/api/performance', require('./routes/performance'));
 app.use('/api/closed-sales', require('./routes/closedSales'));
 app.use('/api/designs', require('./routes/designs'));
 app.use('/api/audit-logs', require('./routes/auditLogs'));
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/chat', require('./routes/chat'));
 app.use('/uploads', require('express').static(require('path').join(__dirname, 'uploads')));
 
 // Health check
@@ -82,6 +84,7 @@ const startServer = async () => {
         // Core module permissions
         await Permission.upsert({ roleId: role.id, module: 'performance', screen: 'performance-view', ...fullAccess });
         await Permission.upsert({ roleId: role.id, module: 'closed_sales', screen: 'closed-sales-list', ...fullAccess });
+        await Permission.upsert({ roleId: role.id, module: 'attendance', screen: 'attendance-list', ...fullAccess });
 
         // Design module — view + create for all admin-level roles
         await Permission.upsert({ roleId: role.id, module: 'design', screen: 'design-list', ...fullAccess });

@@ -30,6 +30,10 @@ const Company = sequelize.define('Company', {
     type: DataTypes.BOOLEAN,
     defaultValue: true
   },
+  chatServerId: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
   createdById: {
     type: DataTypes.UUID,
     allowNull: true

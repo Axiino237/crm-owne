@@ -3,7 +3,7 @@ import {
   RiDashboardLine, RiTeamLine, RiShieldUserLine,
   RiKey2Line, RiBuildingLine, RiBuilding2Line,
   RiGroupLine, RiLogoutBoxLine, RiSettings4Line, RiStarLine,
-  RiOrganizationChart, RiTargetLine, RiFilePaper2Line, RiBarChart2Line, RiCheckboxCircleLine, RiDraftLine, RiPaletteLine, RiFileList2Line, RiCheckDoubleLine
+  RiOrganizationChart, RiTargetLine, RiFilePaper2Line, RiBarChart2Line, RiCheckboxCircleLine, RiDraftLine, RiPaletteLine, RiFileList2Line, RiCheckDoubleLine, RiCalendarLine, RiChat3Line
 } from 'react-icons/ri';
 import { useAuth } from '../context/AuthContext';
 import './Layout.css';
@@ -127,6 +127,40 @@ const Sidebar = () => {
           icon: <RiCheckDoubleLine />,
           label: 'Completed Models',
           show: hasPermission('design', 'completed-models-list', 'canView')
+        }
+      ]
+    },
+    {
+      section: 'HR Management',
+      items: [
+        {
+          to: '/attendance',
+          icon: <RiCalendarLine />,
+          label: 'Attendance Portal',
+          show: hasPermission('attendance', 'attendance-list', 'canView')
+        },
+        {
+          to: '/leaves',
+          icon: <RiFileList2Line />,
+          label: 'Leave Portal',
+          show: hasPermission('attendance', 'attendance-list', 'canView')
+        }
+      ]
+    },
+    {
+      section: 'Collaboration',
+      items: [
+        {
+          to: '/chat',
+          icon: <RiChat3Line />,
+          label: 'Chat Room',
+          show: hasPermission('attendance', 'attendance-list', 'canView')
+        },
+        {
+          to: '/chat-settings',
+          icon: <RiSettings4Line />,
+          label: 'Chat Workspaces',
+          show: hasPermission('attendance', 'attendance-list', 'canView')
         }
       ]
     }

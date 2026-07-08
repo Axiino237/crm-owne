@@ -57,6 +57,10 @@ const User = sequelize.define('User', {
   resetToken: DataTypes.STRING,
   resetTokenExpiry: DataTypes.DATE,
   lastLogin: DataTypes.DATE,
+  lastActiveAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
   createdById: {
     type: DataTypes.UUID,
     allowNull: true

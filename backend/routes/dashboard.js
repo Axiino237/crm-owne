@@ -56,6 +56,17 @@ router.get('/stats', async (req, res) => {
     const isDeptManager = userRole === 'dept_manager';
     const isRegular = userRole === 'user';
 
+    // Check if user is a department head via headId
+    const { Department } = require('../models');
+    const managedDept = !isSuper && !isOrgAdmin && !isCompanyAdmin
+      ? await Department.findOne({ where: { headId: req.user.id }, attributes: ['id'] })
+      : null;
+    const isDeptHead = !!managedDept;
+
+    // Combined: dept_manager role OR headId-based head gets team-level scoping
+    const hasTeamScope = isDeptManager || isDeptHead;
+    const scopedDeptId = managedDept?.id || req.user.departmentId;
+
     // Base scoping where clause for dashboard counts
     const countsWhere = {};
     if (!isSuper) {
@@ -67,9 +78,10 @@ router.get('/stats', async (req, res) => {
           attributes: ['id']
         })).map(u => u.id);
         countsWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else if (isDeptManager && req.user.departmentId) {
+      } else if (hasTeamScope && scopedDeptId) {
+        // dept_manager OR dept head → see their whole department's leads
         const deptUserIds = (await User.findAll({
-          where: { departmentId: req.user.departmentId },
+          where: { departmentId: scopedDeptId },
           attributes: ['id']
         })).map(u => u.id);
         countsWhere.assignedTo = { [Op.or]: [{ [Op.in]: deptUserIds }, null] };
@@ -100,7 +112,6 @@ router.get('/stats', async (req, res) => {
       isDesignTeam = true;
     }
     if (req.user.departmentId) {
-      const { Department } = require('../models');
       const dept = await Department.findByPk(req.user.departmentId);
       if (dept && (dept.name.toLowerCase().includes('design') || (dept.code && dept.code.toLowerCase().includes('design')))) {
         isDesignTeam = true;
@@ -114,9 +125,10 @@ router.get('/stats', async (req, res) => {
       } else if (isDesignTeam) {
         designOrderWhere.assignedDesignerId = req.user.id;
         if (req.user.organizationId) designOrderWhere.organizationId = req.user.organizationId;
-      } else if (isDeptManager && req.user.departmentId) {
+      } else if (hasTeamScope && scopedDeptId) {
+        // dept_manager OR dept head → see all design orders submitted by their dept
         const deptUserIds = (await User.findAll({
-          where: { departmentId: req.user.departmentId },
+          where: { departmentId: scopedDeptId },
           attributes: ['id']
         })).map(u => u.id);
         designOrderWhere.submittedBy = { [Op.in]: deptUserIds };
@@ -156,9 +168,10 @@ router.get('/stats', async (req, res) => {
         })).map(o => o.leadId).filter(Boolean);
         changeWhere.id = { [Op.in]: assignedLeadIds };
         if (req.user.organizationId) changeWhere.organizationId = req.user.organizationId;
-      } else if (isDeptManager && req.user.departmentId) {
+      } else if (hasTeamScope && scopedDeptId) {
+        // dept_manager OR dept head → see change designs for their dept
         const deptUserIds = (await User.findAll({
-          where: { departmentId: req.user.departmentId },
+          where: { departmentId: scopedDeptId },
           attributes: ['id']
         })).map(u => u.id);
         changeWhere.submittedBy = { [Op.in]: deptUserIds };

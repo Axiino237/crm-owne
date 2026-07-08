@@ -9,6 +9,11 @@ const Lead = require('./Lead');
 const Project = require('./Project');
 const DesignOrder = require('./DesignOrder');
 const AuditLog = require('./AuditLog');
+const Attendance = require('./Attendance');
+const LeaveRequest = require('./LeaveRequest');
+const Holiday = require('./Holiday');
+const ChatServer = require('./ChatServer');
+const ChatMessage = require('./ChatMessage');
 
 // ---- Associations ----
 
@@ -51,5 +56,27 @@ DesignOrder.belongsTo(User, { foreignKey: 'assignedDesignerId', as: 'designer', 
 AuditLog.belongsTo(User, { foreignKey: 'userId', as: 'user', constraints: false });
 User.hasMany(AuditLog, { foreignKey: 'userId', as: 'auditLogs' });
 
-module.exports = { User, Role, Permission, Organization, Company, Department, Lead, Project, DesignOrder, AuditLog };
+// Attendance associations
+Attendance.belongsTo(User, { foreignKey: 'userId', as: 'user', constraints: false });
+User.hasMany(Attendance, { foreignKey: 'userId', as: 'attendances' });
+Attendance.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization', constraints: false });
 
+// LeaveRequest associations
+LeaveRequest.belongsTo(User, { foreignKey: 'userId', as: 'user', constraints: false });
+User.hasMany(LeaveRequest, { foreignKey: 'userId', as: 'leaveRequests' });
+LeaveRequest.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver', constraints: false });
+
+// Holiday associations
+Holiday.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization', constraints: false });
+
+// ChatServer and ChatMessage associations
+ChatServer.hasMany(Company, { foreignKey: 'chatServerId', as: 'companies' });
+Company.belongsTo(ChatServer, { foreignKey: 'chatServerId', as: 'chatServer' });
+ChatMessage.belongsTo(User, { foreignKey: 'senderId', as: 'sender', constraints: false });
+ChatMessage.belongsTo(User, { foreignKey: 'receiverId', as: 'receiver', constraints: false });
+ChatMessage.belongsTo(ChatServer, { foreignKey: 'chatServerId', constraints: false });
+ChatMessage.belongsTo(Company, { foreignKey: 'companyId', constraints: false });
+
+module.exports = { 
+  User, Role, Permission, Organization, Company, Department, Lead, Project, DesignOrder, AuditLog, Attendance, LeaveRequest, Holiday, ChatServer, ChatMessage 
+};

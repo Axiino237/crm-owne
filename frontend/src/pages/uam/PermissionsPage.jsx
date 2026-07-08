@@ -9,7 +9,8 @@ import api from '../../api/axios';
 const MODULE_ICONS = {
   dashboard: '🏠', uam: '👥', roles: '🛡️',
   permissions: '🔑', organizations: '🏢', companies: '🏭',
-  departments: '🗂️', leads: '🎯', quotations: '📄'
+  departments: '🗂️', leads: '🎯', quotations: '📄',
+  attendance: '📅'
 };
 
 const ACTIONS = [

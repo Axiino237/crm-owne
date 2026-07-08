@@ -36,7 +36,8 @@ const MODULE_SCREENS = {
   quotations: ['quotations-list', 'quotation-create', 'quotation-export'],
   performance: ['performance-view'],
   closed_sales: ['closed-sales-list'],
-  design: ['design-list', 'my-projects-list', 'completed-models-list']
+  design: ['design-list', 'my-projects-list', 'completed-models-list'],
+  attendance: ['attendance-list']
 };
 
 // @desc    Get permissions for a role

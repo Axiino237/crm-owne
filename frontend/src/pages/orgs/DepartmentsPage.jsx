@@ -17,6 +17,7 @@ const DeptModal = ({ dept, onClose, onSaved }) => {
   const [orgs, setOrgs] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,9 +32,12 @@ const DeptModal = ({ dept, onClose, onSaved }) => {
   }, [form.organizationId]);
 
   useEffect(() => {
-    if (form.companyId) {
-      api.get(`/uam/users?limit=100`).then(r => setUsers(r.data.users || []));
-    }
+    if (!form.companyId) { setUsers([]); return; }
+    setUsersLoading(true);
+    api.get(`/uam/users?limit=200&companyId=${form.companyId}`)
+      .then(r => setUsers(r.data.users || []))
+      .catch(() => setUsers([]))
+      .finally(() => setUsersLoading(false));
   }, [form.companyId]);
 
   const handleSubmit = async (e) => {
@@ -61,14 +65,14 @@ const DeptModal = ({ dept, onClose, onSaved }) => {
             <div className="grid-2">
               <div className="form-group">
                 <label className="form-label">Organization *</label>
-                <select className="form-control" value={form.organizationId} onChange={e => setForm(p => ({ ...p, organizationId: e.target.value, companyId: '' }))} required disabled={!!dept} id="dept-org">
+                <select className="form-control" value={form.organizationId} onChange={e => setForm(p => ({ ...p, organizationId: e.target.value, companyId: '', headId: '' }))} required disabled={!!dept} id="dept-org">
                   <option value="">Select Organization</option>
                   {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Company *</label>
-                <select className="form-control" value={form.companyId} onChange={f('companyId')} required disabled={!!dept || !form.organizationId} id="dept-company">
+                <select className="form-control" value={form.companyId} onChange={e => setForm(p => ({ ...p, companyId: e.target.value, headId: '' }))} required disabled={!!dept || !form.organizationId} id="dept-company">
                   <option value="">Select Company</option>
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -82,19 +86,39 @@ const DeptModal = ({ dept, onClose, onSaved }) => {
               <label className="form-label">Description</label>
               <input className="form-control" value={form.description} onChange={f('description')} placeholder="Brief description..." id="dept-desc" />
             </div>
+
             <div className="form-group">
-              <label className="form-label">Department Head (optional)</label>
-              <select className="form-control" value={form.headId} onChange={f('headId')} id="dept-head">
-                <option value="">No Head Assigned</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                👑 Department Head
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', padding: '1px 7px', borderRadius: 10 }}>Sees all dept members' performance</span>
+              </label>
+              <select className="form-control" value={form.headId} onChange={f('headId')} id="dept-head" disabled={!form.companyId || usersLoading}>
+                <option value="">
+                  {!form.companyId ? '— Select a Company first —' : usersLoading ? 'Loading users...' : 'No Head Assigned'}
+                </option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>
+                    👤 {u.name} · {u.role?.name || 'No Role'} ({u.email})
+                  </option>
+                ))}
               </select>
+              {form.companyId && !usersLoading && users.length === 0 && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--warning, #f59e0b)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  ⚠️ No users found in this company — add users first via UAM → Users.
+                </div>
+              )}
+              {form.headId && users.find(u => u.id === form.headId) && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  👑 <strong>{users.find(u => u.id === form.headId)?.name}</strong> will be set as Department Head — they'll see this dept's team performance.
+                </div>
+              )}
             </div>
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading} id="dept-save-btn">
               {loading ? <div className="spinner spinner-sm" /> : null}
-              {dept ? 'Update' : 'Create Department'}
+              {dept ? 'Update Department' : 'Create Department'}
             </button>
           </div>
         </form>

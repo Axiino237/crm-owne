@@ -22,6 +22,10 @@ import DesignPage from './pages/design/DesignPage';
 import MyProjectsPage from './pages/design/MyProjectsPage';
 import CompletedModelsPage from './pages/design/CompletedModelsPage';
 import AuditLogsPage from './pages/uam/AuditLogsPage';
+import AttendancePage from './pages/AttendancePage';
+import LeavesPage from './pages/LeavesPage';
+import ChatPage from './pages/chat/ChatPage';
+import ChatSettingsPage from './pages/chat/ChatSettingsPage';
 
 const App = () => {
   return (
@@ -167,6 +171,34 @@ const App = () => {
           <Route path="/completed-models" element={
             <ProtectedRoute module="design" screen="completed-models-list" action="canView">
               <CompletedModelsPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Attendance Portal */}
+          <Route path="/attendance" element={
+            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+              <AttendancePage />
+            </ProtectedRoute>
+          } />
+
+          {/* Leaves Portal */}
+          <Route path="/leaves" element={
+            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+              <LeavesPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Chat room */}
+          <Route path="/chat" element={
+            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+              <ChatPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Chat settings */}
+          <Route path="/chat-settings" element={
+            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+              <ChatSettingsPage />
             </ProtectedRoute>
           } />
 
