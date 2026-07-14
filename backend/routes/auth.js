@@ -173,4 +173,64 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+// @route   PUT /api/auth/profile
+router.put('/profile', protect, async (req, res) => {
+  try {
+    const { name, avatar, currentPassword, newPassword } = req.body;
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const updates = {};
+    if (name) updates.name = name;
+    if (avatar !== undefined) updates.avatar = avatar;
+
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: 'Current password is required to change password' });
+      }
+      const isMatch = await user.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Incorrect current password' });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+      }
+      updates.password = newPassword;
+    }
+
+    await user.update(updates);
+    
+    // Fetch updated user without sensitive fields
+    const updatedUser = await User.findByPk(user.id, {
+      attributes: { exclude: ['password', 'resetOTP', 'resetOTPExpiry', 'resetToken', 'resetTokenExpiry'] },
+      include: [
+        { model: Role, as: 'role' },
+        { model: Organization, as: 'organization', attributes: ['id', 'name', 'code'] },
+        { model: Company, as: 'company', attributes: ['id', 'name', 'code'] },
+        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] }
+      ]
+    });
+
+    res.json({ success: true, message: 'Profile updated successfully', user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @route   PUT /api/auth/public-key
+router.put('/public-key', protect, async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+    if (!publicKey) {
+      return res.status(400).json({ success: false, message: 'Public key is required' });
+    }
+    await User.update({ publicKey }, { where: { id: req.user.id } });
+    res.json({ success: true, message: 'Public key updated successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;

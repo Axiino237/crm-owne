@@ -61,6 +61,10 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: true
   },
+  publicKey: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   createdById: {
     type: DataTypes.UUID,
     allowNull: true

@@ -10,7 +10,7 @@ const MODULE_ICONS = {
   dashboard: '🏠', uam: '👥', roles: '🛡️',
   permissions: '🔑', organizations: '🏢', companies: '🏭',
   departments: '🗂️', leads: '🎯', quotations: '📄',
-  attendance: '📅'
+  attendance: '📅', chat: '💬'
 };
 
 const ACTIONS = [

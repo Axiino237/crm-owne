@@ -148,6 +148,20 @@ router.put('/:id/assign', checkPermission('design', 'design-list', 'canEdit'), a
       ]
     });
 
+    // Emit real-time project assignment notification to the assigned designer
+    if (designerId) {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user_${designerId}`).emit('project_assigned', {
+          orderId: order.id,
+          companyName: order.companyName,
+          assignedBy: req.user.name,
+          deadline: endTime || null,
+          message: `You have been assigned a new design project: "${order.companyName}"`
+        });
+      }
+    }
+
     res.json({ success: true, order: updatedOrder });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
@@ -289,6 +303,14 @@ router.put('/:id/status', async (req, res, next) => {
 // Upload final design model file when marking as completed
 router.post('/:id/complete-model', uploadModel.single('model'), async (req, res) => {
   try {
+    // ⛔ Block if no file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'A design model file is required to mark as completed. Please upload a file.'
+      });
+    }
+
     const order = await DesignOrder.findByPk(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: 'Design order not found' });
 
@@ -298,7 +320,7 @@ router.post('/:id/complete-model', uploadModel.single('model'), async (req, res)
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
 
-    const modelUrl = req.file ? `/uploads/completed-models/${req.file.filename}` : null;
+    const modelUrl = `/uploads/completed-models/${req.file.filename}`;
     const completedAt = new Date();
 
     await order.update({

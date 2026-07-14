@@ -1,13 +1,84 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const socketIo = require('socket.io');
 const { connectDB } = require('./config/db');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://178.238.236.200', 'http://crm.178-238-236-200.sslip.io'],
+    credentials: true
+  }
+});
+
+// Map of active users: userId -> Set(socket.id)
+const activeUsers = new Map();
+
+// Configure socket authentication middleware
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (!token) return next(new Error('Authentication error: Token missing'));
+
+  try {
+    const jwt = require('jsonwebtoken');
+    const { User, Role } = require('./models');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const user = await User.findByPk(decoded.id, {
+      include: [{ model: Role, as: 'role' }]
+    });
+
+    if (!user || !user.isActive) {
+      return next(new Error('Authentication error: Invalid or inactive user'));
+    }
+
+    socket.user = user;
+    next();
+  } catch (err) {
+    return next(new Error('Authentication error: Token invalid'));
+  }
+});
+
+// Connection handler
+io.on('connection', (socket) => {
+  const userId = socket.user.id;
+  
+  if (!activeUsers.has(userId)) {
+    activeUsers.set(userId, new Set());
+    // Broadcast user online status change
+    io.emit('status_change', { userId, isOnline: true });
+  }
+  activeUsers.get(userId).add(socket.id);
+
+  // Join rooms for easy broadcasting
+  socket.join(`org_${socket.user.organizationId}`);
+  if (socket.user.companyId) {
+    socket.join(`company_${socket.user.companyId}`);
+  }
+
+  socket.on('disconnect', () => {
+    const userSockets = activeUsers.get(userId);
+    if (userSockets) {
+      userSockets.delete(socket.id);
+      if (userSockets.size === 0) {
+        activeUsers.delete(userId);
+        // Broadcast user offline status change
+        io.emit('status_change', { userId, isOnline: false });
+      }
+    }
+  });
+});
+
+// Attach socket objects to express app
+app.set('io', io);
+app.set('activeUsers', activeUsers);
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://178.238.236.200', 'http://crm.178-238-236-200.sslip.io'],
   credentials: true
 }));
 app.use(express.json());
@@ -55,7 +126,7 @@ const startServer = async () => {
   // Wait for DB connection + ALTER TYPE + sync to complete
   await connectDB();
 
-  app.listen(PORT, async () => {
+  server.listen(PORT, async () => {
     console.log(`\n🚀 CRM Server running on http://localhost:${PORT}`);
     console.log(`📋 API Docs: http://localhost:${PORT}/api/health\n`);
 
@@ -85,6 +156,10 @@ const startServer = async () => {
         await Permission.upsert({ roleId: role.id, module: 'performance', screen: 'performance-view', ...fullAccess });
         await Permission.upsert({ roleId: role.id, module: 'closed_sales', screen: 'closed-sales-list', ...fullAccess });
         await Permission.upsert({ roleId: role.id, module: 'attendance', screen: 'attendance-list', ...fullAccess });
+
+        // Chat module permissions
+        await Permission.upsert({ roleId: role.id, module: 'chat', screen: 'chat-room', ...fullAccess });
+        await Permission.upsert({ roleId: role.id, module: 'chat', screen: 'chat-workspaces', ...fullAccess });
 
         // Design module — view + create for all admin-level roles
         await Permission.upsert({ roleId: role.id, module: 'design', screen: 'design-list', ...fullAccess });

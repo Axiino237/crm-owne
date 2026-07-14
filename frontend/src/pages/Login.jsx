@@ -213,11 +213,6 @@ const LoginPage = () => {
                 {loginLoading ? <div className="spinner spinner-sm" /> : '🔐'}
                 {loginLoading ? 'Signing in...' : 'Sign In'}
               </button>
-
-              <div className="login-demo">
-                <p>Default Super Admin credentials:</p>
-                <code>superadmin@crm.com / SuperAdmin@123</code>
-              </div>
             </form>
           )}
 

@@ -157,13 +157,52 @@ router.delete('/users/:id', checkPermission('uam', 'users-list', 'canDelete'), a
     if (user.isSuperAdmin) return res.status(403).json({ success: false, message: 'Cannot delete Super Admin' });
     if (user.id === req.user.id) return res.status(400).json({ success: false, message: 'Cannot delete your own account' });
 
+    const userId = user.id;
+    const {
+      Attendance, Lead, DesignOrder, LeaveRequest,
+      ChatMessage, AuditLog
+    } = require('../models');
+
+    // 1. Delete records that cannot have null userId (allowNull: false)
+    if (Attendance) {
+      await Attendance.destroy({ where: { userId } }).catch(err => console.error('Error deleting user attendance:', err.message));
+    }
+    if (LeaveRequest) {
+      await LeaveRequest.destroy({ where: { userId } }).catch(err => console.error('Error deleting user leave requests:', err.message));
+      await LeaveRequest.update({ approvedBy: null }, { where: { approvedBy: userId } }).catch(err => console.error('Error nullifying leave approvals:', err.message));
+    }
+    if (ChatMessage) {
+      await ChatMessage.destroy({ 
+        where: { 
+          [Op.or]: [
+            { senderId: userId },
+            { receiverId: userId }
+          ] 
+        } 
+      }).catch(err => console.error('Error deleting user chat messages:', err.message));
+    }
+
+    // 2. Nullify records that allow null userId (allowNull: true)
+    if (Lead) {
+      await Lead.update({ assignedTo: null }, { where: { assignedTo: userId } }).catch(err => console.error('Error nullifying lead assignment:', err.message));
+    }
+    if (DesignOrder) {
+      await DesignOrder.update({ assignedDesignerId: null }, { where: { assignedDesignerId: userId } }).catch(err => console.error('Error nullifying design designer:', err.message));
+      await DesignOrder.update({ submittedBy: null }, { where: { submittedBy: userId } }).catch(err => console.error('Error nullifying design submitter:', err.message));
+    }
+    if (AuditLog) {
+      await AuditLog.update({ userId: null }, { where: { userId } }).catch(err => console.error('Error nullifying audit logs:', err.message));
+    }
+
+    // 3. Now safely delete the user
     await user.destroy();
 
     const { logAction } = require('../utils/auditLogger');
-    await logAction(req, 'DELETE', 'uam', user.id, user.name, `Deleted user ${user.name} (${user.email})`);
+    await logAction(req, 'DELETE', 'uam', userId, user.name, `Deleted user ${user.name} (${user.email})`);
 
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
+    console.error('User delete failed:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });

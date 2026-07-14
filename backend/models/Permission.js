@@ -12,7 +12,7 @@ const Permission = sequelize.define('Permission', {
     allowNull: false
   },
   module: {
-    type: DataTypes.ENUM('dashboard', 'uam', 'roles', 'permissions', 'organizations', 'companies', 'departments', 'leads', 'quotations', 'performance', 'closed_sales', 'design'),
+    type: DataTypes.ENUM('dashboard', 'uam', 'roles', 'permissions', 'organizations', 'companies', 'departments', 'leads', 'quotations', 'performance', 'closed_sales', 'design', 'chat', 'attendance'),
     allowNull: false
   },
   screen: {
@@ -34,7 +34,9 @@ const Permission = sequelize.define('Permission', {
       'performance-view',
       'closed-sales-list',
       'design-list',
-      'my-projects-list', 'completed-models-list'
+      'my-projects-list', 'completed-models-list',
+      'chat-room', 'chat-workspaces',
+      'attendance-list'
     ),
     allowNull: false
   },

@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
+import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { 
-  RiChat3Line, RiSendPlane2Line, RiUserLine, RiBuildingLine, RiFolderUserLine, RiUserSmileLine
+  RiChat3Line, RiSendPlane2Line, RiUserLine, RiBuildingLine, RiFolderUserLine, RiUserSmileLine, RiShieldKeyholeLine, RiLock2Line, RiLockUnlockLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
@@ -9,11 +11,158 @@ import {
   useGetChatServersQuery,
   useGetChatMessagesQuery,
   useGetChatMembersQuery,
-  useSendChatMessageMutation
+  useSendChatMessageMutation,
+  apiSlice
 } from '../../store/apiSlice';
+import api from '../../api/axios';
+import { generateE2EEKeys, encryptE2EEMessage, decryptE2EEMessage } from '../../utils/crypto';
+
+// Sub-component to handle E2EE decryption asynchronously
+const DecryptedMessage = ({ rawMessage, privateKeyJwk, isSender }) => {
+  const [decryptedText, setDecryptedText] = useState('Decrypting secure message...');
+
+  useEffect(() => {
+    const decrypt = async () => {
+      if (!privateKeyJwk) {
+        setDecryptedText('🔑 [Encrypted Message - Private key missing]');
+        return;
+      }
+      try {
+        const decrypted = await decryptE2EEMessage(rawMessage, privateKeyJwk, isSender);
+        setDecryptedText(decrypted);
+      } catch (e) {
+        setDecryptedText(rawMessage);
+      }
+    };
+    decrypt();
+  }, [rawMessage, privateKeyJwk, isSender]);
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {rawMessage.startsWith('{"encryptedPayload"') && <RiLock2Line style={{ color: 'var(--success)', display: 'inline', fontSize: '0.85rem' }} />}
+      {decryptedText}
+    </span>
+  );
+};
 
 const ChatPage = () => {
   const { user } = useAuth();
+  const dispatch = useDispatch();
+
+  // E2EE Keys state
+  const [privateKeyJwk, setPrivateKeyJwk] = useState(null);
+  const [publicKeyJwk, setPublicKeyJwk] = useState(null);
+
+  // Track the currently active channel for notification filtering
+  const activeChannelRef = useRef(null);
+
+  // Initialize E2EE Keys
+  useEffect(() => {
+    const initKeys = async () => {
+      if (!user) return;
+      const pubKeyName = `e2ee_public_key_${user.id}`;
+      const privKeyName = `e2ee_private_key_${user.id}`;
+      
+      let pubKey = localStorage.getItem(pubKeyName);
+      let privKey = localStorage.getItem(privKeyName);
+      
+      if (!pubKey || !privKey) {
+        try {
+          const keys = await generateE2EEKeys();
+          localStorage.setItem(pubKeyName, JSON.stringify(keys.publicKeyJwk));
+          localStorage.setItem(privKeyName, JSON.stringify(keys.privateKeyJwk));
+          pubKey = JSON.stringify(keys.publicKeyJwk);
+          privKey = JSON.stringify(keys.privateKeyJwk);
+        } catch (e) {
+          console.error("Failed to generate E2EE keys", e);
+          return;
+        }
+      }
+      
+      setPrivateKeyJwk(JSON.parse(privKey));
+      setPublicKeyJwk(JSON.parse(pubKey));
+      
+      // Upload public key to backend if it's missing or changed
+      if (user && user.publicKey !== pubKey) {
+        try {
+          await api.put('/auth/public-key', { publicKey: pubKey });
+        } catch (e) {
+          console.error("Failed to upload public key", e);
+        }
+      }
+    };
+    initKeys();
+  }, [user]);
+
+  // Request browser notification permission once on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Socket.io connection for real-time updates
+  useEffect(() => {
+    const token = localStorage.getItem('crm_token');
+    if (!token) return;
+
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', {
+      auth: { token }
+    });
+
+    socket.on('connect', () => {
+      console.log('✅ Connected to WebSocket Server');
+    });
+
+    socket.on('new_message', (data) => {
+      // Instantly refresh message cache
+      dispatch(apiSlice.util.invalidateTags(['ChatMessages']));
+
+      // Fire system notification if the tab is hidden or user is in a different channel
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const isTabHidden = document.hidden;
+        const isSameChannel = activeChannelRef.current &&
+          data.channelId && activeChannelRef.current === data.channelId;
+        
+        if (isTabHidden || !isSameChannel) {
+          const senderName = data.senderName || 'Someone';
+          const channelName = data.channelName || 'a channel';
+          const preview = data.isEncrypted ? '🔒 Encrypted message' : (data.preview || 'Sent you a message');
+
+          const notification = new Notification(`💬 New message from ${senderName}`, {
+            body: `${channelName}: ${preview}`,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: `chat-${data.channelId || 'general'}`,
+            requireInteraction: false,
+            silent: false,
+          });
+
+          // Click the notification to focus and navigate to the CRM
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+
+          // Auto-close after 5 seconds
+          setTimeout(() => notification.close(), 5000);
+        }
+      }
+    });
+
+    socket.on('status_change', (data) => {
+      // Instantly refresh members cache
+      dispatch(apiSlice.util.invalidateTags(['ChatMembers']));
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('WebSocket connection error:', err);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [dispatch]);
   
   // Selected Channel state: 
   // can be:
@@ -37,7 +186,7 @@ const ChatPage = () => {
 
   // Fetch members in this workspace context
   const { data: membersData, isLoading: loadingMembers } = useGetChatMembersQuery(undefined, {
-    pollingInterval: 3000 // Refresh active members and online/offline status dots every 3s
+    pollingInterval: 15000 // Refresh active members and online/offline status dots as a safety fallback
   });
   const members = membersData?.members || [];
 
@@ -66,10 +215,10 @@ const ChatPage = () => {
 
   const skipQuery = !selectedChannel;
 
-  // Fetch messages with 3-second polling interval (real-time chat updates!)
+  // Fetch messages with 15-second fallback polling interval
   const { data: messagesData, isLoading: loadingMessages } = useGetChatMessagesQuery(queryParams, {
     skip: skipQuery,
-    pollingInterval: 3000
+    pollingInterval: 15000
   });
   const messages = messagesData?.messages || [];
 
@@ -84,9 +233,32 @@ const ChatPage = () => {
     e.preventDefault();
     if (!messageText.trim() || !selectedChannel) return;
 
+    let msgToSend = messageText;
+    let isEncrypted = false;
+
+    if (selectedChannel.type === 'dm') {
+      const receiver = members.find(m => m.id === selectedChannel.id);
+      if (receiver && receiver.publicKey && publicKeyJwk) {
+        try {
+          msgToSend = await encryptE2EEMessage(
+            messageText,
+            JSON.parse(receiver.publicKey),
+            publicKeyJwk
+          );
+          isEncrypted = true;
+        } catch (error) {
+          toast.error('Encryption failed. Message not sent for your security.');
+          return;
+        }
+      } else {
+        toast.error('Cannot send: recipient has not registered encryption keys yet. Ask them to open the Chat page.', { duration: 5000 });
+        return;
+      }
+    }
+
     try {
       await sendMessage({
-        message: messageText,
+        message: msgToSend,
         chatServerId: selectedChannel.type === 'server' ? selectedChannel.id : null,
         companyId: selectedChannel.type === 'company' ? selectedChannel.id : null,
         receiverId: selectedChannel.type === 'dm' ? selectedChannel.id : null
@@ -100,6 +272,15 @@ const ChatPage = () => {
   const selectDirectMessage = (member) => {
     setSelectedChannel({ type: 'dm', id: member.id, name: member.name });
   };
+
+  const activeDMRecipient = selectedChannel?.type === 'dm' ? members.find(m => m.id === selectedChannel.id) : null;
+  const isE2EEDM = activeDMRecipient && activeDMRecipient.publicKey && publicKeyJwk;
+
+  const placeholderText = selectedChannel 
+    ? (selectedChannel.type === 'dm' 
+        ? (isE2EEDM ? `🔒 Send secure E2EE message to ${selectedChannel.name}...` : `🔓 Send message to ${selectedChannel.name}... (receiver has no keys)`)
+        : `Send message to # ${selectedChannel.name}...`)
+    : 'Select a channel or member...';
 
   return (
     <AppLayout title="Collaboration Chat Room">
@@ -245,18 +426,34 @@ const ChatPage = () => {
             background: 'var(--bg-secondary)', 
             display: 'flex', 
             alignItems: 'center', 
+            justifyContent: 'space-between',
             gap: 10 
           }}>
-            <RiChat3Line style={{ color: 'var(--accent)', fontSize: '1.25rem' }} />
-            <div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                # {selectedChannel ? selectedChannel.name : 'Loading Channel...'}
-              </h3>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                {selectedChannel?.type === 'server' ? `Shared Server workspace: ${userServer?.name || 'Default'}` : 
-                 selectedChannel?.type === 'company' ? 'Private isolated company channel' : 'Direct Message session'}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <RiChat3Line style={{ color: 'var(--accent)', fontSize: '1.25rem' }} />
+              <div>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  # {selectedChannel ? selectedChannel.name : 'Loading Channel...'}
+                </h3>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {selectedChannel?.type === 'server' ? `Shared Server workspace: ${userServer?.name || 'Default'}` : 
+                   selectedChannel?.type === 'company' ? 'Private isolated company channel' : 'Direct Message session'}
+                </span>
+              </div>
             </div>
+
+            {/* E2EE Badge */}
+            {selectedChannel?.type === 'dm' && (
+              isE2EEDM ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--success)', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.1)', padding: '4px 10px', borderRadius: 20, fontWeight: 700 }}>
+                  <RiLock2Line /> End-to-End Encrypted
+                </span>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#f59e0b', fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', padding: '4px 10px', borderRadius: 20, fontWeight: 700 }} title="Recipient must open Chat page to register their encryption keys.">
+                  <RiLock2Line /> Waiting for recipient keys...
+                </span>
+              )
+            )}
           </div>
 
           {/* Messages Feed */}
@@ -291,18 +488,18 @@ const ChatPage = () => {
                   }}>
                     {/* Avatar */}
                     <div style={{ 
-                      width: 36, 
-                      height: 36, 
-                      borderRadius: '50%', 
-                      background: isMe ? 'var(--accent)' : 'var(--bg-secondary)', 
-                      color: isMe ? '#ffffff' : 'var(--text-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.78rem',
-                      fontWeight: 800,
-                      border: '1px solid var(--border)',
-                      flexShrink: 0
+                       width: 36, 
+                       height: 36, 
+                       borderRadius: '50%', 
+                       background: isMe ? 'var(--accent)' : 'var(--bg-secondary)', 
+                       color: isMe ? '#ffffff' : 'var(--text-primary)',
+                       display: 'flex',
+                       alignItems: 'center',
+                       justifyContent: 'center',
+                       fontSize: '0.78rem',
+                       fontWeight: 800,
+                       border: '1px solid var(--border)',
+                       flexShrink: 0
                     }}>
                       {initials}
                     </div>
@@ -341,7 +538,15 @@ const ChatPage = () => {
                         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                         border: isMe ? 'none' : '1px solid var(--border)'
                       }}>
-                        {msg.message}
+                        {msg.receiverId ? (
+                          <DecryptedMessage 
+                            rawMessage={msg.message} 
+                            privateKeyJwk={privateKeyJwk} 
+                            isSender={msg.senderId === user?.id} 
+                          />
+                        ) : (
+                          msg.message
+                        )}
                       </div>
                     </div>
                   </div>
@@ -362,7 +567,7 @@ const ChatPage = () => {
             <input 
               type="text" 
               className="form-control" 
-              placeholder={selectedChannel ? `Send message to # ${selectedChannel.name}...` : 'Select a channel or member...'}
+              placeholder={placeholderText}
               value={messageText}
               onChange={e => setMessageText(e.target.value)}
               disabled={!selectedChannel || sending}

@@ -4,6 +4,34 @@ const { ChatServer, ChatMessage, Company, User, Role, Department } = require('..
 const { protect, adminOnly } = require('../middleware/auth');
 const { Op } = require('sequelize');
 
+// Helper to broadcast new messages via Socket.io
+const emitChatMessage = (req, msg) => {
+  const io = req.app.get('io');
+  const activeUsers = req.app.get('activeUsers');
+  if (!io) return;
+
+  const event = { type: 'new_message', message: msg };
+
+  if (msg.receiverId) {
+    // Direct Message: emit to sender and receiver socket connections
+    const recipients = [msg.senderId, msg.receiverId];
+    recipients.forEach(uid => {
+      const socketIds = activeUsers.get(uid);
+      if (socketIds) {
+        socketIds.forEach(sid => {
+          io.to(sid).emit('new_message', event);
+        });
+      }
+    });
+  } else if (msg.companyId) {
+    // Company Channel: emit to company room
+    io.to(`company_${msg.companyId}`).emit('new_message', event);
+  } else if (msg.chatServerId) {
+    // Global Chat: emit to organization room
+    io.to(`org_${msg.organizationId}`).emit('new_message', event);
+  }
+};
+
 router.use(protect);
 
 // Helper to get organizationId (with fallback for Super Admin)
@@ -263,6 +291,9 @@ router.post('/message', async (req, res) => {
       ]
     });
 
+    // Broadcast message via Socket.io in real-time
+    emitChatMessage(req, msg);
+
     res.status(201).json({ success: true, message: msg });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error sending message', error: error.message });
@@ -308,7 +339,7 @@ router.get('/members', async (req, res) => {
         isActive: true,
         id: { [Op.ne]: req.user.id } // Exclude myself from member list for cleaner DMs listing
       },
-      attributes: ['id', 'name', 'email', 'avatar', 'lastActiveAt'],
+      attributes: ['id', 'name', 'email', 'avatar', 'lastActiveAt', 'publicKey'],
       include: [
         { model: Company, as: 'company', attributes: ['id', 'name'] },
         { model: Role, as: 'role', attributes: ['id', 'name'] },
@@ -317,9 +348,10 @@ router.get('/members', async (req, res) => {
       order: [['name', 'ASC']]
     });
 
+    const activeUsers = req.app.get('activeUsers');
     const cutoff = new Date(Date.now() - 180000); // 3 minutes ago
     const members = users.map(u => {
-      const isOnline = u.lastActiveAt && new Date(u.lastActiveAt) > cutoff;
+      const isOnline = (activeUsers && activeUsers.has(u.id)) || (u.lastActiveAt && new Date(u.lastActiveAt) > cutoff);
       return {
         id: u.id,
         name: u.name,
@@ -327,7 +359,8 @@ router.get('/members', async (req, res) => {
         companyName: u.company?.name || 'Unassigned',
         roleName: u.role?.name || 'User',
         deptName: u.department?.name || 'Unassigned',
-        isOnline: !!isOnline
+        isOnline: !!isOnline,
+        publicKey: u.publicKey
       };
     });
 

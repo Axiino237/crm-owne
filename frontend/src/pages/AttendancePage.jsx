@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { 
   RiLoginBoxLine, RiLogoutBoxLine, 
@@ -32,6 +32,11 @@ const AttendancePage = () => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState('All');
+
   // RTK Query hooks
   const { data: summaryData, isLoading: loadingSummary } = useGetMySummaryQuery({ year: currentYear, month: currentMonth });
   const logs = summaryData?.logs || [];
@@ -43,6 +48,48 @@ const AttendancePage = () => {
     skip: !isAdmin && !hasTeamAccess
   });
   const teamAttendance = teamData?.teamAttendance || [];
+
+  // Calculate departments list dynamically from team attendance logs
+  const departmentsList = ['All', ...new Set(teamAttendance.map(m => m.department).filter(Boolean))];
+
+  // Filter team attendance logs
+  const filteredTeamAttendance = teamAttendance.filter(member => {
+    const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (member.role && member.role.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesDept = selectedDept === 'All' || member.department === selectedDept;
+
+    const statusStr = member.log ? member.log.status : 'absent';
+    const matchesStatus = selectedStatus === 'All' || statusStr === selectedStatus;
+
+    return matchesSearch && matchesDept && matchesStatus;
+  });
+
+  // Client-side CSV export function
+  const handleExportCSV = () => {
+    const headers = ['Member Name', 'Department', 'Role', 'Check-in Time', 'Check-out Time', 'Work Duration', 'Status'];
+    const rows = filteredTeamAttendance.map(member => [
+      member.name,
+      member.department || 'Unassigned',
+      member.role || 'User',
+      member.log?.checkIn ? new Date(member.log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
+      member.log?.checkOut ? new Date(member.log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
+      member.log ? calculateDuration(member.log.checkIn, member.log.checkOut) : '-',
+      member.log ? member.log.status.toUpperCase() : 'ABSENT'
+    ]);
+
+    const csvString = [headers.join(','), ...rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const dateStr = new Date().toLocaleDateString('en-CA');
+    link.setAttribute("download", `attendance_report_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Attendance report exported successfully!');
+  };
 
   const { data: holidaysData } = useGetAllHolidaysQuery(undefined, {
     skip: !isAdmin
@@ -69,14 +116,61 @@ const AttendancePage = () => {
   };
 
   // Handle check-out
-  const handleCheckOut = async () => {
+  const handleCheckOut = useCallback(async () => {
     try {
       const res = await checkOut().unwrap();
       toast.success(res.message || 'Checked out successfully!');
     } catch (err) {
       toast.error(err.data?.message || 'Check-out failed');
     }
+  }, [checkOut]);
+
+  // ── Auto-checkout timer (8 hours from check-in) ───────────────────────────
+  const AUTO_CHECKOUT_MS = 8 * 60 * 60 * 1000;
+  const WARN_BEFORE_MS   = 15 * 60 * 1000;
+  const [extensionMs, setExtensionMs]             = useState(0);
+  const [timeLeft, setTimeLeft]                   = useState(null);
+  const [showExtendWarning, setShowExtendWarning] = useState(false);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (!todayLog?.checkIn || todayLog?.checkOut) {
+      clearInterval(intervalRef.current);
+      setTimeLeft(null);
+      setShowExtendWarning(false);
+      return;
+    }
+    const checkInTime = new Date(todayLog.checkIn).getTime();
+    const tick = () => {
+      const remaining = (checkInTime + AUTO_CHECKOUT_MS + extensionMs) - Date.now();
+      setTimeLeft(remaining);
+      if (remaining <= WARN_BEFORE_MS && remaining > 0) setShowExtendWarning(true);
+      if (remaining <= 0) {
+        clearInterval(intervalRef.current);
+        setShowExtendWarning(false);
+        handleCheckOut();
+      }
+    };
+    tick();
+    intervalRef.current = setInterval(tick, 1000);
+    return () => clearInterval(intervalRef.current);
+  }, [todayLog?.checkIn, todayLog?.checkOut, extensionMs, handleCheckOut]);
+
+  const handleExtend = (extraMinutes) => {
+    setExtensionMs(prev => prev + extraMinutes * 60 * 1000);
+    setShowExtendWarning(false);
+    toast.success(`⏰ Session extended by ${extraMinutes} minutes!`);
   };
+
+  const formatTimeLeft = (ms) => {
+    if (!ms || ms <= 0) return '00:00:00';
+    const totalSecs = Math.floor(ms / 1000);
+    const hrs  = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+    return `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Admin holiday actions
   const handleAddHoliday = async (e) => {
@@ -237,9 +331,51 @@ const AttendancePage = () => {
                       </div>
                     </>
                   ) : (
-                    <button className="btn btn-outline-danger" onClick={handleCheckOut} style={{ width: '100%', marginTop: 8 }}>
-                      <RiLogoutBoxLine /> Check Out Now
-                    </button>
+                    <>
+                      {/* Countdown Timer */}
+                      {timeLeft !== null && (
+                        <div style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 12px', borderRadius: 8,
+                          background: timeLeft < WARN_BEFORE_MS ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.07)',
+                          border: `1px solid ${timeLeft < WARN_BEFORE_MS ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)'}`
+                        }}>
+                          <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            ⏱ Auto-checkout in
+                          </span>
+                          <span style={{ fontWeight: 800, fontSize: '1rem', fontFamily: 'monospace', letterSpacing: '0.06em', color: timeLeft < WARN_BEFORE_MS ? '#ef4444' : '#10b981' }}>
+                            {formatTimeLeft(timeLeft)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Extend Warning Banner */}
+                      {showExtendWarning && (
+                        <div style={{ padding: '12px 14px', borderRadius: 10, border: '1.5px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.07)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f59e0b', marginBottom: 8 }}>
+                            ⚠️ Auto-checkout soon! Extend session?
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => handleExtend(30)}
+                              style={{ flex: 1, padding: '7px 0', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: 8, color: '#f59e0b', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}>
+                              +30 min
+                            </button>
+                            <button onClick={() => handleExtend(60)}
+                              style={{ flex: 1, padding: '7px 0', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: 8, color: '#f59e0b', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}>
+                              +1 hour
+                            </button>
+                            <button onClick={() => setShowExtendWarning(false)}
+                              style={{ padding: '7px 10px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-muted)', fontWeight: 600, cursor: 'pointer', fontSize: '0.78rem' }}>
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <button className="btn btn-outline-danger" onClick={handleCheckOut} style={{ width: '100%', marginTop: 4 }}>
+                        <RiLogoutBoxLine /> Check Out Now
+                      </button>
+                    </>
                   )}
                 </div>
               ) : (
@@ -419,8 +555,91 @@ const AttendancePage = () => {
               <button className="btn btn-outline btn-sm" onClick={refetchTeamData}>Refresh Logs</button>
             </div>
 
+            {/* Filter Bar */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 16,
+              marginBottom: 20,
+              padding: '16px',
+              background: 'var(--bg-secondary)',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              alignItems: 'center'
+            }}>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Search Member / Role</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="Search by name or role..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                />
+              </div>
+              
+              <div style={{ flex: '1 1 150px' }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Department</label>
+                <select 
+                  className="form-control" 
+                  value={selectedDept}
+                  onChange={e => setSelectedDept(e.target.value)}
+                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                >
+                  {departmentsList.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ flex: '1 1 150px' }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Presence Status</label>
+                <select 
+                  className="form-control" 
+                  value={selectedStatus}
+                  onChange={e => setSelectedStatus(e.target.value)}
+                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="present">Present</option>
+                  <option value="late">Late Arrival</option>
+                  <option value="half_day">Half Day</option>
+                  <option value="absent">Absent</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-end', marginLeft: 'auto' }}>
+                <button 
+                  type="button"
+                  className="btn btn-outline btn-sm" 
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedDept('All');
+                    setSelectedStatus('All');
+                  }}
+                  style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+                >
+                  Reset
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-primary btn-sm" 
+                  onClick={handleExportCSV}
+                  disabled={filteredTeamAttendance.length === 0}
+                  style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  📥 Export CSV ({filteredTeamAttendance.length})
+                </button>
+              </div>
+            </div>
+
             {loadingTeam ? (
               <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner" /></div>
+            ) : filteredTeamAttendance.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                No attendance logs found matching the selected filters.
+              </div>
             ) : (
               <div className="table-wrapper">
                 <table className="table">
@@ -436,7 +655,7 @@ const AttendancePage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {teamAttendance.map(member => (
+                    {filteredTeamAttendance.map(member => (
                       <tr key={member.id}>
                         <td style={{ fontWeight: 700 }}>{member.name}</td>
                         <td>{member.department}</td>

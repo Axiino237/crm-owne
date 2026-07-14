@@ -26,6 +26,7 @@ import AttendancePage from './pages/AttendancePage';
 import LeavesPage from './pages/LeavesPage';
 import ChatPage from './pages/chat/ChatPage';
 import ChatSettingsPage from './pages/chat/ChatSettingsPage';
+import ProfilePage from './pages/ProfilePage';
 
 const App = () => {
   return (
@@ -199,6 +200,13 @@ const App = () => {
           <Route path="/chat-settings" element={
             <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
               <ChatSettingsPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Profile settings */}
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           } />
 

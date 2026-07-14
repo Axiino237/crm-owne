@@ -107,6 +107,8 @@ router.put('/:id', adminOnly, checkPermission('roles', 'roles-list', 'canEdit'),
     if (organizationId !== undefined) updates.organizationId = organizationId || null;
     if (companyId !== undefined) updates.companyId = companyId || null;
 
+    await role.update(updates);
+
     const { logAction } = require('../utils/auditLogger');
     await logAction(req, 'UPDATE', 'roles', role.id, role.name, {
       description: `Updated role "${role.name}"`,
@@ -131,6 +133,7 @@ router.delete('/:id', adminOnly, checkPermission('roles', 'roles-list', 'canDele
     if (usersCount > 0)
       return res.status(400).json({ success: false, message: `Cannot delete: ${usersCount} user(s) assigned this role` });
 
+    await Permission.destroy({ where: { roleId: role.id } });
     await role.destroy();
 
     const { logAction } = require('../utils/auditLogger');

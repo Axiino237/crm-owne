@@ -37,7 +37,8 @@ const MODULE_SCREENS = {
   performance: ['performance-view'],
   closed_sales: ['closed-sales-list'],
   design: ['design-list', 'my-projects-list', 'completed-models-list'],
-  attendance: ['attendance-list']
+  attendance: ['attendance-list'],
+  chat: ['chat-room', 'chat-workspaces']
 };
 
 // @desc    Get permissions for a role

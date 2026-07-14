@@ -33,6 +33,32 @@ const EMPTY_FORM = {
   sourceMode: '', lastContactedDate: '', nextFollowUp: '', alternatePhone: ''
 };
 
+const MODAL_INPUT_STYLE = { width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' };
+const MODAL_LABEL_STYLE = { fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' };
+
+const MoveToDesignRow = ({ children }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+    {children}
+  </div>
+);
+
+const MoveToDesignField = ({ label, value, onChange, type = 'text', placeholder }) => (
+  <div>
+    <label style={MODAL_LABEL_STYLE}>{label}</label>
+    <input type={type} placeholder={placeholder || ''} value={value} onChange={onChange} style={MODAL_INPUT_STYLE} />
+  </div>
+);
+
+const MoveToDesignSelectField = ({ label, value, onChange, options }) => (
+  <div>
+    <label style={MODAL_LABEL_STYLE}>{label}</label>
+    <select value={value} onChange={onChange} style={{ ...MODAL_INPUT_STYLE, cursor: 'pointer' }}>
+      <option value="">Select...</option>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  </div>
+);
+
 // ── Move to Design Form ───────────────────────────────────────────────────────
 const MoveToDesignModal = ({ lead, onClose, onDone }) => {
   const [form, setForm] = useState({
@@ -81,26 +107,6 @@ const MoveToDesignModal = ({ lead, onClose, onDone }) => {
     setSaving(false);
   };
 
-  const inputStyle = { width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' };
-  const labelStyle = { fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' };
-
-  const Row = ({ children }) => <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>{children}</div>;
-  const Field = ({ label, k, type = 'text', placeholder }) => (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <input type={type} placeholder={placeholder || ''} value={form[k]} onChange={e => set(k, e.target.value)} style={inputStyle} />
-    </div>
-  );
-  const SelectField = ({ label, k, options }) => (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <select value={form[k]} onChange={e => set(k, e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-        <option value="">Select...</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  );
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 820, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
@@ -119,65 +125,65 @@ const MoveToDesignModal = ({ lead, onClose, onDone }) => {
         <form onSubmit={handleSubmit} style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
           {/* Section 1: Client Info */}
           <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Client Information</div>
-          <Row>
-            <Field label="Company Name *" k="companyName" placeholder="Required" />
-            <Field label="Website" k="website" placeholder="https://..." />
-          </Row>
-          <Row>
-            <Field label="Exhibition Name" k="exhibitionName" placeholder="e.g. MEDICALL 2026" />
+          <MoveToDesignRow>
+            <MoveToDesignField label="Company Name *" value={form.companyName} onChange={e => set('companyName', e.target.value)} placeholder="Required" />
+            <MoveToDesignField label="Website" value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://..." />
+          </MoveToDesignRow>
+          <MoveToDesignRow>
+            <MoveToDesignField label="Exhibition Name" value={form.exhibitionName} onChange={e => set('exhibitionName', e.target.value)} placeholder="e.g. MEDICALL 2026" />
             <div />
-          </Row>
+          </MoveToDesignRow>
 
           {/* Section 2: Stall Info */}
           <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, marginTop: 8 }}>Requirements for Stall Design</div>
-          <Row>
-            <Field label="Stall No." k="stallNo" />
-            <Field label="Hall No." k="hallNo" />
-          </Row>
-          <Row>
-            <Field label="Stall Size" k="stallSize" placeholder="e.g. 6m x 3m" />
-            <Field label="No. of Sides Open" k="sidesOpen" placeholder="e.g. 3 sides open" />
-          </Row>
-          <Row>
-            <SelectField label="Reception Counter (y/n)" k="receptionCounter" options={['y', 'n']} />
-            <Field label="Round Table + Bar Stool (y/n + count)" k="roundTableBarStool" placeholder="e.g. y, 2" />
-          </Row>
-          <Row>
-            <Field label="Closed Meeting Room (y/n + count)" k="closedMeetingRoom" placeholder="e.g. n" />
-            <SelectField label="Product Display Podiums (y/n)" k="productDisplayPodiums" options={['y', 'n', 'L-shaped podium', 'Other']} />
-          </Row>
+          <MoveToDesignRow>
+            <MoveToDesignField label="Stall No." value={form.stallNo} onChange={e => set('stallNo', e.target.value)} />
+            <MoveToDesignField label="Hall No." value={form.hallNo} onChange={e => set('hallNo', e.target.value)} />
+          </MoveToDesignRow>
+          <MoveToDesignRow>
+            <MoveToDesignField label="Stall Size" value={form.stallSize} onChange={e => set('stallSize', e.target.value)} placeholder="e.g. 6m x 3m" />
+            <MoveToDesignField label="No. of Sides Open" value={form.sidesOpen} onChange={e => set('sidesOpen', e.target.value)} placeholder="e.g. 3 sides open" />
+          </MoveToDesignRow>
+          <MoveToDesignRow>
+            <MoveToDesignSelectField label="Reception Counter (y/n)" value={form.receptionCounter} onChange={e => set('receptionCounter', e.target.value)} options={['y', 'n']} />
+            <MoveToDesignField label="Round Table + Bar Stool (y/n + count)" value={form.roundTableBarStool} onChange={e => set('roundTableBarStool', e.target.value)} placeholder="e.g. y, 2" />
+          </MoveToDesignRow>
+          <MoveToDesignRow>
+            <MoveToDesignField label="Closed Meeting Room (y/n + count)" value={form.closedMeetingRoom} onChange={e => set('closedMeetingRoom', e.target.value)} placeholder="e.g. n" />
+            <MoveToDesignSelectField label="Product Display Podiums (y/n)" value={form.productDisplayPodiums} onChange={e => set('productDisplayPodiums', e.target.value)} options={['y', 'n', 'L-shaped podium', 'Other']} />
+          </MoveToDesignRow>
 
           {/* Products */}
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Nature / Specifications of Products to be Displayed</label>
-            <textarea value={form.productNature} onChange={e => set('productNature', e.target.value)} rows={2} placeholder="Describe products..." style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} />
+            <label style={MODAL_LABEL_STYLE}>Nature / Specifications of Products to be Displayed</label>
+            <textarea value={form.productNature} onChange={e => set('productNature', e.target.value)} rows={2} placeholder="Describe products..." style={{ ...MODAL_INPUT_STYLE, resize: 'vertical', minHeight: 60 }} />
           </div>
-          <Row>
-            <Field label="No. of Products / Dimensions" k="productsCount" placeholder="e.g. 10 items, 30x40cm each" />
-            <SelectField label="Posters Required" k="postersRequired" options={['Flex', 'Backlit', 'Sunboard', 'None']} />
-          </Row>
-          <Row>
-            <SelectField label="Brochure Stand (y/n)" k="brochureStand" options={['y', 'n']} />
-            <SelectField label="Pantry / Storage Area (y/n)" k="pantryStorageArea" options={['y', 'n']} />
-          </Row>
-          <Row>
-            <SelectField label="Plasma TV (y/n)" k="plasmaTV" options={['y', 'n']} />
-            <SelectField label="Flooring Type" k="flooringType" options={['Carpet', 'Wooden Finish', 'Raised Platform', 'Other']} />
-          </Row>
-          <Row>
-            <Field label="Color Scheme" k="colorScheme" placeholder="e.g. Logo colors" />
-            <Field label="Approx. Budget (Rs. Lacs)" k="approxBudget" type="number" placeholder="e.g. 2.5" />
-          </Row>
+          <MoveToDesignRow>
+            <MoveToDesignField label="No. of Products / Dimensions" value={form.productsCount} onChange={e => set('productsCount', e.target.value)} placeholder="e.g. 10 items, 30x40cm each" />
+            <MoveToDesignSelectField label="Posters Required" value={form.postersRequired} onChange={e => set('postersRequired', e.target.value)} options={['Flex', 'Backlit', 'Sunboard', 'None']} />
+          </MoveToDesignRow>
+          <MoveToDesignRow>
+            <MoveToDesignSelectField label="Brochure Stand (y/n)" value={form.brochureStand} onChange={e => set('brochureStand', e.target.value)} options={['y', 'n']} />
+            <MoveToDesignSelectField label="Pantry / Storage Area (y/n)" value={form.pantryStorageArea} onChange={e => set('pantryStorageArea', e.target.value)} options={['y', 'n']} />
+          </MoveToDesignRow>
+          <MoveToDesignRow>
+            <MoveToDesignSelectField label="Plasma TV (y/n)" value={form.plasmaTV} onChange={e => set('plasmaTV', e.target.value)} options={['y', 'n']} />
+            <MoveToDesignSelectField label="Flooring Type" value={form.flooringType} onChange={e => set('flooringType', e.target.value)} options={['Carpet', 'Wooden Finish', 'Raised Platform', 'Other']} />
+          </MoveToDesignRow>
+          <MoveToDesignRow>
+            <MoveToDesignField label="Color Scheme" value={form.colorScheme} onChange={e => set('colorScheme', e.target.value)} placeholder="e.g. Logo colors" />
+            <MoveToDesignField label="Approx. Budget (Rs. Lacs)" value={form.approxBudget} onChange={e => set('approxBudget', e.target.value)} type="number" placeholder="e.g. 2.5" />
+          </MoveToDesignRow>
 
           {/* Other info */}
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Any Other Information</label>
-            <textarea value={form.otherInfo} onChange={e => set('otherInfo', e.target.value)} rows={2} placeholder="Any additional requirements..." style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} />
+            <label style={MODAL_LABEL_STYLE}>Any Other Information</label>
+            <textarea value={form.otherInfo} onChange={e => set('otherInfo', e.target.value)} rows={2} placeholder="Any additional requirements..." style={{ ...MODAL_INPUT_STYLE, resize: 'vertical', minHeight: 60 }} />
           </div>
 
           {/* Reference Image */}
           <div style={{ marginBottom: 24 }}>
-            <label style={labelStyle}>Reference Image (optional)</label>
+            <label style={MODAL_LABEL_STYLE}>Reference Image (optional)</label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-secondary)', border: `2px dashed ${imageFile ? 'var(--success)' : 'var(--border)'}`, borderRadius: 10, padding: '14px 18px', cursor: 'pointer', transition: 'all 0.2s' }}>
               <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={e => setImageFile(e.target.files[0] || null)} />
               <RiDraftLine style={{ fontSize: '1.4rem', color: imageFile ? 'var(--success)' : 'var(--text-muted)', flexShrink: 0 }} />

@@ -19,7 +19,7 @@ const STATUS_CONFIG = {
 // ── View Detail Modal ────────────────────────────────────────────────────────
 const ViewDesignModal = ({ order, onClose }) => {
   const imgUrl = order.referenceImageUrl
-    ? `http://localhost:5000${order.referenceImageUrl}`
+    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`
     : null;
 
   const Field = ({ label, value }) =>
@@ -343,7 +343,7 @@ const DesignPage = () => {
                               <RiEyeLine />
                             </button>
                             {order.referenceImageUrl && (
-                              <a href={`http://localhost:5000${order.referenceImageUrl}`} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline" title="View Reference Image" style={{ display: 'flex', alignItems: 'center' }}>
+                              <a href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline" title="View Reference Image" style={{ display: 'flex', alignItems: 'center' }}>
                                 <RiImageLine />
                               </a>
                             )}

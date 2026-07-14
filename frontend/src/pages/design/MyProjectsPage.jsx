@@ -3,7 +3,8 @@ import {
   RiPaletteLine, RiTimeLine, RiCheckDoubleLine, RiRefreshLine,
   RiEyeLine, RiCloseLine, RiBuilding2Line,
   RiGlobalLine, RiCalendarLine, RiMoneyDollarCircleLine,
-  RiUploadCloud2Line, RiFileImageLine, RiCheckLine, RiTimerLine
+  RiUploadCloud2Line, RiFileImageLine, RiCheckLine, RiTimerLine,
+  RiDownloadLine, RiImageLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
@@ -19,10 +20,10 @@ const STATUS_CONFIG = {
 // ── View Detail Modal ────────────────────────────────────────────────────────
 const ViewDesignModal = ({ order, onClose }) => {
   const imgUrl = order.referenceImageUrl
-    ? `http://localhost:5000${order.referenceImageUrl}`
+    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`
     : null;
   const modelUrl = order.completedModelUrl
-    ? `http://localhost:5000${order.completedModelUrl}`
+    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.completedModelUrl}`
     : null;
 
   const Field = ({ label, value }) =>
@@ -76,7 +77,16 @@ const ViewDesignModal = ({ order, onClose }) => {
 
           {imgUrl && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Reference Image</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reference Image</div>
+                <a
+                  href={imgUrl}
+                  download
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 8, color: 'var(--accent)', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 700 }}
+                >
+                  <RiDownloadLine /> Download
+                </a>
+              </div>
               <img src={imgUrl} alt="Reference" style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, border: '1px solid var(--border)', objectFit: 'contain' }} />
             </div>
           )}
@@ -569,12 +579,21 @@ const MyProjectsPage = () => {
                           <button className="btn btn-sm btn-outline" onClick={() => setViewOrder(order)} title="View Details">
                             <RiEyeLine />
                           </button>
+                          {order.referenceImageUrl && (
+                            <a
+                              href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`}
+                              download
+                              title="Download Reference Image"
+                              className="btn btn-sm"
+                              style={{ background: 'rgba(129,140,248,0.12)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <RiImageLine />
+                            </a>
+                          )}
                           {order.status === 'completed' && order.completedModelUrl && (
                             <a
-                              href={`http://localhost:5000${order.completedModelUrl}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Download Model"
+                              href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.completedModelUrl}`}
+                              download
+                              title="Download Completed Model"
                               className="btn btn-sm"
                               style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <RiFileImageLine />

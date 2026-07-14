@@ -18,14 +18,21 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('crm_token');
-    const savedUser = localStorage.getItem('crm_user');
-    if (token && savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-      fetchPermissions();
-    }
-    setLoading(false);
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('crm_token');
+      const savedUser = localStorage.getItem('crm_user');
+      if (token && savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+          await fetchPermissions();
+        } catch (e) {
+          console.error('Auth initialization failed:', e);
+        }
+      }
+      setLoading(false);
+    };
+    initializeAuth();
   }, [fetchPermissions]);
 
   const login = async (email, password) => {
@@ -51,19 +58,33 @@ export const AuthProvider = ({ children }) => {
     setPermissions([]);
   };
 
+  const updateUser = useCallback((userData) => {
+    setUser(userData);
+    localStorage.setItem('crm_user', JSON.stringify(userData));
+  }, []);
+
   /**
    * Check if user has permission for module/screen/action
-   * Super admin always returns true
+   * Super admin bypasses only core administration modules to prevent lockout
    */
   const hasPermission = useCallback((module, screen, action = 'canView') => {
     if (!user) return false;
-    if (user.isSuperAdmin) return true;
+
+    // Core admin modules are always accessible to Super Admin to avoid lockouts
+    const isCoreAdminModule = ['uam', 'roles', 'permissions'].includes(module);
+    if (user.isSuperAdmin && isCoreAdminModule) return true;
+
     const perm = permissions.find(p => p.module === module && p.screen === screen);
-    return perm ? !!perm[action] : false;
+    if (perm) {
+      return !!perm[action];
+    }
+
+    // Default to true for Super Admin (if no database record exists), and false for others
+    return user.isSuperAdmin ? true : false;
   }, [user, permissions]);
 
   return (
-    <AuthContext.Provider value={{ user, permissions, loading, login, logout, hasPermission, fetchPermissions }}>
+    <AuthContext.Provider value={{ user, permissions, loading, login, logout, hasPermission, fetchPermissions, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
