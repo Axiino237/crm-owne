@@ -18,7 +18,7 @@ const Permission = sequelize.define('Permission', {
   screen: {
     type: DataTypes.ENUM(
       'dashboard-home',
-      'leads-widget', 'projects-widget', 'pending-projects-widget', 'completed-projects-widget',
+      'leads-widget', 'calls-widget', 'interested-leads-widget', 'projects-widget', 'pending-projects-widget', 'completed-projects-widget',
       'total-profit-card', 'monthly-profit-card', 'deductions-card',
       'profit-trend-chart', 'recent-leads-list', 'recent-projects-list',
       'org-overview', 'system-overview',

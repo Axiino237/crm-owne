@@ -10,6 +10,8 @@ const MODULE_SCREENS = {
   dashboard: [
     'dashboard-home',
     'leads-widget',
+    'calls-widget',
+    'interested-leads-widget',
     'projects-widget',
     'pending-projects-widget',
     'completed-projects-widget',

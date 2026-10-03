@@ -149,8 +149,25 @@ router.get('/stats', async (req, res) => {
       ]
     };
 
+    // Calls made: status has changed from 'new' to any other status or lastContactedDate is recorded
+    const callsWhere = {
+      ...countsWhere,
+      [Op.or]: [
+        { status: { [Op.ne]: 'new' } },
+        { lastContactedDate: { [Op.ne]: null } }
+      ]
+    };
+
+    // Interested leads: status is 'qualified'
+    const interestedLeadsWhere = {
+      ...countsWhere,
+      status: 'qualified'
+    };
+
     const [
       totalLeads,
+      totalCalls,
+      totalInterestedLeads,
       totalProjects,
       pendingProjects,
       completedProjects,
@@ -164,6 +181,8 @@ router.get('/stats', async (req, res) => {
       recentConvertedLeads
     ] = await Promise.all([
       Lead.count({ where: countsWhere }),
+      Lead.count({ where: callsWhere }),
+      Lead.count({ where: interestedLeadsWhere }),
       Lead.count({ where: convertedProjectsWhere }),
       Lead.count({ where: pendingProjectsWhere }),
       Lead.count({ where: completedProjectsWhere }),
@@ -222,7 +241,23 @@ router.get('/stats', async (req, res) => {
       success: true,
       isDeptHead,
       scopeType: isSuper ? 'all' : (isOrgAdmin ? 'organization' : (isCompanyAdmin ? 'company' : (isDeptHead ? 'department' : 'personal'))),
-      stats: { totalLeads, totalProjects, pendingProjects, completedProjects, totalDesigns, pendingDesigns, completedDesigns, changeDesigns, totalRevenue, totalDeductions, totalProfit, perMonthProfit, monthlyData: monthlyList.length > 0 ? monthlyList : [{ month: 'Jul 2026', revenue: totalRevenue, deductions: totalDeductions, profit: totalProfit }] },
+      stats: {
+        totalLeads,
+        totalCalls,
+        totalInterestedLeads,
+        totalProjects,
+        pendingProjects,
+        completedProjects,
+        totalDesigns,
+        pendingDesigns,
+        completedDesigns,
+        changeDesigns,
+        totalRevenue,
+        totalDeductions,
+        totalProfit,
+        perMonthProfit,
+        monthlyData: monthlyList.length > 0 ? monthlyList : [{ month: 'Jul 2026', revenue: totalRevenue, deductions: totalDeductions, profit: totalProfit }]
+      },
       recentLeads,
       recentProjects
     });

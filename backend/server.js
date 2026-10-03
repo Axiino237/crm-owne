@@ -161,6 +161,8 @@ const startServer = async () => {
         // ✅ Dashboard — ALL business stat widgets
         await ensurePerm('dashboard', 'dashboard-home');
         await ensurePerm('dashboard', 'leads-widget');
+        await ensurePerm('dashboard', 'calls-widget');
+        await ensurePerm('dashboard', 'interested-leads-widget');
         await ensurePerm('dashboard', 'projects-widget');
         await ensurePerm('dashboard', 'pending-projects-widget');
         await ensurePerm('dashboard', 'completed-projects-widget');

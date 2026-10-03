@@ -13,7 +13,9 @@ import {
   RiTimeLine,
   RiCheckDoubleLine,
   RiLineChartLine,
-  RiPaletteLine
+  RiPaletteLine,
+  RiPhoneLine,
+  RiUserHeartLine
 } from 'react-icons/ri';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +37,8 @@ const Dashboard = () => {
   // Business stats visibility check (only checks actual business widgets, not general page access)
   const canSeeBusinessTab =
     hasPermission('dashboard', 'leads-widget', 'canView') ||
+    hasPermission('dashboard', 'calls-widget', 'canView') ||
+    hasPermission('dashboard', 'interested-leads-widget', 'canView') ||
     hasPermission('dashboard', 'projects-widget', 'canView') ||
     hasPermission('dashboard', 'pending-projects-widget', 'canView') ||
     hasPermission('dashboard', 'completed-projects-widget', 'canView') ||
@@ -271,12 +275,19 @@ const Dashboard = () => {
       {/* BUSINESS TAB */}
       {activeTab === 'business' && canSeeBusinessTab && (
         <div>
-          {/* Business Metrics Grid */}
+          {/* Business Metrics Grid - 6 Core Cards */}
           {(hasPermission('dashboard', 'leads-widget', 'canView') ||
+            hasPermission('dashboard', 'calls-widget', 'canView') ||
+            hasPermission('dashboard', 'interested-leads-widget', 'canView') ||
             hasPermission('dashboard', 'projects-widget', 'canView') ||
             hasPermission('dashboard', 'pending-projects-widget', 'canView') ||
             hasPermission('dashboard', 'completed-projects-widget', 'canView')) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
               {hasPermission('dashboard', 'leads-widget', 'canView') && (
                 <StatCard 
                   icon={<RiTeamLine />} 
@@ -285,12 +296,28 @@ const Dashboard = () => {
                   color="accent" 
                 />
               )}
+              {hasPermission('dashboard', 'calls-widget', 'canView') && (
+                <StatCard 
+                  icon={<RiPhoneLine />} 
+                  label="Total Calls" 
+                  value={loadingBusiness ? null : businessStats?.stats?.totalCalls} 
+                  color="info" 
+                />
+              )}
+              {hasPermission('dashboard', 'interested-leads-widget', 'canView') && (
+                <StatCard 
+                  icon={<RiUserHeartLine />} 
+                  label="Total Interested Leads" 
+                  value={loadingBusiness ? null : businessStats?.stats?.totalInterestedLeads} 
+                  color="warning" 
+                />
+              )}
               {hasPermission('dashboard', 'projects-widget', 'canView') && (
                 <StatCard 
                   icon={<RiBriefcaseLine />} 
                   label="Total Projects" 
                   value={loadingBusiness ? null : businessStats?.stats?.totalProjects} 
-                  color="info" 
+                  color="accent" 
                 />
               )}
               {hasPermission('dashboard', 'pending-projects-widget', 'canView') && (

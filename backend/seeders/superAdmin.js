@@ -6,6 +6,8 @@ const ALL_PERMISSIONS = [
   // dashboard
   { module: 'dashboard', screen: 'dashboard-home' },
   { module: 'dashboard', screen: 'leads-widget' },
+  { module: 'dashboard', screen: 'calls-widget' },
+  { module: 'dashboard', screen: 'interested-leads-widget' },
   { module: 'dashboard', screen: 'projects-widget' },
   { module: 'dashboard', screen: 'pending-projects-widget' },
   { module: 'dashboard', screen: 'completed-projects-widget' },
