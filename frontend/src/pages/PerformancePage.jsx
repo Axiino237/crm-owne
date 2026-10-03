@@ -353,11 +353,11 @@ const PerformancePage = () => {
 
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: hasTeamAccess || isAdmin ? '2fr 1fr' : '1fr', gap: 24, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
             
             {/* Leaderboard Table — only for admins and team-access users */}
             {(hasTeamAccess || isAdmin) && (
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card" style={{ padding: 0, overflow: 'hidden', width: '100%' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <RiUserLine style={{ color: 'var(--accent)' }} />
@@ -374,7 +374,7 @@ const PerformancePage = () => {
                 </div>
               ) : (
                 <div className="table-wrapper">
-                  <table className="table">
+                  <table className="table" style={{ width: '100%' }}>
                     <thead>
                       <tr>
                         <th>{isDesignDept ? 'Designer Name' : 'Caller Name'}</th>
@@ -457,7 +457,7 @@ const PerformancePage = () => {
 
             {/* Personal stats card for regular users (non-head, non-admin) */}
             {!hasTeamAccess && !isAdmin && members.length > 0 && (
-              <div className="card" style={{ padding: 24 }}>
+              <div className="card" style={{ padding: 24, width: '100%' }}>
                 <h3 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <RiUserLine style={{ color: 'var(--accent)' }} /> My Performance
                 </h3>
@@ -472,7 +472,7 @@ const PerformancePage = () => {
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{me.role}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
                       {isDesignDept ? (
                         [
                           { label: 'Designs Assigned', val: me.stats?.totalAssigned, color: '#f59e0b' },
@@ -504,49 +504,6 @@ const PerformancePage = () => {
                 ))}
               </div>
             )}
-
-            {/* Activity feed */}
-            <div className="card" style={{ padding: 0, maxHeight: 520, overflowY: 'auto' }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 10 }}>
-                <h3 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <RiHistoryLine style={{ color: 'var(--accent)' }} /> 
-                  {isDesignDept ? 'Design Log Feed (What they completed)' : 'Call Feed (What they did)'}
-                </h3>
-              </div>
-
-              {activities.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                  No calls or activities logged for this period.
-                </div>
-              ) : (
-                <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {activities.map(act => (
-                    <div key={act.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
-                          {act.assignee?.name || 'Unassigned'}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          {act.lastContactedDate}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 6 }}>
-                        Contacted <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{act.name || act.companyName || 'Lead'}</span>
-                      </div>
-                      {act.notes ? (
-                        <div style={{ background: 'var(--bg-secondary)', padding: '6px 10px', borderRadius: 6, fontSize: '0.75rem', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-                          {act.notes}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                          No remarks added
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
           </div>
         </>
