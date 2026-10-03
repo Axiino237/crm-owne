@@ -150,8 +150,21 @@ const Dashboard = () => {
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                 {user?.name} {user?.isSuperAdmin && '⭐'}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--accent-light)', marginTop: '4px' }}>
-                {user?.isSuperAdmin ? 'Super Administrator — Full System Access' : `Role: ${user?.role?.name}`}
+              <div style={{ fontSize: '0.875rem', color: 'var(--accent-light)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>{user?.isSuperAdmin ? 'Super Administrator — Full System Access' : `Role: ${user?.role?.name}`}</span>
+                {businessStats?.isDeptHead && (
+                  <span style={{
+                    fontSize: '0.72rem',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    color: '#818cf8',
+                    border: '1px solid rgba(99, 102, 241, 0.35)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: 600
+                  }}>
+                    👑 Department Head View (Team Leads & Projects)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -444,8 +457,15 @@ const Dashboard = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
               {hasPermission('dashboard', 'recent-leads-list', 'canView') && (
                 <div className="card">
-                  <div className="card-header">
-                    <span className="card-title">Recent Leads</span>
+                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="card-title">Recent Leads</span>
+                      {businessStats?.isDeptHead && (
+                        <span style={{ fontSize: '0.72rem', background: 'rgba(99, 102, 241, 0.18)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                          Department Scope
+                        </span>
+                      )}
+                    </div>
                     <span className="badge badge-accent">Business Opportunities</span>
                   </div>
                   {loadingBusiness ? (
@@ -456,6 +476,7 @@ const Dashboard = () => {
                         <thead>
                           <tr>
                             <th>Lead Info</th>
+                            {(businessStats?.isDeptHead || user?.isSuperAdmin) && <th>Assigned Member</th>}
                             <th>Expo</th>
                             <th>Est. Value</th>
                             <th>Status</th>
@@ -468,6 +489,29 @@ const Dashboard = () => {
                                 <div style={{ fontWeight: 600 }}>{lead.name}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{lead.companyName || 'Individual'}</div>
                               </td>
+                              {(businessStats?.isDeptHead || user?.isSuperAdmin) && (
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 24,
+                                      height: 24,
+                                      borderRadius: '50%',
+                                      background: 'rgba(99, 102, 241, 0.2)',
+                                      color: 'var(--accent)',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700
+                                    }}>
+                                      {lead.assignee?.name ? lead.assignee.name.charAt(0).toUpperCase() : '?'}
+                                    </span>
+                                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                      {lead.assignee?.name || 'Unassigned'}
+                                    </span>
+                                  </div>
+                                </td>
+                              )}
                               <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{lead.expo}</span></td>
                               <td><span style={{ fontWeight: 600, color: 'var(--accent)' }}>{formatCurrency(lead.value)}</span></td>
                               <td>
@@ -488,8 +532,15 @@ const Dashboard = () => {
 
               {hasPermission('dashboard', 'recent-projects-list', 'canView') && (
                 <div className="card">
-                  <div className="card-header">
-                    <span className="card-title">Recent Projects</span>
+                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="card-title">Recent Projects</span>
+                      {businessStats?.isDeptHead && (
+                        <span style={{ fontSize: '0.72rem', background: 'rgba(99, 102, 241, 0.18)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                          Department Scope
+                        </span>
+                      )}
+                    </div>
                     <span className="badge badge-info">Active Engagements</span>
                   </div>
                   {loadingBusiness ? (
@@ -500,6 +551,7 @@ const Dashboard = () => {
                         <thead>
                           <tr>
                             <th>Project Name</th>
+                            {(businessStats?.isDeptHead || user?.isSuperAdmin) && <th>Assigned Member</th>}
                             <th>Budget</th>
                             <th>Deductions</th>
                             <th>Status</th>
@@ -512,6 +564,29 @@ const Dashboard = () => {
                                 <div style={{ fontWeight: 600 }}>{project.name}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Start: {project.startDate}</div>
                               </td>
+                              {(businessStats?.isDeptHead || user?.isSuperAdmin) && (
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 24,
+                                      height: 24,
+                                      borderRadius: '50%',
+                                      background: 'rgba(99, 102, 241, 0.2)',
+                                      color: 'var(--accent)',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700
+                                    }}>
+                                      {project.assignee?.name ? project.assignee.name.charAt(0).toUpperCase() : '?'}
+                                    </span>
+                                    <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                      {project.assignee?.name || 'Unassigned'}
+                                    </span>
+                                  </div>
+                                </td>
+                              )}
                               <td><span style={{ fontWeight: 600, color: 'var(--success)' }}>{formatCurrency(project.revenue)}</span></td>
                               <td><span style={{ color: 'var(--danger)' }}>{formatCurrency(project.deductions)}</span></td>
                               <td>

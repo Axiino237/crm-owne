@@ -88,18 +88,9 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
     if (expo) baseWhere.expo = expo;
 
     // Scope by org / role hierarchy
-    const userRole = req.user.role?.level;
-    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
-    const isOrgAdmin = userRole === 'org_admin';
-    const isCompanyAdmin = userRole === 'company_admin';
-
-    const { Department } = require('../models');
-    const managedDept = !isSuper && !isOrgAdmin && !isCompanyAdmin
-      ? await Department.findOne({ where: { headId: req.user.id }, attributes: ['id'] })
-      : null;
-    const isDeptHead = !!managedDept;
-    const hasTeamScope = (userRole === 'dept_manager') || isDeptHead;
-    const scopedDeptId = managedDept?.id || req.user.departmentId;
+    const { getDeptHeadScope } = require('../utils/departmentScope');
+    const scopeInfo = await getDeptHeadScope(req.user);
+    const { isSuper, isOrgAdmin, isCompanyAdmin, isDeptHead, teamUserIds } = scopeInfo;
 
     if (!isSuper) {
       if (isOrgAdmin && req.user.organizationId) {
@@ -112,8 +103,12 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
         })).map(u => u.id);
         baseWhere.organizationId = req.user.organizationId;
         baseWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
+      } else if (isDeptHead && teamUserIds.length > 0) {
+        // Department Head sees all leads assigned to any member of their department(s)
+        baseWhere.organizationId = req.user.organizationId;
+        baseWhere.assignedTo = { [Op.in]: teamUserIds };
       } else {
-        // Regular users and department managers/team heads only see leads assigned directly to them
+        // Regular users ("mathavangal") only see leads assigned directly to them
         baseWhere.organizationId = req.user.organizationId;
         baseWhere.assignedTo = req.user.id;
       }
@@ -170,19 +165,9 @@ router.get('/:id', checkPermission('leads', 'leads-list', 'canView'), async (req
     });
     if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
 
-    // Scoping check for read authorization
-    const userRole = req.user.role?.level;
-    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
-    const isOrgAdmin = userRole === 'org_admin';
-    const isCompanyAdmin = userRole === 'company_admin';
-
-    const { Department } = require('../models');
-    const managedDept = !isSuper && !isOrgAdmin && !isCompanyAdmin
-      ? await Department.findOne({ where: { headId: req.user.id }, attributes: ['id'] })
-      : null;
-    const isDeptHead = !!managedDept;
-    const hasTeamScope = (userRole === 'dept_manager') || isDeptHead;
-    const scopedDeptId = managedDept?.id || req.user.departmentId;
+    const { getDeptHeadScope } = require('../utils/departmentScope');
+    const scopeInfo = await getDeptHeadScope(req.user);
+    const { isSuper, isOrgAdmin, isCompanyAdmin, isDeptHead, teamUserIds } = scopeInfo;
 
     let isAuthorized = false;
     if (isSuper) {
@@ -191,6 +176,8 @@ router.get('/:id', checkPermission('leads', 'leads-list', 'canView'), async (req
       if (isOrgAdmin) {
         isAuthorized = true;
       } else if (lead.assignedTo === req.user.id) {
+        isAuthorized = true;
+      } else if (isDeptHead && lead.assignedTo && teamUserIds.includes(lead.assignedTo)) {
         isAuthorized = true;
       } else if (isCompanyAdmin && req.user.companyId) {
         if (lead.assignedTo) {
