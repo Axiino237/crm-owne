@@ -97,7 +97,6 @@ const RolesPage = () => {
   useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   const handleDelete = (role) => {
-    if (role.isSystem) { toast.error('System roles cannot be deleted'); return; }
     setDeleteRole(role);
   };
 
@@ -154,13 +153,24 @@ const RolesPage = () => {
                     <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>{new Date(r.createdAt).toLocaleDateString()}</td>
                     <td>
                       <div className="flex gap-2">
-                        {canEdit && !r.isSystem && (
-                          <button className="btn btn-icon btn-sm" onClick={() => { setEditRole(r); setShowModal(true); }} title="Edit Role" id={`edit-role-${r.id}`}>
+                        {canEdit && (
+                          <button
+                            className="btn btn-icon btn-sm"
+                            onClick={() => { setEditRole(r); setShowModal(true); }}
+                            title="Edit Role"
+                            id={`edit-role-${r.id}`}
+                          >
                             <RiPencilLine />
                           </button>
                         )}
-                        {canDelete && !r.isSystem && (
-                          <button className="btn btn-icon btn-sm" onClick={() => handleDelete(r)} title="Delete Role" style={{ color: 'var(--danger)' }} id={`delete-role-${r.id}`}>
+                        {canDelete && (
+                          <button
+                            className="btn btn-icon btn-sm"
+                            onClick={() => handleDelete(r)}
+                            title={r.isSystem ? 'Delete (Protected Role)' : 'Delete Role'}
+                            style={{ color: 'var(--danger)' }}
+                            id={`delete-role-${r.id}`}
+                          >
                             <RiDeleteBinLine />
                           </button>
                         )}

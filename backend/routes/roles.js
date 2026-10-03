@@ -95,8 +95,19 @@ router.post('/', adminOnly, checkPermission('roles', 'roles-list', 'canCreate'),
 router.put('/:id', adminOnly, checkPermission('roles', 'roles-list', 'canEdit'), async (req, res) => {
   try {
     const role = await Role.findByPk(req.params.id);
-    if (!role) return res.status(404).json({ success: false, message: 'Role not found' });
-    if (role.isSystem) return res.status(403).json({ success: false, message: 'Cannot edit system role' });
+    if (role.isSystem) {
+      const { name, description } = req.body;
+      const updates = {};
+      if (name) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      await role.update(updates);
+      const { logAction } = require('../utils/auditLogger');
+      await logAction(req, 'UPDATE', 'roles', role.id, role.name, {
+        description: `Updated system role "${role.name}"`,
+        changes: updates
+      });
+      return res.json({ success: true, message: 'Role updated successfully', role });
+    }
 
     const { name, description, level, isActive, organizationId, companyId } = req.body;
     const updates = {};
