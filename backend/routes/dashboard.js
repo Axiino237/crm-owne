@@ -158,10 +158,10 @@ router.get('/stats', async (req, res) => {
       ]
     };
 
-    // Interested leads: status is 'qualified' (or 'interested')
+    // Interested leads: status is 'qualified'
     const interestedLeadsWhere = {
       ...countsWhere,
-      status: { [Op.in]: ['qualified', 'Qualified', 'interested', 'Interested'] }
+      status: 'qualified'
     };
 
     const [

@@ -174,7 +174,9 @@ const Dashboard = () => {
       const res = await api.get('/dashboard/stats');
       setBusinessStats(res.data);
     } catch { /* ignore */ }
-    setLoadingBusiness(false);
+    finally {
+      setLoadingBusiness(false);
+    }
   }, []);
 
   useEffect(() => {
