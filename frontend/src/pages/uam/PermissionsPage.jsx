@@ -29,7 +29,10 @@ const SCREEN_LABELS = {
   'closed-sales-value': 'Deal Value (Column & Input)',
   'closed-sales-paid': 'Paid Amount (Column & Input)',
   'closed-sales-balance': 'Outstanding Balance (Column & View)',
-  'closed-sales-vendor-payout': 'Vendor Payout (Column & Input)'
+  'closed-sales-vendor-payout': 'Vendor Payout (Column & Input)',
+  'total-profit-card': 'Total Sales Card',
+  'monthly-profit-card': 'Average Monthly Sales Card',
+  'profit-trend-chart': 'Monthly Sales Trend Chart'
 };
 
 const PermissionsPage = () => {

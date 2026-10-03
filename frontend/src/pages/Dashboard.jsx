@@ -92,12 +92,12 @@ const Dashboard = () => {
       return {
         month: m,
         label: m.split(' ')[0],
-        profit: match ? Math.max(0, parseFloat(match.profit) || 0) : 0,
+        sales: match ? Math.max(0, parseFloat(match.revenue) || 0) : 0,
         hasData: !!match
       };
     });
 
-    const maxVal = Math.max(...pointsData.map(p => p.profit), 10000);
+    const maxVal = Math.max(...pointsData.map(p => p.sales), 10000);
     const paddingLeft = 70;
     const paddingRight = 45;
     const chartWidth = 800 - paddingLeft - paddingRight;
@@ -107,7 +107,7 @@ const Dashboard = () => {
 
     const coords = pointsData.map((p, idx) => {
       const x = paddingLeft + (idx / Math.max(1, pointsData.length - 1)) * chartWidth;
-      const y = baselineY - (p.profit > 0 ? (p.profit / maxVal) * chartHeight : 0);
+      const y = baselineY - (p.sales > 0 ? (p.sales / maxVal) * chartHeight : 0);
       return { ...p, x, y };
     });
 
@@ -411,9 +411,9 @@ const Dashboard = () => {
                 <div className="card" style={{ borderLeft: '4px solid var(--success)', background: 'var(--bg-glass)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total profit (Revenue - Deductions)</span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total Sales (Deal Value)</span>
                       <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 8, color: 'var(--success)' }}>
-                        {loadingBusiness ? <div className="spinner spinner-sm" /> : formatCurrency(businessStats?.stats?.totalProfit)}
+                        {loadingBusiness ? <div className="spinner spinner-sm" /> : formatCurrency(businessStats?.stats?.totalSales ?? businessStats?.stats?.totalRevenue)}
                       </h2>
                     </div>
                     <div style={{ background: 'var(--success-bg)', color: 'var(--success)', padding: 12, borderRadius: '50%', fontSize: '1.5rem', display: 'flex' }}>
@@ -421,9 +421,9 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Total Revenue:</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total Closed Deals:</span>
                     <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {loadingBusiness ? '...' : formatCurrency(businessStats?.stats?.totalRevenue)}
+                      {businessStats?.stats?.totalProjects ?? 0} Projects
                     </span>
                   </div>
                 </div>
@@ -433,9 +433,9 @@ const Dashboard = () => {
                 <div className="card" style={{ borderLeft: '4px solid var(--accent)', background: 'var(--bg-glass)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Monthly Profit</span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Monthly Sales</span>
                       <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 8, color: 'var(--accent)' }}>
-                        {loadingBusiness ? <div className="spinner spinner-sm" /> : formatCurrency(businessStats?.stats?.perMonthProfit)}
+                        {loadingBusiness ? <div className="spinner spinner-sm" /> : formatCurrency(businessStats?.stats?.perMonthSales ?? businessStats?.stats?.totalRevenue)}
                       </h2>
                     </div>
                     <div style={{ background: 'var(--accent-glow)', color: 'var(--accent)', padding: 12, borderRadius: '50%', fontSize: '1.5rem', display: 'flex' }}>
@@ -478,9 +478,9 @@ const Dashboard = () => {
             <div className="card" style={{ marginBottom: '24px' }}>
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="card-title">Monthly Net Profit Trend (2026)</span>
+                  <span className="card-title">Monthly Total Sales Trend (2026)</span>
                   <span style={{ fontSize: '0.72rem', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
-                    📈 Line Trend
+                    📈 Sales Trend
                   </span>
                 </div>
                 <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
@@ -578,7 +578,7 @@ const Dashboard = () => {
                     {/* Data Points, Dots & Value Pills */}
                     {lineChartData.coords.map((pt, idx) => {
                       const isHovered = hoveredPoint?.month === pt.month;
-                      const hasValue = pt.profit > 0;
+                      const hasValue = pt.sales > 0;
 
                       return (
                         <g 
@@ -639,7 +639,7 @@ const Dashboard = () => {
                                 fontSize="11" 
                                 fontWeight="700"
                               >
-                                {formatCurrency(pt.profit)}
+                                {formatCurrency(pt.sales)}
                               </text>
                             </g>
                           )}

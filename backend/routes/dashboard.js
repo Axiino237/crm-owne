@@ -236,6 +236,7 @@ router.get('/stats', async (req, res) => {
       return { month: m.month ? new Date(m.month).toLocaleString('default', { month: 'short', year: 'numeric' }) : 'Jan 2026', revenue: rev, deductions: ded, profit: rev - ded };
     });
     const perMonthProfit = totalProfit / Math.max(1, monthlyList.length);
+    const perMonthSales = totalRevenue / Math.max(1, monthlyList.length);
 
     res.json({
       success: true,
@@ -252,11 +253,13 @@ router.get('/stats', async (req, res) => {
         pendingDesigns,
         completedDesigns,
         changeDesigns,
+        totalSales: totalRevenue,
         totalRevenue,
         totalDeductions,
         totalProfit,
         perMonthProfit,
-        monthlyData: monthlyList.length > 0 ? monthlyList : [{ month: 'Jul 2026', revenue: totalRevenue, deductions: totalDeductions, profit: totalProfit }]
+        perMonthSales,
+        monthlyData: monthlyList.length > 0 ? monthlyList : [{ month: 'Oct 2026', revenue: totalRevenue, deductions: totalDeductions, profit: totalProfit }]
       },
       recentLeads,
       recentProjects
