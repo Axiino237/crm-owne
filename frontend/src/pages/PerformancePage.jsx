@@ -444,7 +444,7 @@ const PerformancePage = () => {
                                 ) : (
                                   <>
                                     <span className="badge badge-info" title="New leads">{member.stats?.newCount} N</span>
-                                    <span className="badge badge-warning" title="Contacted">{member.stats?.inProgressCount} C</span>
+                                    <span className="badge badge-warning" title="Call Not Picked">{member.stats?.inProgressCount} C</span>
                                     <span className="badge badge-success" title="Converted">{member.stats?.convertedCount} V</span>
                                     <span className="badge badge-danger" title="Lost">{member.stats?.lostCount} L</span>
                                   </>

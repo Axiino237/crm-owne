@@ -59,7 +59,7 @@ const parseCSV = (buffer) => {
   return { headers, rows };
 };
 
-const VALID_STATUSES = ['new', 'contacted', 'qualified', 'lost', 'converted'];
+const VALID_STATUSES = ['new', 'contacted', 'not_interested', 'qualified', 'lost', 'converted'];
 const VALID_EXPOS = ['website', 'referral', 'social_media', 'cold_call', 'email', 'other'];
 
 // @desc   Get all leads
@@ -496,9 +496,20 @@ router.post('/bulk-upload', checkPermission('leads', 'leads-list', 'canCreate'),
       }
 
       // Status mapping (default to 'new')
-      let status = (row['status'] || 'new').trim().toLowerCase();
-      if (!VALID_STATUSES.includes(status)) {
-        status = 'new';
+      let statusRaw = (row['status'] || 'new').trim().toLowerCase().replace(/[\s-]+/g, '_');
+      let status = 'new';
+      if (['call_not_picked', 'not_picked', 'not_pick_call', 'not_picked_call', 'contacted', 'no_answer'].includes(statusRaw)) {
+        status = 'contacted';
+      } else if (['qualified', 'interested', 'qualified_(interested)'].includes(statusRaw)) {
+        status = 'qualified';
+      } else if (['not_interested', 'not_intrestd', 'not_intrested', 'not_interest'].includes(statusRaw)) {
+        status = 'not_interested';
+      } else if (['lost', 'closed_lost'].includes(statusRaw)) {
+        status = 'lost';
+      } else if (['converted', 'won', 'closed_won'].includes(statusRaw)) {
+        status = 'converted';
+      } else if (VALID_STATUSES.includes(statusRaw)) {
+        status = statusRaw;
       }
 
       // Assignee lookup

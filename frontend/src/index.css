@@ -289,6 +289,7 @@ select.form-control option { background: var(--bg-card); color: var(--text-prima
 .badge-warning { background: var(--warning-bg); color: var(--warning); }
 .badge-info { background: var(--info-bg); color: var(--info); }
 .badge-accent { background: var(--accent-glow); color: var(--accent); }
+.badge-secondary { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
 
 /* ==================== SPINNER ==================== */
 .spinner {

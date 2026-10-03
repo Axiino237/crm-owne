@@ -731,8 +731,15 @@ const Dashboard = () => {
                                 <span className={`badge ${
                                   lead.status === 'converted' ? 'badge-success' :
                                   lead.status === 'lost' ? 'badge-danger' :
-                                  lead.status === 'qualified' ? 'badge-info' : 'badge-warning'
-                                }`}>{lead.status}</span>
+                                  lead.status === 'qualified' ? 'badge-accent' :
+                                  lead.status === 'not_interested' ? 'badge-secondary' :
+                                  lead.status === 'contacted' ? 'badge-warning' : 'badge-info'
+                                }`}>
+                                  {lead.status === 'contacted' ? 'Call Not Picked' :
+                                   lead.status === 'qualified' ? 'Qualified (Interested)' :
+                                   lead.status === 'not_interested' ? 'Not Interested' :
+                                   lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1)) : 'New'}
+                                </span>
                               </td>
                             </tr>
                           ))}

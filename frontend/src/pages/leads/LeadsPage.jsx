@@ -15,11 +15,12 @@ import toast from 'react-hot-toast';
 
 // Status config
 const STATUS_CONFIG = {
-  new:       { label: 'New',       cls: 'badge-info',    dot: '#06b6d4' },
-  contacted: { label: 'Contacted', cls: 'badge-warning', dot: '#f59e0b' },
-  qualified: { label: 'Qualified (Interested)', cls: 'badge-accent',  dot: '#818cf8' },
-  lost:      { label: 'Lost',      cls: 'badge-danger',  dot: '#ef4444' },
-  converted: { label: 'Converted', cls: 'badge-success', dot: '#10b981' },
+  new:            { label: 'New',                    cls: 'badge-info',      dot: '#06b6d4' },
+  contacted:      { label: 'Call Not Picked',        cls: 'badge-warning',   dot: '#f59e0b' },
+  qualified:      { label: 'Qualified (Interested)', cls: 'badge-accent',    dot: '#818cf8' },
+  not_interested: { label: 'Not Interested',         cls: 'badge-secondary', dot: '#c084fc' },
+  lost:           { label: 'Lost',                   cls: 'badge-danger',    dot: '#ef4444' },
+  converted:      { label: 'Converted',              cls: 'badge-success',   dot: '#10b981' },
 };
 
 const EXPO_LABELS = {
