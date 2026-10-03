@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   RiUserAddLine, RiSearchLine, RiEditLine, RiDeleteBinLine,
   RiRefreshLine, RiCloseLine, RiSaveLine, RiPhoneLine,
@@ -583,16 +584,24 @@ const BulkUploadModal = ({ onClose, onDone }) => {
 // ── Main Page ────────────────────────────────────────────────────────────────
 const LeadsPage = () => {
   const { hasPermission } = useAuth();
+  const [searchParams] = useSearchParams();
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [statusCounts, setStatusCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [expoFilter, setExpoFilter] = useState('');
   const [page, setPage] = useState(1);
   const limit = 10;
+
+  useEffect(() => {
+    const qStatus = searchParams.get('status');
+    if (qStatus !== null) {
+      setStatusFilter(qStatus);
+    }
+  }, [searchParams]);
 
   // Selection state for bulk delete
   const [selected, setSelected] = useState(new Set());

@@ -17,12 +17,20 @@ import {
   RiPhoneLine,
   RiUserHeartLine
 } from 'react-icons/ri';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
-const StatCard = ({ icon, label, value, color = 'accent' }) => (
-  <div className={`stat-card ${color}`}>
+const StatCard = ({ icon, label, value, color = 'accent', onClick }) => (
+  <div 
+    className={`stat-card ${color}`}
+    onClick={onClick}
+    style={{ 
+      cursor: onClick ? 'pointer' : 'default', 
+      transition: 'transform 0.18s ease, box-shadow 0.18s ease' 
+    }}
+  >
     <div className="stat-icon" style={{ color: `var(--${color === 'accent' ? 'accent' : color})` }}>
       {icon}
     </div>
@@ -33,6 +41,7 @@ const StatCard = ({ icon, label, value, color = 'accent' }) => (
 
 const Dashboard = () => {
   const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
 
   // Business stats visibility check (only checks actual business widgets, not general page access)
   const canSeeBusinessTab =
@@ -294,6 +303,7 @@ const Dashboard = () => {
                   label="Total Leads" 
                   value={loadingBusiness ? null : businessStats?.stats?.totalLeads} 
                   color="accent" 
+                  onClick={() => navigate('/leads')}
                 />
               )}
               {hasPermission('dashboard', 'calls-widget', 'canView') && (
@@ -302,6 +312,7 @@ const Dashboard = () => {
                   label="Total Calls" 
                   value={loadingBusiness ? null : businessStats?.stats?.totalCalls} 
                   color="info" 
+                  onClick={() => navigate('/leads')}
                 />
               )}
               {hasPermission('dashboard', 'interested-leads-widget', 'canView') && (
@@ -310,6 +321,7 @@ const Dashboard = () => {
                   label="Total Interested Leads" 
                   value={loadingBusiness ? null : businessStats?.stats?.totalInterestedLeads} 
                   color="warning" 
+                  onClick={() => navigate('/leads?status=qualified')}
                 />
               )}
               {hasPermission('dashboard', 'projects-widget', 'canView') && (
@@ -318,6 +330,7 @@ const Dashboard = () => {
                   label="Total Projects" 
                   value={loadingBusiness ? null : businessStats?.stats?.totalProjects} 
                   color="accent" 
+                  onClick={() => navigate('/leads?status=converted')}
                 />
               )}
               {hasPermission('dashboard', 'pending-projects-widget', 'canView') && (
@@ -326,6 +339,7 @@ const Dashboard = () => {
                   label="Pending Projects" 
                   value={loadingBusiness ? null : businessStats?.stats?.pendingProjects} 
                   color="warning" 
+                  onClick={() => navigate('/leads?status=converted')}
                 />
               )}
               {hasPermission('dashboard', 'completed-projects-widget', 'canView') && (
@@ -334,6 +348,7 @@ const Dashboard = () => {
                   label="Completed Projects" 
                   value={loadingBusiness ? null : businessStats?.stats?.completedProjects} 
                   color="success" 
+                  onClick={() => navigate('/leads?status=converted')}
                 />
               )}
             </div>
