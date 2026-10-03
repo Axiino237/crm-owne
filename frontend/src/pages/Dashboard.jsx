@@ -32,9 +32,8 @@ const StatCard = ({ icon, label, value, color = 'accent' }) => (
 const Dashboard = () => {
   const { user, hasPermission } = useAuth();
 
-  // Business stats visibility check
+  // Business stats visibility check (only checks actual business widgets, not general page access)
   const canSeeBusinessTab =
-    hasPermission('dashboard', 'dashboard-home', 'canView') ||
     hasPermission('dashboard', 'leads-widget', 'canView') ||
     hasPermission('dashboard', 'projects-widget', 'canView') ||
     hasPermission('dashboard', 'pending-projects-widget', 'canView') ||
@@ -44,7 +43,11 @@ const Dashboard = () => {
     hasPermission('dashboard', 'deductions-card', 'canView') ||
     hasPermission('dashboard', 'profit-trend-chart', 'canView') ||
     hasPermission('dashboard', 'recent-leads-list', 'canView') ||
-    hasPermission('dashboard', 'recent-projects-list', 'canView');
+    hasPermission('dashboard', 'recent-projects-list', 'canView') ||
+    hasPermission('dashboard', 'pending-designs-widget', 'canView') ||
+    hasPermission('dashboard', 'completed-designs-widget', 'canView') ||
+    hasPermission('dashboard', 'change-designs-widget', 'canView') ||
+    hasPermission('dashboard', 'total-designs-widget', 'canView');
 
   // System Overviews tab visibility check
   const canSeeSystemTab =
@@ -52,6 +55,7 @@ const Dashboard = () => {
 
   // Initialize active tab based on permissions
   const [activeTab, setActiveTab] = useState(() => {
+    if (canSeeSystemTab && !canSeeBusinessTab) return 'system';
     if (canSeeBusinessTab) return 'business';
     if (canSeeSystemTab) return 'system';
     return 'none';
@@ -63,10 +67,12 @@ const Dashboard = () => {
 
   // Dynamic activeTab sync if permissions load late
   useEffect(() => {
-    if (canSeeBusinessTab) {
-      setActiveTab('business');
+    if (canSeeBusinessTab && canSeeSystemTab) {
+      setActiveTab(prev => (prev === 'system' || prev === 'business') ? prev : 'business');
     } else if (canSeeSystemTab) {
       setActiveTab('system');
+    } else if (canSeeBusinessTab) {
+      setActiveTab('business');
     } else {
       setActiveTab('none');
     }
