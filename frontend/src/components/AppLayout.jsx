@@ -17,7 +17,7 @@ const Sidebar = () => {
   const { user, logout, hasPermission } = useAuth();
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'SA';
   const navItems = [
-    { section: 'Main', items: [{ to: '/dashboard', icon: <RiDashboardLine />, label: 'Dashboard', always: true }] },
+    { section: 'Main', items: [{ to: '/dashboard', icon: <RiDashboardLine />, label: 'Dashboard', show: hasPermission('dashboard', 'dashboard-home', 'canView') }] },
     {
       section: 'User Management', items: [
         { to: '/uam/users', icon: <RiTeamLine />, label: 'Users', show: hasPermission('uam', 'users-list', 'canView') },
@@ -28,7 +28,7 @@ const Sidebar = () => {
     },
     {
       section: 'Organization', items: [
-        { to: '/organizations', icon: <RiBuildingLine />, label: 'Organizations', show: user?.isSuperAdmin },
+        { to: '/organizations', icon: <RiBuildingLine />, label: 'Organizations', show: user?.isSuperAdmin && hasPermission('organizations', 'organizations-list', 'canView') },
         { to: '/companies', icon: <RiBuilding2Line />, label: 'Companies', show: hasPermission('companies', 'companies-list', 'canView') },
         { to: '/departments', icon: <RiGroupLine />, label: 'Departments', show: hasPermission('departments', 'departments-list', 'canView') },
         { to: '/org-overview', icon: <RiOrganizationChart />, label: 'Org Overview', show: hasPermission('dashboard', 'org-overview', 'canView') }

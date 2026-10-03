@@ -3,7 +3,7 @@ import { RiAddLine, RiPencilLine, RiDeleteBinLine, RiSearchLine } from 'react-ic
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 import api from '../../api/axios';
-import ConfirmModal from '../../components/ConfirmModal';
+import DeleteDependencyModal from '../../components/DeleteDependencyModal';
 
 const DeptModal = ({ dept, onClose, onSaved }) => {
   const [form, setForm] = useState({
@@ -136,7 +136,6 @@ const DepartmentsPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editDept, setEditDept] = useState(null);
   const [deleteDept, setDeleteDept] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const LIMIT = 10;
 
   const fetchDepts = useCallback(async () => {
@@ -153,21 +152,6 @@ const DepartmentsPage = () => {
 
   const handleDelete = (dept) => {
     setDeleteDept(dept);
-  };
-
-  const executeDelete = async () => {
-    if (!deleteDept) return;
-    setDeleteLoading(true);
-    try {
-      await api.delete(`/departments/${deleteDept.id}`);
-      toast.success('Department deleted');
-      fetchDepts();
-    } catch (err) { 
-      toast.error(err.response?.data?.message || 'Delete failed'); 
-    } finally {
-      setDeleteLoading(false);
-      setDeleteDept(null);
-    }
   };
 
   const totalPages = Math.ceil(total / LIMIT);
@@ -259,15 +243,15 @@ const DepartmentsPage = () => {
         <DeptModal dept={editDept} onClose={() => { setShowModal(false); setEditDept(null); }} onSaved={() => { setShowModal(false); setEditDept(null); fetchDepts(); }} />
       )}
 
-      <ConfirmModal 
+      <DeleteDependencyModal 
         isOpen={!!deleteDept}
-        title="Delete Department"
-        message={`Are you sure you want to delete department "${deleteDept?.name}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteDept(null)}
-        loading={deleteLoading}
+        entityType="Department"
+        entityId={deleteDept?.id}
+        entityName={deleteDept?.name}
+        dependencyEndpoint={deleteDept ? `/departments/${deleteDept.id}/dependencies` : null}
+        deleteEndpoint={deleteDept ? `/departments/${deleteDept.id}` : null}
+        onClose={() => setDeleteDept(null)}
+        onDeleted={fetchDepts}
       />
     </AppLayout>
   );

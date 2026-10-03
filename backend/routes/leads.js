@@ -7,6 +7,17 @@ const { Lead, User, Organization } = require('../models');
 const { protect } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/permission');
 
+// @desc   Download CSV template
+// @route  GET /api/leads/csv-template
+router.get('/csv-template', (req, res) => {
+  const headers = 'Company Name,Contact Person,Email,Phone Number,Designation,Expo Type,Expo Name,Address,Assigned To,Status,Expo Mode,Last Contacted Date,Next Follow Up,Remarks,Alternate Phone';
+  const sample  = 'Acme Corp,John Doe,john@acme.com,9876543210,CEO,Social Media,Google Ads,123 Main St,admin@crm.com,new,Online,2026-06-30,2026-07-15,Looking for CRM options,9876543211';
+  const csv = `${headers}\n${sample}\n`;
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="leads_template.csv"');
+  res.send(csv);
+});
+
 router.use(protect);
 
 // Multer — memory storage for CSV / Excel parsing
@@ -49,15 +60,15 @@ const parseCSV = (buffer) => {
 };
 
 const VALID_STATUSES = ['new', 'contacted', 'qualified', 'lost', 'converted'];
-const VALID_SOURCES = ['website', 'referral', 'social_media', 'cold_call', 'email', 'other'];
+const VALID_EXPOS = ['website', 'referral', 'social_media', 'cold_call', 'email', 'other'];
 
 // @desc   Get all leads
 // @route  GET /api/leads
 router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, res) => {
   try {
-    const { search = '', status, source, page = 1, limit = 10 } = req.query;
+    const { search = '', status, expo, page = 1, limit = 10 } = req.query;
 
-    // Base search + source + org scope (shared between table and badge counts)
+    // Base search + expo + org scope (shared between table and badge counts)
     const baseWhere = {};
     if (search) {
       baseWhere[Op.or] = [
@@ -66,15 +77,15 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
         { email: { [Op.iLike]: `%${search}%` } },
         { phone: { [Op.iLike]: `%${search}%` } },
         { designation: { [Op.iLike]: `%${search}%` } },
-        { sourceType: { [Op.iLike]: `%${search}%` } },
-        { sourceName: { [Op.iLike]: `%${search}%` } },
+        { expoType: { [Op.iLike]: `%${search}%` } },
+        { expoName: { [Op.iLike]: `%${search}%` } },
         { address: { [Op.iLike]: `%${search}%` } },
-        { sourceMode: { [Op.iLike]: `%${search}%` } },
+        { expoMode: { [Op.iLike]: `%${search}%` } },
         { alternatePhone: { [Op.iLike]: `%${search}%` } },
         { notes: { [Op.iLike]: `%${search}%` } }
       ];
     }
-    if (source) baseWhere.source = source;
+    if (expo) baseWhere.expo = expo;
 
     // Scope by org / role hierarchy
     const userRole = req.user.role?.level;
@@ -101,16 +112,8 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
         })).map(u => u.id);
         baseWhere.organizationId = req.user.organizationId;
         baseWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else if (hasTeamScope && scopedDeptId) {
-        // Team head / dept manager sees leads of department users or unassigned in department scope
-        const deptUserIds = (await User.findAll({
-          where: { departmentId: scopedDeptId },
-          attributes: ['id']
-        })).map(u => u.id);
-        baseWhere.organizationId = req.user.organizationId;
-        baseWhere.assignedTo = { [Op.or]: [{ [Op.in]: deptUserIds }, null] };
       } else {
-        // Regular user sees only leads assigned directly to them
+        // Regular users and department managers/team heads only see leads assigned directly to them
         baseWhere.organizationId = req.user.organizationId;
         baseWhere.assignedTo = req.user.id;
       }
@@ -153,16 +156,7 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
 });
 
 
-// @desc   Download CSV template
-// @route  GET /api/leads/csv-template
-router.get('/csv-template', checkPermission('leads', 'leads-list', 'canView'), (req, res) => {
-  const headers = 'Company Name,Contact Person,Email,Phone Number,Designation,Source Type,Source Name,Address,Assigned To,Status,Source Mode,Last Contacted Date,Next Follow Up,Remarks,Alternate Phone';
-  const sample  = 'Acme Corp,John Doe,john@acme.com,9876543210,CEO,Social Media,Google Ads,123 Main St,admin@crm.com,new,Online,2026-06-30,2026-07-15,Looking for CRM options,9876543211';
-  const csv = `${headers}\n${sample}\n`;
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="leads_template.csv"');
-  res.send(csv);
-});
+
 
 // @desc   Get single lead
 // @route  GET /api/leads/:id
@@ -205,13 +199,6 @@ router.get('/:id', checkPermission('leads', 'leads-list', 'canView'), async (req
         } else {
           isAuthorized = true; // Company Admin sees unassigned
         }
-      } else if (hasTeamScope && scopedDeptId) {
-        if (lead.assignedTo) {
-          const assigneeUser = await User.findByPk(lead.assignedTo, { attributes: ['departmentId'] });
-          if (assigneeUser && assigneeUser.departmentId === scopedDeptId) isAuthorized = true;
-        } else {
-          isAuthorized = true; // Manager/Head sees unassigned
-        }
       }
     }
 
@@ -230,8 +217,8 @@ router.get('/:id', checkPermission('leads', 'leads-list', 'canView'), async (req
 router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req, res) => {
   try {
     const {
-      name, companyName, email, phone, status, source, value, notes, assignedTo,
-      designation, sourceType, sourceName, address, sourceMode, lastContactedDate, nextFollowUp, alternatePhone,
+      name, companyName, email, phone, status, expo, value, notes, assignedTo,
+      designation, expoType, expoName, address, expoMode, lastContactedDate, nextFollowUp, alternatePhone,
       paidAmount, vendorPaidAmount, designStatus
     } = req.body;
     if (!name && !companyName) return res.status(400).json({ success: false, message: 'Either Contact Person or Company Name is required' });
@@ -242,15 +229,15 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
       email: email || null,
       phone: phone || null,
       status: status || 'new',
-      source: source || 'other',
+      expo: expo || 'other',
       value: value || 0,
       notes: notes || null,
-      assignedTo: assignedTo || (req.user.role?.level === 'user' ? req.user.id : null),
+      assignedTo: assignedTo || req.user.id, // ✅ Auto-assign to creator always
       designation: designation || null,
-      sourceType: sourceType || null,
-      sourceName: sourceName || null,
+      expoType: expoType || null,
+      expoName: expoName || null,
       address: address || null,
-      sourceMode: sourceMode || null,
+      expoMode: expoMode || null,
       lastContactedDate: lastContactedDate || null,
       nextFollowUp: nextFollowUp || null,
       alternatePhone: alternatePhone || null,
@@ -309,9 +296,13 @@ router.put('/:id', async (req, res, next) => {
     const lead = await Lead.findByPk(req.params.id);
     if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
 
+    if (!req.user.isSuperAdmin && lead.organizationId && req.user.organizationId && lead.organizationId !== req.user.organizationId) {
+      return res.status(403).json({ success: false, message: 'Access denied: You cannot edit leads from another organization' });
+    }
+
     const {
-      name, companyName, email, phone, status, source, value, notes, assignedTo,
-      designation, sourceType, sourceName, address, sourceMode, lastContactedDate, nextFollowUp, alternatePhone,
+      name, companyName, email, phone, status, expo, value, notes, assignedTo,
+      designation, expoType, expoName, address, expoMode, lastContactedDate, nextFollowUp, alternatePhone,
       paidAmount, vendorPaidAmount, designStatus
     } = req.body;
     const updates = {};
@@ -320,15 +311,15 @@ router.put('/:id', async (req, res, next) => {
     if (email !== undefined) updates.email = email;
     if (phone !== undefined) updates.phone = phone;
     if (status !== undefined) updates.status = status;
-    if (source !== undefined) updates.source = source;
+    if (expo !== undefined) updates.expo = expo;
     if (value !== undefined) updates.value = value;
     if (notes !== undefined) updates.notes = notes;
     if (assignedTo !== undefined) updates.assignedTo = assignedTo || null;
     if (designation !== undefined) updates.designation = designation;
-    if (sourceType !== undefined) updates.sourceType = sourceType;
-    if (sourceName !== undefined) updates.sourceName = sourceName;
+    if (expoType !== undefined) updates.expoType = expoType;
+    if (expoName !== undefined) updates.expoName = expoName;
     if (address !== undefined) updates.address = address;
-    if (sourceMode !== undefined) updates.sourceMode = sourceMode;
+    if (expoMode !== undefined) updates.expoMode = expoMode;
     if (lastContactedDate !== undefined) updates.lastContactedDate = lastContactedDate || null;
     if (nextFollowUp !== undefined) updates.nextFollowUp = nextFollowUp || null;
     if (alternatePhone !== undefined) updates.alternatePhone = alternatePhone;
@@ -388,6 +379,11 @@ router.delete('/:id', checkPermission('leads', 'leads-list', 'canDelete'), async
   try {
     const lead = await Lead.findByPk(req.params.id);
     if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+
+    if (!req.user.isSuperAdmin && lead.organizationId && req.user.organizationId && lead.organizationId !== req.user.organizationId) {
+      return res.status(403).json({ success: false, message: 'Access denied: You cannot delete leads from another organization' });
+    }
+
     await lead.destroy();
 
     const { logAction } = require('../utils/auditLogger');
@@ -485,14 +481,14 @@ router.post('/bulk-upload', checkPermission('leads', 'leads-list', 'canCreate'),
           email: (row['email'] || '').trim() || null,
           phone: (row['phone number'] || row['phonenumber'] || row['phone'] || row['mobile'] || '').trim() || null,
           status,
-          source: (row['source type'] || row['sourcetype'] || row['source'] || 'other').trim().toLowerCase() || 'other',
+          expo: (row['expo type'] || row['expotype'] || row['expo'] || row['source type'] || row['sourcetype'] || row['source'] || 'other').trim().toLowerCase() || 'other',
           value: parseFloat(row['value'] || row['estimated value'] || '0') || 0,
           notes: (row['remarks'] || row['notes'] || row['note'] || '').trim() || null,
           designation: (row['designation'] || '').trim() || null,
-          sourceType: (row['source type'] || row['sourcetype'] || '').trim() || null,
-          sourceName: (row['source name'] || row['sourcename'] || '').trim() || null,
+          expoType: (row['expo type'] || row['expotype'] || row['source type'] || row['sourcetype'] || '').trim() || null,
+          expoName: (row['expo name'] || row['exponame'] || row['source name'] || row['sourcename'] || '').trim() || null,
           address: (row['address'] || '').trim() || null,
-          sourceMode: (row['source mode'] || row['sourcemode'] || '').trim() || null,
+          expoMode: (row['expo mode'] || row['expomode'] || row['source mode'] || row['sourcemode'] || '').trim() || null,
           lastContactedDate: parseCSVDate(row['last contacted date'] || row['lastcontacteddate']),
           nextFollowUp: parseCSVDate(row['next follow up'] || row['nextfollowup']),
           alternatePhone: (row['alternate phone'] || row['alternatephone'] || '').trim() || null,

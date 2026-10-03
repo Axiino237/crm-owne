@@ -3,9 +3,9 @@ const { Permission } = require('../models');
 const checkPermission = (module, screen, action = 'canView') => {
   return async (req, res, next) => {
     try {
-      // Core admin modules are always accessible to Super Admin to avoid lockouts
-      const isCoreAdminModule = ['uam', 'roles', 'permissions'].includes(module);
-      if (req.user && req.user.isSuperAdmin && isCoreAdminModule) {
+      // Safety guard: only prevent locking out the permissions configuration screens themselves
+      const isPermManager = module === 'permissions' && ['permissions-list', 'permission-edit'].includes(screen);
+      if (req.user && req.user.isSuperAdmin && isPermManager) {
         return next();
       }
 

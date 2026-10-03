@@ -450,7 +450,7 @@ const Dashboard = () => {
                         <thead>
                           <tr>
                             <th>Lead Info</th>
-                            <th>Source</th>
+                            <th>Expo</th>
                             <th>Est. Value</th>
                             <th>Status</th>
                           </tr>
@@ -462,7 +462,7 @@ const Dashboard = () => {
                                 <div style={{ fontWeight: 600 }}>{lead.name}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{lead.companyName || 'Individual'}</div>
                               </td>
-                              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{lead.source}</span></td>
+                              <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{lead.expo}</span></td>
                               <td><span style={{ fontWeight: 600, color: 'var(--accent)' }}>{formatCurrency(lead.value)}</span></td>
                               <td>
                                 <span className={`badge ${
@@ -539,7 +539,7 @@ const Dashboard = () => {
             {hasPermission('roles', 'roles-list', 'canView') && (
               <StatCard icon={<RiShieldUserLine />} label="Roles" value={loadingSystem ? null : systemStats.roles} color="info" />
             )}
-            {user?.isSuperAdmin && (
+            {user?.isSuperAdmin && hasPermission('organizations', 'organizations-list', 'canView') && (
               <StatCard icon={<RiBuildingLine />} label="Organizations" value={loadingSystem ? null : systemStats.organizations} color="warning" />
             )}
             {hasPermission('companies', 'companies-list', 'canView') && (
@@ -564,7 +564,7 @@ const Dashboard = () => {
                     <RiShieldUserLine /> Create Role
                   </a>
                 )}
-                {user?.isSuperAdmin && (
+                {user?.isSuperAdmin && hasPermission('organizations', 'organization-create', 'canCreate') && (
                   <a href="/organizations" className="btn btn-outline" style={{ justifyContent: 'center' }}>
                     <RiBuildingLine /> Add Organization
                   </a>

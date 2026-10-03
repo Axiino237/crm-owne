@@ -23,7 +23,7 @@ const ACTIONS = [
 const PermissionsPage = () => {
   const { roleId } = useParams();
   const navigate = useNavigate();
-  const { fetchPermissions } = useAuth();
+  const { refreshAuth } = useAuth();
   const [role, setRole] = useState(null);
   const [moduleScreens, setModuleScreens] = useState({});
   const [permsMatrix, setPermsMatrix] = useState({});
@@ -103,7 +103,7 @@ const PermissionsPage = () => {
     try {
       await api.put(`/permissions/role/${roleId}`, { permissions });
       toast.success('Permissions saved successfully!');
-      fetchPermissions(); // instantly update sidebar & current user session permissions
+      refreshAuth(); // instantly update sidebar & current user session permissions & profile
     } catch (err) {
       toast.error(err.response?.data?.message || 'Save failed');
     }

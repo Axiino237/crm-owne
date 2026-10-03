@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Lead, Project, User, DesignOrder } = require('../models');
+const { Lead, Project, User, DesignOrder, Department } = require('../models');
 const { protect } = require('../middleware/auth');
 const { sequelize } = require('../config/db');
 const { Op } = require('sequelize');
@@ -13,14 +13,14 @@ async function seedDummyDataIfEmpty() {
     const leadCount = await Lead.count();
     if (leadCount === 0) {
       await Lead.bulkCreate([
-        { name: 'John Doe', companyName: 'Google Inc.', email: 'john@google.com', phone: '+1 555-1234', status: 'converted', source: 'Website', value: 50000.00, notes: 'Interested in CRM custom systems' },
-        { name: 'Jane Smith', companyName: 'Acme Corp', email: 'jane@acme.com', phone: '+1 555-5678', status: 'qualified', source: 'Referral', value: 25000.00, notes: 'Follow up next Tuesday' },
-        { name: 'Vijay Kumar', companyName: 'Vee Tech', email: 'vijay@veetech.in', phone: '+91 9876543210', status: 'contacted', source: 'LinkedIn', value: 15000.00, notes: 'Shared brochure' },
-        { name: 'Sarah Connor', companyName: 'Cyberdyne Systems', email: 'sarah@cyberdyne.com', phone: '+1 555-9000', status: 'new', source: 'Google Ads', value: 120000.00, notes: 'Very high intent lead' },
-        { name: 'Robert Downey', companyName: 'Stark Industries', email: 'tony@stark.com', phone: '+1 555-3000', status: 'converted', source: 'Partner', value: 450000.00, notes: 'Signed contract' },
-        { name: 'Elon Musk', companyName: 'X Corp', email: 'elon@x.com', phone: '+1 555-4242', status: 'lost', source: 'Cold Email', value: 90000.00, notes: 'Not interested at this time' },
-        { name: 'Sundar Pichai', companyName: 'Alphabet', email: 'sundar@google.com', phone: '+1 555-1111', status: 'new', source: 'Website', value: 80000.00, notes: 'Requested demo request' },
-        { name: 'Mark Zuckerberg', companyName: 'Meta', email: 'mark@meta.com', phone: '+1 555-2222', status: 'contacted', source: 'LinkedIn', value: 150000.00, notes: 'Interested in enterprise subscription' }
+        { name: 'John Doe', companyName: 'Google Inc.', email: 'john@google.com', phone: '+1 555-1234', status: 'converted', expo: 'Website', value: 50000.00, notes: 'Interested in CRM custom systems' },
+        { name: 'Jane Smith', companyName: 'Acme Corp', email: 'jane@acme.com', phone: '+1 555-5678', status: 'qualified', expo: 'Referral', value: 25000.00, notes: 'Follow up next Tuesday' },
+        { name: 'Vijay Kumar', companyName: 'Vee Tech', email: 'vijay@veetech.in', phone: '+91 9876543210', status: 'contacted', expo: 'LinkedIn', value: 15000.00, notes: 'Shared brochure' },
+        { name: 'Sarah Connor', companyName: 'Cyberdyne Systems', email: 'sarah@cyberdyne.com', phone: '+1 555-9000', status: 'new', expo: 'Google Ads', value: 120000.00, notes: 'Very high intent lead' },
+        { name: 'Robert Downey', companyName: 'Stark Industries', email: 'tony@stark.com', phone: '+1 555-3000', status: 'converted', expo: 'Partner', value: 450000.00, notes: 'Signed contract' },
+        { name: 'Elon Musk', companyName: 'X Corp', email: 'elon@x.com', phone: '+1 555-4242', status: 'lost', expo: 'Cold Email', value: 90000.00, notes: 'Not interested at this time' },
+        { name: 'Sundar Pichai', companyName: 'Alphabet', email: 'sundar@google.com', phone: '+1 555-1111', status: 'new', expo: 'Website', value: 80000.00, notes: 'Requested demo request' },
+        { name: 'Mark Zuckerberg', companyName: 'Meta', email: 'mark@meta.com', phone: '+1 555-2222', status: 'contacted', expo: 'LinkedIn', value: 150000.00, notes: 'Interested in enterprise subscription' }
       ]);
       console.log('✅ Dummy leads seeded successfully!');
     }
@@ -47,8 +47,6 @@ async function seedDummyDataIfEmpty() {
 // Stats Endpoint
 router.get('/stats', async (req, res) => {
   try {
-    // await seedDummyDataIfEmpty();
-
     const userRole = req.user.role?.level;
     const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
     const isOrgAdmin = userRole === 'org_admin';
@@ -56,66 +54,32 @@ router.get('/stats', async (req, res) => {
     const isDeptManager = userRole === 'dept_manager';
     const isRegular = userRole === 'user';
 
-    // Check if user is a department head via headId
-    const { Department } = require('../models');
     const managedDept = !isSuper && !isOrgAdmin && !isCompanyAdmin
       ? await Department.findOne({ where: { headId: req.user.id }, attributes: ['id'] })
       : null;
     const isDeptHead = !!managedDept;
 
-    // Combined: dept_manager role OR headId-based head gets team-level scoping
     const hasTeamScope = isDeptManager || isDeptHead;
     const scopedDeptId = managedDept?.id || req.user.departmentId;
 
-    // Base scoping where clause for dashboard counts
     const countsWhere = {};
     if (!isSuper) {
       if (isOrgAdmin && req.user.organizationId) {
         countsWhere.organizationId = req.user.organizationId;
       } else if (isCompanyAdmin && req.user.companyId) {
-        const companyUserIds = (await User.findAll({
-          where: { companyId: req.user.companyId },
-          attributes: ['id']
-        })).map(u => u.id);
+        const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
         countsWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else if (hasTeamScope && scopedDeptId) {
-        // dept_manager OR dept head → see their whole department's leads
-        const deptUserIds = (await User.findAll({
-          where: { departmentId: scopedDeptId },
-          attributes: ['id']
-        })).map(u => u.id);
-        countsWhere.assignedTo = { [Op.or]: [{ [Op.in]: deptUserIds }, null] };
-      } else if (isRegular) {
+      } else {
+        // dept_manager and regular users only count leads assigned directly to them
         countsWhere.assignedTo = req.user.id;
       }
     }
 
-    const totalLeads = await Lead.count({ where: countsWhere });
-    const totalProjects = await Project.count();
-    
-    const pendingProjects = await Project.count({
-      where: {
-        status: { [Op.in]: ['pending', 'in_progress'] }
-      }
-    });
-
-    const completedProjects = await Project.count({
-      where: {
-        status: 'completed'
-      }
-    });
-
-    // Count design statuses from converted leads
-    // Design team scoping check
     let isDesignTeam = false;
-    if (req.user.role?.name && req.user.role.name.toLowerCase().includes('design')) {
-      isDesignTeam = true;
-    }
+    if (req.user.role?.name && req.user.role.name.toLowerCase().includes('design')) isDesignTeam = true;
     if (req.user.departmentId) {
       const dept = await Department.findByPk(req.user.departmentId);
-      if (dept && (dept.name.toLowerCase().includes('design') || (dept.code && dept.code.toLowerCase().includes('design')))) {
-        isDesignTeam = true;
-      }
+      if (dept && (dept.name.toLowerCase().includes('design') || (dept.code && dept.code.toLowerCase().includes('design')))) isDesignTeam = true;
     }
 
     const designOrderWhere = {};
@@ -126,11 +90,7 @@ router.get('/stats', async (req, res) => {
         designOrderWhere.assignedDesignerId = req.user.id;
         if (req.user.organizationId) designOrderWhere.organizationId = req.user.organizationId;
       } else if (hasTeamScope && scopedDeptId) {
-        // dept_manager OR dept head → see all design orders submitted by their dept
-        const deptUserIds = (await User.findAll({
-          where: { departmentId: scopedDeptId },
-          attributes: ['id']
-        })).map(u => u.id);
+        const deptUserIds = (await User.findAll({ where: { departmentId: scopedDeptId }, attributes: ['id'] })).map(u => u.id);
         designOrderWhere.submittedBy = { [Op.in]: deptUserIds };
         if (req.user.organizationId) designOrderWhere.organizationId = req.user.organizationId;
       } else {
@@ -139,157 +99,71 @@ router.get('/stats', async (req, res) => {
       }
     }
 
-    const totalDesigns = await DesignOrder.count({
-      where: designOrderWhere
-    });
-
-    const pendingDesigns = await DesignOrder.count({
-      where: {
-        ...designOrderWhere,
-        status: { [Op.in]: ['pending', 'in_progress'] }
-      }
-    });
-
-    const completedDesigns = await DesignOrder.count({
-      where: {
-        ...designOrderWhere,
-        status: 'completed'
-      }
-    });
-
+    // changeWhere: scopes Lead.count for change designs — uses Lead columns only (assignedTo, organizationId)
     const changeWhere = {};
     if (!isSuper) {
       if (isOrgAdmin && req.user.organizationId) {
         changeWhere.organizationId = req.user.organizationId;
       } else if (isDesignTeam) {
+        // Get lead IDs assigned to this designer via DesignOrder
         const assignedLeadIds = (await DesignOrder.findAll({
-          where: { assignedDesignerId: req.user.id },
-          attributes: ['leadId']
+          where: { assignedDesignerId: req.user.id }, attributes: ['leadId']
         })).map(o => o.leadId).filter(Boolean);
-        changeWhere.id = { [Op.in]: assignedLeadIds };
+        changeWhere.id = { [Op.in]: assignedLeadIds.length ? assignedLeadIds : [-1] };
         if (req.user.organizationId) changeWhere.organizationId = req.user.organizationId;
       } else if (hasTeamScope && scopedDeptId) {
-        // dept_manager OR dept head → see change designs for their dept
-        const deptUserIds = (await User.findAll({
-          where: { departmentId: scopedDeptId },
-          attributes: ['id']
-        })).map(u => u.id);
-        changeWhere.submittedBy = { [Op.in]: deptUserIds };
+        // dept_manager / dept head — scope by leads assigned to dept users
+        const deptUserIds = (await User.findAll({ where: { departmentId: scopedDeptId }, attributes: ['id'] })).map(u => u.id);
+        changeWhere.assignedTo = { [Op.in]: deptUserIds.length ? deptUserIds : [-1] };
         if (req.user.organizationId) changeWhere.organizationId = req.user.organizationId;
+      } else if (isCompanyAdmin && req.user.companyId) {
+        const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
+        changeWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
       } else {
-        changeWhere.submittedBy = req.user.id;
+        changeWhere.assignedTo = req.user.id;
         if (req.user.organizationId) changeWhere.organizationId = req.user.organizationId;
       }
     }
-
-    const changeDesigns = await Lead.count({
-      where: {
-        ...changeWhere,
-        status: 'converted',
-        designStatus: 'change'
-      }
-    });
-
-    // Compute financial totals from Converted Leads (fully paid only: value = paidAmount)
-
-    const financialWhere = {
-      status: 'converted'
-    };
-
-    // Only count leads where value === paidAmount
-    financialWhere[Op.and] = [
-      sequelize.where(sequelize.col('value'), '=', sequelize.col('paidAmount'))
-    ];
-
+    const financialWhere = { status: 'converted', [Op.and]: [sequelize.where(sequelize.col('value'), '=', sequelize.col('paidAmount'))] };
     if (!isSuper) {
-      if (isOrgAdmin && req.user.organizationId) {
-        financialWhere.organizationId = req.user.organizationId;
-      } else if (isCompanyAdmin && req.user.companyId) {
-        const companyUserIds = (await User.findAll({
-          where: { companyId: req.user.companyId },
-          attributes: ['id']
-        })).map(u => u.id);
+      if (isOrgAdmin && req.user.organizationId) financialWhere.organizationId = req.user.organizationId;
+      else if (isCompanyAdmin && req.user.companyId) {
+        const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
         financialWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
       } else if (isDeptManager && req.user.departmentId) {
-        const deptUserIds = (await User.findAll({
-          where: { departmentId: req.user.departmentId },
-          attributes: ['id']
-        })).map(u => u.id);
+        const deptUserIds = (await User.findAll({ where: { departmentId: req.user.departmentId }, attributes: ['id'] })).map(u => u.id);
         financialWhere.assignedTo = { [Op.or]: [{ [Op.in]: deptUserIds }, null] };
-      } else if (isRegular) {
-        financialWhere.assignedTo = req.user.id;
-      }
+      } else if (isRegular) financialWhere.assignedTo = req.user.id;
     }
 
-    const financeStats = await Lead.findOne({
-      attributes: [
-        [sequelize.fn('SUM', sequelize.col('value')), 'totalRevenue'],
-        [sequelize.fn('SUM', sequelize.col('vendorPaidAmount')), 'totalDeductions']
-      ],
-      where: financialWhere,
-      raw: true
-    });
+    const [totalLeads, totalProjects, pendingProjects, completedProjects, totalDesigns, pendingDesigns, completedDesigns, changeDesigns, financeStats, monthlyData, recentLeads, recentProjects] = await Promise.all([
+      Lead.count({ where: countsWhere }),
+      Project.count(),
+      Project.count({ where: { status: { [Op.in]: ['pending', 'in_progress'] } } }),
+      Project.count({ where: { status: 'completed' } }),
+      DesignOrder.count({ where: designOrderWhere }),
+      DesignOrder.count({ where: { ...designOrderWhere, status: { [Op.in]: ['pending', 'in_progress'] } } }),
+      DesignOrder.count({ where: { ...designOrderWhere, status: 'completed' } }),
+      Lead.count({ where: { ...changeWhere, status: 'converted', designStatus: 'change' } }),
+      Lead.findOne({ attributes: [[sequelize.fn('SUM', sequelize.col('value')), 'totalRevenue'], [sequelize.fn('SUM', sequelize.col('vendorPaidAmount')), 'totalDeductions']], where: financialWhere, raw: true }),
+      Lead.findAll({ attributes: [[sequelize.fn('date_trunc', 'month', sequelize.col('createdAt')), 'month'], [sequelize.fn('SUM', sequelize.col('value')), 'revenue'], [sequelize.fn('SUM', sequelize.col('vendorPaidAmount')), 'deductions']], where: financialWhere, group: [sequelize.fn('date_trunc', 'month', sequelize.col('createdAt'))], order: [[sequelize.fn('date_trunc', 'month', sequelize.col('createdAt')), 'ASC']], raw: true }),
+      Lead.findAll({ where: countsWhere, order: [['createdAt', 'DESC']], limit: 5 }),
+      Project.findAll({ order: [['createdAt', 'DESC']], limit: 5 })
+    ]);
 
     const totalRevenue = parseFloat(financeStats?.totalRevenue || 0);
     const totalDeductions = parseFloat(financeStats?.totalDeductions || 0);
     const totalProfit = totalRevenue - totalDeductions;
-
-    // Monthly average
-    const monthlyData = await Lead.findAll({
-      attributes: [
-        [sequelize.fn('date_trunc', 'month', sequelize.col('createdAt')), 'month'],
-        [sequelize.fn('SUM', sequelize.col('value')), 'revenue'],
-        [sequelize.fn('SUM', sequelize.col('vendorPaidAmount')), 'deductions']
-      ],
-      where: financialWhere,
-      group: [sequelize.fn('date_trunc', 'month', sequelize.col('createdAt'))],
-      order: [[sequelize.fn('date_trunc', 'month', sequelize.col('createdAt')), 'ASC']],
-      raw: true
-    });
-
-    // Format monthly data for front-end charts
     const monthlyList = monthlyData.map(m => {
       const rev = parseFloat(m.revenue || 0);
       const ded = parseFloat(m.deductions || 0);
-      return {
-        month: m.month ? new Date(m.month).toLocaleString('default', { month: 'short', year: 'numeric' }) : 'Jan 2026',
-        revenue: rev,
-        deductions: ded,
-        profit: rev - ded
-      };
+      return { month: m.month ? new Date(m.month).toLocaleString('default', { month: 'short', year: 'numeric' }) : 'Jan 2026', revenue: rev, deductions: ded, profit: rev - ded };
     });
-
-    const activeMonths = Math.max(1, monthlyList.length);
-    const perMonthProfit = totalProfit / activeMonths;
-
-    // Fetch lists to show inside dashboard summaries
-    const recentLeads = await Lead.findAll({
-      order: [['createdAt', 'DESC']],
-      limit: 5
-    });
-
-    const recentProjects = await Project.findAll({
-      order: [['createdAt', 'DESC']],
-      limit: 5
-    });
+    const perMonthProfit = totalProfit / Math.max(1, monthlyList.length);
 
     res.json({
       success: true,
-      stats: {
-        totalLeads,
-        totalProjects,
-        pendingProjects,
-        completedProjects,
-        totalDesigns,
-        pendingDesigns,
-        completedDesigns,
-        changeDesigns,
-        totalRevenue,
-        totalDeductions,
-        totalProfit,
-        perMonthProfit,
-        monthlyData: monthlyList.length > 0 ? monthlyList : [{ month: 'Jul 2026', revenue: totalRevenue, deductions: totalDeductions, profit: totalProfit }]
-      },
+      stats: { totalLeads, totalProjects, pendingProjects, completedProjects, totalDesigns, pendingDesigns, completedDesigns, changeDesigns, totalRevenue, totalDeductions, totalProfit, perMonthProfit, monthlyData: monthlyList.length > 0 ? monthlyList : [{ month: 'Jul 2026', revenue: totalRevenue, deductions: totalDeductions, profit: totalProfit }] },
       recentLeads,
       recentProjects
     });

@@ -59,7 +59,7 @@ const App = () => {
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={
-            <ProtectedRoute>
+            <ProtectedRoute module="dashboard" screen="dashboard-home" action="canView">
               <Dashboard />
             </ProtectedRoute>
           } />
@@ -93,7 +93,7 @@ const App = () => {
 
           {/* Organizations - Super Admin Only */}
           <Route path="/organizations" element={
-            <ProtectedRoute superAdminOnly={true}>
+            <ProtectedRoute superAdminOnly={true} module="organizations" screen="organizations-list" action="canView">
               <OrganizationsPage />
             </ProtectedRoute>
           } />
@@ -191,14 +191,14 @@ const App = () => {
 
           {/* Chat room */}
           <Route path="/chat" element={
-            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+            <ProtectedRoute module="chat" screen="chat-room" action="canView">
               <ChatPage />
             </ProtectedRoute>
           } />
 
           {/* Chat settings */}
           <Route path="/chat-settings" element={
-            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+            <ProtectedRoute module="chat" screen="chat-workspaces" action="canView">
               <ChatSettingsPage />
             </ProtectedRoute>
           } />

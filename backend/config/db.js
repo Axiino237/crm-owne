@@ -14,11 +14,13 @@ const [_, username, password, host, port, database] = match;
 
 const decodedPassword = decodeURIComponent(password);
 
+const isLocal = ['localhost', '127.0.0.1', 'postgres', 'dental_crm_postgres'].includes(host);
+
 const sequelize = new Sequelize(database, username, decodedPassword, {
   host: host,
   port: port,
   dialect: 'postgres',
-  dialectOptions: {
+  dialectOptions: isLocal ? {} : {
     ssl: {
       require: true,
       rejectUnauthorized: false // This disables SSL verification check
@@ -26,10 +28,11 @@ const sequelize = new Sequelize(database, username, decodedPassword, {
   },
   logging: false,
   pool: {
-    max: 5,
-    min: 0,
+    max: 15,       // ✅ More connections for parallel queries
+    min: 2,        // ✅ Keep 2 connections warm (faster first response)
     acquire: 30000,
-    idle: 10000
+    idle: 10000,
+    evict: 5000    // ✅ Clean up idle connections faster
   }
 });
 

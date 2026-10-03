@@ -21,16 +21,16 @@ const STATUS_CONFIG = {
   converted: { label: 'Converted', cls: 'badge-success', dot: '#10b981' },
 };
 
-const SOURCE_LABELS = {
+const EXPO_LABELS = {
   website: 'Website', referral: 'Referral', social_media: 'Social Media',
   cold_call: 'Cold Call', email: 'Email', other: 'Other'
 };
 
 const EMPTY_FORM = {
   name: '', companyName: '', email: '', phone: '',
-  status: 'new', source: 'other', value: '', notes: '', assignedTo: '',
-  designation: '', sourceType: '', sourceName: '', address: '',
-  sourceMode: '', lastContactedDate: '', nextFollowUp: '', alternatePhone: ''
+  status: 'new', expo: 'other', value: '', notes: '', assignedTo: '',
+  designation: '', expoType: '', expoName: '', address: '',
+  expoMode: '', lastContactedDate: '', nextFollowUp: '', alternatePhone: ''
 };
 
 const MODAL_INPUT_STYLE = { width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text-primary)', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' };
@@ -215,10 +215,10 @@ const formatCurrency = (v) => {
 const LeadModal = ({ lead, users, onClose, onSaved }) => {
   const [form, setForm] = useState(lead ? {
     name: lead.name || '', companyName: lead.companyName || '', email: lead.email || '',
-    phone: lead.phone || '', status: lead.status || 'new', source: lead.source || 'other',
+    phone: lead.phone || '', status: lead.status || 'new', expo: lead.expo || 'other',
     value: lead.value || '', notes: lead.notes || '', assignedTo: lead.assignedTo || '',
-    designation: lead.designation || '', sourceType: lead.sourceType || '', sourceName: lead.sourceName || '',
-    address: lead.address || '', sourceMode: lead.sourceMode || '',
+    designation: lead.designation || '', expoType: lead.expoType || '', expoName: lead.expoName || '',
+    address: lead.address || '', expoMode: lead.expoMode || '',
     lastContactedDate: lead.lastContactedDate || '', nextFollowUp: lead.nextFollowUp || '',
     alternatePhone: lead.alternatePhone || ''
   } : { ...EMPTY_FORM });
@@ -278,20 +278,17 @@ const LeadModal = ({ lead, users, onClose, onSaved }) => {
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Status</label>
               <select style={inputStyle} value={form.status} onChange={e => set('status', e.target.value)}>
                 {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
-            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Source Type</label>
-              <input style={inputStyle} value={form.sourceType} onChange={e => set('sourceType', e.target.value)} placeholder="e.g. Social Media, Cold Call" /></div>
-            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Source Name</label>
-              <input style={inputStyle} value={form.sourceName} onChange={e => set('sourceName', e.target.value)} placeholder="e.g. Google Ads, Referral" /></div>
-            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Source Mode</label>
-              <input style={inputStyle} value={form.sourceMode} onChange={e => set('sourceMode', e.target.value)} placeholder="e.g. Online, Offline" /></div>
+            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Expo Type</label>
+              <input style={inputStyle} value={form.expoType} onChange={e => set('expoType', e.target.value)} placeholder="e.g. Social Media, Cold Call" /></div>
+            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Expo Name</label>
+              <input style={inputStyle} value={form.expoName} onChange={e => set('expoName', e.target.value)} placeholder="e.g. Google Ads, Referral" /></div>
+            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Expo Mode</label>
+              <input style={inputStyle} value={form.expoMode} onChange={e => set('expoMode', e.target.value)} placeholder="e.g. Online, Offline" /></div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Last Contacted Date</label>
               <input style={inputStyle} type="date" value={form.lastContactedDate} onChange={e => set('lastContactedDate', e.target.value)} /></div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Next Follow Up</label>
               <input style={inputStyle} type="date" value={form.nextFollowUp} onChange={e => set('nextFollowUp', e.target.value)} /></div>
-            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Assign To</label>
-              <select style={inputStyle} value={form.assignedTo} onChange={e => set('assignedTo', e.target.value)}>
-                <option value="">— Unassigned —</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}</select></div>
+            {/* Assign To — hidden: auto-assigned to creator on backend */}
             <div style={{ gridColumn: 'span 2' }}>
               <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Address</label>
               <textarea style={{ ...inputStyle, minHeight: 44, resize: 'vertical' }} value={form.address} onChange={e => set('address', e.target.value)} placeholder="Full Address" />
@@ -360,12 +357,12 @@ const ViewLeadModal = ({ lead, onClose }) => {
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Source Type</div>
-              <div style={{ color: 'var(--text-primary)' }}>{lead.sourceType || SOURCE_LABELS[lead.source] || lead.source || '—'}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Expo Type</div>
+              <div style={{ color: 'var(--text-primary)' }}>{lead.expoType || EXPO_LABELS[lead.expo] || lead.expo || '—'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Source Name / Mode</div>
-              <div style={{ color: 'var(--text-primary)' }}>{lead.sourceName ? `${lead.sourceName} ${lead.sourceMode ? `(${lead.sourceMode})` : ''}` : '—'}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Expo Name / Mode</div>
+              <div style={{ color: 'var(--text-primary)' }}>{lead.expoName ? `${lead.expoName} ${lead.expoMode ? `(${lead.expoMode})` : ''}` : '—'}</div>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -429,7 +426,19 @@ const BulkUploadModal = ({ onClose, onDone }) => {
   };
 
   const downloadTemplate = () => {
-    window.open('/api/leads/csv-template', '_blank');
+    const headers = 'Company Name,Contact Person,Email,Phone Number,Designation,Expo Type,Expo Name,Address,Assigned To,Status,Expo Mode,Last Contacted Date,Next Follow Up,Remarks,Alternate Phone';
+    const sample  = 'Acme Corp,John Doe,john@acme.com,9876543210,CEO,Social Media,Google Ads,123 Main St,admin@crm.com,new,Online,2026-06-30,2026-07-15,Looking for CRM options,9876543211';
+    
+    const csvContent = "\uFEFF" + [headers, sample].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "leads_template.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleUpload = async () => {
@@ -466,7 +475,7 @@ const BulkUploadModal = ({ onClose, onDone }) => {
           <div style={{ background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.15)', borderRadius: 10, padding: '14px 16px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: 2 }}>CSV Template</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>name, companyName, email, phone, status, source, value, notes</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>name, companyName, email, phone, status, expo, value, notes</div>
             </div>
             <button className="btn btn-sm btn-outline" onClick={downloadTemplate}>
               <RiDownloadLine /> Download
@@ -552,7 +561,7 @@ const LeadsPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('');
+  const [expoFilter, setExpoFilter] = useState('');
   const [page, setPage] = useState(1);
   const limit = 10;
 
@@ -577,14 +586,14 @@ const LeadsPage = () => {
     try {
       const params = new URLSearchParams({ page, limit, search });
       if (statusFilter) params.set('status', statusFilter);
-      if (sourceFilter) params.set('source', sourceFilter);
+      if (expoFilter) params.set('expo', expoFilter);
       const res = await api.get(`/leads?${params}`);
       setLeads(res.data.leads || []);
       setTotal(res.data.total || 0);
       setStatusCounts(res.data.statusCounts || {});
     } catch { toast.error('Failed to load leads'); }
     setLoading(false);
-  }, [page, search, statusFilter, sourceFilter]);
+  }, [page, search, statusFilter, expoFilter]);
 
   const fetchUsers = useCallback(async () => {
     try { const res = await api.get('/uam/users?limit=100'); setUsers(res.data.users || []); } catch {}
@@ -721,10 +730,10 @@ const LeadsPage = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <RiFilterLine style={{ color: 'var(--text-muted)' }} />
-          <select value={sourceFilter} onChange={e => { setSourceFilter(e.target.value); setPage(1); }}
+          <select value={expoFilter} onChange={e => { setExpoFilter(e.target.value); setPage(1); }}
             style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary)', fontSize: '0.875rem' }}>
-            <option value="">All Sources</option>
-            {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            <option value="">All Expos</option>
+            {Object.entries(EXPO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
         <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
@@ -744,9 +753,9 @@ const LeadsPage = () => {
             <div style={{ fontSize: '3rem', marginBottom: 12 }}>🎯</div>
             <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>No leads found</div>
             <div style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-              {search || statusFilter || sourceFilter ? 'Try changing your filters' : 'Start by adding your first lead'}
+              {search || statusFilter || expoFilter ? 'Try changing your filters' : 'Start by adding your first lead'}
             </div>
-            {canCreate && !search && !statusFilter && !sourceFilter && (
+            {canCreate && !search && !statusFilter && !expoFilter && (
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                 <button className="btn btn-outline" onClick={() => setShowUpload(true)}><RiUpload2Line /> Bulk Upload</button>
                 <button className="btn btn-primary" onClick={openAdd}><RiUserAddLine /> Add Lead</button>
@@ -767,7 +776,7 @@ const LeadsPage = () => {
                   )}
                   <th>Lead</th>
                   <th>Contact</th>
-                  <th>Source</th>
+                  <th>Expo</th>
                   <th>Follow Up</th>
                   <th>Status</th>
                   <th>Assigned To</th>
@@ -817,9 +826,9 @@ const LeadsPage = () => {
                       </td>
                       <td>
                         <div style={{ fontSize: '0.8125rem' }}>
-                          <div style={{ color: 'var(--text-primary)' }}>{lead.sourceType || SOURCE_LABELS[lead.source] || lead.source}</div>
-                          {lead.sourceName && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{lead.sourceName}</div>}
-                          {lead.sourceMode && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({lead.sourceMode})</div>}
+                          <div style={{ color: 'var(--text-primary)' }}>{lead.expoType || EXPO_LABELS[lead.expo] || lead.expo}</div>
+                          {lead.expoName && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{lead.expoName}</div>}
+                          {lead.expoMode && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({lead.expoMode})</div>}
                         </div>
                       </td>
                       <td>

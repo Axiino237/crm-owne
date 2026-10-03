@@ -135,22 +135,76 @@ router.put('/:id', adminOnly, checkPermission('departments', 'departments-list',
   }
 });
 
-// @desc    Delete department
-// @route   DELETE /api/departments/:id
-router.delete('/:id', adminOnly, checkPermission('departments', 'departments-list', 'canDelete'), async (req, res) => {
+// @desc    Get department mapped dependencies (to check before delete)
+// @route   GET /api/departments/:id/dependencies
+router.get('/:id/dependencies', adminOnly, async (req, res) => {
   try {
     const { User } = require('../models');
-    const usersCount = await User.count({ where: { departmentId: req.params.id } });
-    if (usersCount > 0) {
-      return res.status(400).json({ success: false, message: `Cannot delete: ${usersCount} user(s) in this department` });
-    }
-
     const dept = await Department.findByPk(req.params.id);
     if (!dept) return res.status(404).json({ success: false, message: 'Department not found' });
 
-    await dept.destroy();
+    const users = await User.findAll({
+      where: { departmentId: req.params.id },
+      attributes: ['id', 'name', 'email']
+    });
+
+    const canDelete = users.length === 0;
+    const blockReasons = [];
+
+    if (users.length > 0) {
+      blockReasons.push({
+        type: 'Users',
+        count: users.length,
+        items: users.map(u => `${u.name} (${u.email})`),
+        actionRequired: `You must delete or reassign these ${users.length} user(s) in this department first.`
+      });
+    }
+
+    res.json({
+      success: true,
+      canDelete,
+      name: dept.name,
+      code: dept.code,
+      mappedItems: {
+        users
+      },
+      blockReasons
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @desc    Delete department
+// @route   DELETE /api/departments/:id
+router.delete('/:id', adminOnly, checkPermission('departments', 'departments-list', 'canDelete'), async (req, res) => {
+  const { sequelize } = require('../config/db');
+  const t = await sequelize.transaction();
+  try {
+    const { User } = require('../models');
+    const dept = await Department.findByPk(req.params.id, { transaction: t });
+    if (!dept) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Department not found' });
+    }
+
+    const users = await User.findAll({ where: { departmentId: req.params.id }, attributes: ['id', 'name', 'email'], transaction: t });
+    if (users.length > 0) {
+      await t.rollback();
+      const userNames = users.map(u => u.name).join(', ');
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete: ${users.length} user(s) assigned to this department (${userNames}). You must delete or reassign them first.`,
+        mappedType: 'users',
+        mappedItems: users
+      });
+    }
+
+    await dept.destroy({ transaction: t });
+    await t.commit();
     res.json({ success: true, message: 'Department deleted successfully' });
   } catch (error) {
+    await t.rollback();
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });

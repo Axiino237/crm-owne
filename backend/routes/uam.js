@@ -80,10 +80,14 @@ router.post('/users', checkPermission('uam', 'users-list', 'canCreate'), async (
     if (role.level === 'super_admin')
       return res.status(403).json({ success: false, message: 'Cannot create Super Admin via UAM' });
 
+    const targetOrgId = req.user.isSuperAdmin ? (organizationId || null) : (req.user.organizationId || null);
+    const targetCompanyId = (req.user.role?.level === 'company_admin') ? (req.user.companyId || null) : (companyId || null);
+
     const user = await User.create({
       name, email: email.toLowerCase(), password, phone,
-      roleId, organizationId: organizationId || null,
-      companyId: companyId || null,
+      roleId,
+      organizationId: targetOrgId,
+      companyId: targetCompanyId,
       departmentId: departmentId || null,
       createdById: req.user.id
     });
@@ -114,13 +118,26 @@ router.put('/users/:id', checkPermission('uam', 'users-list', 'canEdit'), async 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     if (user.isSuperAdmin) return res.status(403).json({ success: false, message: 'Cannot edit Super Admin' });
 
+    if (!req.user.isSuperAdmin && user.organizationId && req.user.organizationId && user.organizationId !== req.user.organizationId) {
+      return res.status(403).json({ success: false, message: 'Access denied: You cannot edit users from another organization' });
+    }
+
     const { name, email, phone, roleId, organizationId, companyId, departmentId, isActive } = req.body;
+
+    if (roleId) {
+      const role = await Role.findByPk(roleId);
+      if (!role) return res.status(400).json({ success: false, message: 'Invalid role' });
+      if (role.level === 'super_admin' && !req.user.isSuperAdmin) {
+        return res.status(403).json({ success: false, message: 'Only Super Admin can assign a Super Admin role' });
+      }
+    }
+
     const updates = {};
     if (name) updates.name = name;
     if (email) updates.email = email.toLowerCase();
     if (phone !== undefined) updates.phone = phone;
     if (roleId) updates.roleId = roleId;
-    if (organizationId !== undefined) updates.organizationId = organizationId || null;
+    if (req.user.isSuperAdmin && organizationId !== undefined) updates.organizationId = organizationId || null;
     if (companyId !== undefined) updates.companyId = companyId || null;
     if (departmentId !== undefined) updates.departmentId = departmentId || null;
     if (isActive !== undefined) updates.isActive = isActive;
@@ -156,6 +173,10 @@ router.delete('/users/:id', checkPermission('uam', 'users-list', 'canDelete'), a
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     if (user.isSuperAdmin) return res.status(403).json({ success: false, message: 'Cannot delete Super Admin' });
     if (user.id === req.user.id) return res.status(400).json({ success: false, message: 'Cannot delete your own account' });
+
+    if (!req.user.isSuperAdmin && user.organizationId && req.user.organizationId && user.organizationId !== req.user.organizationId) {
+      return res.status(403).json({ success: false, message: 'Access denied: You cannot delete users from another organization' });
+    }
 
     const userId = user.id;
     const {

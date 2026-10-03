@@ -118,27 +118,103 @@ router.put('/:id', adminOnly, checkPermission('companies', 'companies-list', 'ca
   }
 });
 
-// @desc    Delete company
-// @route   DELETE /api/companies/:id
-router.delete('/:id', adminOnly, checkPermission('companies', 'companies-list', 'canDelete'), async (req, res) => {
+// @desc    Get company mapped dependencies (to check before delete)
+// @route   GET /api/companies/:id/dependencies
+router.get('/:id/dependencies', adminOnly, async (req, res) => {
   try {
     const { Department, User } = require('../models');
-    const departmentsCount = await Department.count({ where: { companyId: req.params.id } });
-    if (departmentsCount > 0) {
-      return res.status(400).json({ success: false, message: `Cannot delete: ${departmentsCount} department(s) exist` });
-    }
-
-    const usersCount = await User.count({ where: { companyId: req.params.id } });
-    if (usersCount > 0) {
-      return res.status(400).json({ success: false, message: `Cannot delete: ${usersCount} user(s) assigned to this company` });
-    }
-
     const company = await Company.findByPk(req.params.id);
     if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
 
-    await company.destroy();
+    const departments = await Department.findAll({
+      where: { companyId: req.params.id },
+      attributes: ['id', 'name', 'code']
+    });
+
+    const users = await User.findAll({
+      where: { companyId: req.params.id },
+      attributes: ['id', 'name', 'email']
+    });
+
+    const canDelete = departments.length === 0 && users.length === 0;
+    const blockReasons = [];
+
+    if (departments.length > 0) {
+      blockReasons.push({
+        type: 'Departments',
+        count: departments.length,
+        items: departments.map(d => d.name + (d.code ? ` (${d.code})` : '')),
+        actionRequired: `You must delete or reassign these ${departments.length} department(s) under this company first.`
+      });
+    }
+
+    if (users.length > 0) {
+      blockReasons.push({
+        type: 'Users',
+        count: users.length,
+        items: users.map(u => `${u.name} (${u.email})`),
+        actionRequired: `You must delete or reassign these ${users.length} user(s) assigned to this company first.`
+      });
+    }
+
+    res.json({
+      success: true,
+      canDelete,
+      name: company.name,
+      code: company.code,
+      mappedItems: {
+        departments,
+        users
+      },
+      blockReasons
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @desc    Delete company
+// @route   DELETE /api/companies/:id
+router.delete('/:id', adminOnly, checkPermission('companies', 'companies-list', 'canDelete'), async (req, res) => {
+  const { sequelize } = require('../config/db');
+  const t = await sequelize.transaction();
+  try {
+    const { Department, User } = require('../models');
+    const company = await Company.findByPk(req.params.id, { transaction: t });
+    if (!company) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+
+    const departments = await Department.findAll({ where: { companyId: req.params.id }, attributes: ['id', 'name', 'code'], transaction: t });
+    if (departments.length > 0) {
+      await t.rollback();
+      const deptNames = departments.map(d => d.name).join(', ');
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete: ${departments.length} department(s) mapped to this company (${deptNames}). You must delete or reassign them first.`,
+        mappedType: 'departments',
+        mappedItems: departments
+      });
+    }
+
+    const users = await User.findAll({ where: { companyId: req.params.id }, attributes: ['id', 'name', 'email'], transaction: t });
+    if (users.length > 0) {
+      await t.rollback();
+      const userNames = users.map(u => u.name).join(', ');
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete: ${users.length} user(s) mapped to this company (${userNames}). You must delete or reassign them first.`,
+        mappedType: 'users',
+        mappedItems: users
+      });
+    }
+
+    await company.destroy({ transaction: t });
+    await t.commit();
     res.json({ success: true, message: 'Company deleted successfully' });
   } catch (error) {
+    await t.rollback();
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });

@@ -151,31 +151,59 @@ const startServer = async () => {
 
       for (const role of adminRoles) {
         const fullAccess = { canView: true, canCreate: true, canEdit: true, canDelete: true };
+        const ensurePerm = async (module, screen, access = fullAccess) => {
+          await Permission.findOrCreate({
+            where: { roleId: role.id, module, screen },
+            defaults: { roleId: role.id, module, screen, ...access }
+          });
+        };
 
-        // Core module permissions
-        await Permission.upsert({ roleId: role.id, module: 'performance', screen: 'performance-view', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'closed_sales', screen: 'closed-sales-list', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'attendance', screen: 'attendance-list', ...fullAccess });
+        // ✅ Dashboard — ALL business stat widgets
+        await ensurePerm('dashboard', 'dashboard-home');
+        await ensurePerm('dashboard', 'leads-widget');
+        await ensurePerm('dashboard', 'projects-widget');
+        await ensurePerm('dashboard', 'pending-projects-widget');
+        await ensurePerm('dashboard', 'completed-projects-widget');
+        await ensurePerm('dashboard', 'total-profit-card');
+        await ensurePerm('dashboard', 'monthly-profit-card');
+        await ensurePerm('dashboard', 'deductions-card');
+        await ensurePerm('dashboard', 'profit-trend-chart');
+        await ensurePerm('dashboard', 'recent-leads-list');
+        await ensurePerm('dashboard', 'recent-projects-list');
 
-        // Chat module permissions
-        await Permission.upsert({ roleId: role.id, module: 'chat', screen: 'chat-room', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'chat', screen: 'chat-workspaces', ...fullAccess });
+        // ✅ Dashboard — Design widgets
+        await ensurePerm('dashboard', 'total-designs-widget');
+        await ensurePerm('dashboard', 'pending-designs-widget');
+        await ensurePerm('dashboard', 'completed-designs-widget');
+        await ensurePerm('dashboard', 'change-designs-widget');
+        await ensurePerm('dashboard', 'system-overview');
 
-        // Design module — view + create for all admin-level roles
-        await Permission.upsert({ roleId: role.id, module: 'design', screen: 'design-list', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'design', screen: 'my-projects-list', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'design', screen: 'completed-models-list', ...fullAccess });
+        // ✅ Core modules
+        await ensurePerm('performance', 'performance-view');
+        await ensurePerm('closed_sales', 'closed-sales-list');
+        await ensurePerm('attendance', 'attendance-list');
 
-        // Dashboard design widgets
-        await Permission.upsert({ roleId: role.id, module: 'dashboard', screen: 'pending-designs-widget', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'dashboard', screen: 'completed-designs-widget', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'dashboard', screen: 'change-designs-widget', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'dashboard', screen: 'total-designs-widget', ...fullAccess });
-        await Permission.upsert({ roleId: role.id, module: 'dashboard', screen: 'system-overview', ...fullAccess });
+        // ✅ Chat module
+        await ensurePerm('chat', 'chat-room');
+        await ensurePerm('chat', 'chat-workspaces');
 
-        // Audit logs - SUPER_ADMIN gets full access on startup
+        // ✅ Design module
+        await ensurePerm('design', 'design-list');
+        await ensurePerm('design', 'my-projects-list');
+        await ensurePerm('design', 'completed-models-list');
+
+        // ✅ Leads & Quotations
+        await ensurePerm('leads', 'leads-list');
+        await ensurePerm('leads', 'lead-create');
+        await ensurePerm('leads', 'lead-edit');
+        await ensurePerm('leads', 'lead-delete');
+        await ensurePerm('quotations', 'quotations-list');
+        await ensurePerm('quotations', 'quotation-create');
+        await ensurePerm('quotations', 'quotation-export');
+
+        // ✅ Audit logs - SUPER_ADMIN only
         if (role.code === 'SUPER_ADMIN') {
-          await Permission.upsert({ roleId: role.id, module: 'uam', screen: 'audit-logs-list', ...fullAccess });
+          await ensurePerm('uam', 'audit-logs-list');
         }
       }
       console.log(`✅ Permissions auto-synced for ${adminRoles.length} admin-level role(s)`);

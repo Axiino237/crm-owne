@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   RiDownloadLine, RiAddLine, RiDeleteBinLine, RiImageAddLine,
   RiCloseLine, RiFilePdf2Line, RiDragMove2Line, RiSaveLine,
@@ -45,7 +45,7 @@ const newItem = () => ({
 
 // ─────────────────────────────────────────────────────────────────────────────
 const QuotationPage = () => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canCreate = hasPermission('quotations', 'quotations-list', 'canCreate');
   const canExport = hasPermission('quotations', 'quotations-list', 'canCreate') ||
     hasPermission('quotations', 'quotation-export', 'canCreate');
@@ -59,6 +59,21 @@ const QuotationPage = () => {
   const [companyEmail, setCompanyEmail] = useState('hello@thefirststepsolutions.com');
   const [companyGST, setCompanyGST] = useState('33CBNPK3375G1ZJ');
   const [companyWebsite, setCompanyWebsite] = useState('www.thefirststepsolutions.com');
+
+  // Pre-fill tenant / company details if available on logged-in user
+  useEffect(() => {
+    if (user?.company?.name) {
+      setCompanyName(user.company.name);
+    } else if (user?.organization?.name) {
+      setCompanyName(user.organization.name);
+    }
+    if (user?.company?.email || user?.organization?.email) {
+      setCompanyEmail(user.company?.email || user.organization?.email);
+    }
+    if (user?.company?.phone || user?.organization?.phone) {
+      setCompanyPhone(user.company?.phone || user.organization?.phone);
+    }
+  }, [user]);
 
   // Client info
   const [clientName, setClientName] = useState('Dear Sir,');
@@ -77,6 +92,7 @@ const QuotationPage = () => {
   const [bankBranch, setBankBranch] = useState('Chinmaya Nagar');
   const [bankAccNo, setBankAccNo] = useState('923020018036099');
   const [bankIFSC, setBankIFSC] = useState('UTIB0003450');
+  const [showBankDetails, setShowBankDetails] = useState(true);
 
   // Quotation meta
   const [quoteNo, setQuoteNo] = useState(`QT-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`);
@@ -87,6 +103,19 @@ const QuotationPage = () => {
   const [globalDiscount, setGlobalDiscount] = useState(7.643); // Matches 28550 discount on 373550 total (approx 7.643%)
   const [notes, setNotes] = useState('Artwork (With high resolution CDR/AI) has to be provided by the client\nAll the materials are rented to the client.\nElectricity during the construction and Exhibition of the stall to be provided by the client');
   const [terms, setTerms] = useState('60% Payment has to be paid as an advance at the time of confirmation and remaining 40% of first day of exhibition.');
+
+  const [clientGST, setClientGST] = useState('');
+  const [clientRef, setClientRef] = useState('');
+  const [docType, setDocType] = useState('quotation'); // 'quotation' | 'invoice'
+
+  const handleDocTypeChange = (val) => {
+    setDocType(val);
+    if (val === 'invoice' && quoteNo.startsWith('QT-')) {
+      setQuoteNo(p => p.replace('QT-', 'INV-'));
+    } else if (val === 'quotation' && quoteNo.startsWith('INV-')) {
+      setQuoteNo(p => p.replace('INV-', 'QT-'));
+    }
+  };
 
   // Line items
   const [items, setItems] = useState([
@@ -117,17 +146,63 @@ const QuotationPage = () => {
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [activeTab, setActiveTab] = useState('form'); // 'form' | 'preview'
 
+  // ── Discount & Tax visibility toggles ─────────────────────────────────────
+  const [showDiscount, setShowDiscount] = useState(true);
+  const [showTax, setShowTax] = useState(true);
+  const [taxType, setTaxType] = useState('cgst_sgst'); // 'cgst_sgst' | 'igst' | 'export_lut' | 'export_igst'
+
   const logoInputRef = useRef();
   const signatureInputRef = useRef();
   const previewRef = useRef();
 
+  const [leftWidth, setLeftWidth] = useState(42); // default 42% left, 58% right
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResize = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const resize = useCallback((e) => {
+    if (!isResizing) return;
+    const container = document.getElementById('split-pane-container');
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+    if (newLeftWidth >= 25 && newLeftWidth <= 75) {
+      setLeftWidth(newLeftWidth);
+    }
+  }, [isResizing]);
+
+  const stopResize = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResize);
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResize);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResize);
+    };
+  }, [isResizing, resize, stopResize]);
+
   const currencyObj = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
 
   // ── Calculations ───────────────────────────────────────────────────────────
-  const subtotal = items.reduce((s, i) => s + (Number(i.qty) * Number(i.rate) * (1 - Number(i.discount) / 100)), 0);
-  const discountAmt = subtotal * (Number(globalDiscount) / 100);
+  // Item-level discount only applies when showDiscount is ON
+  const subtotal = items.reduce((s, i) => {
+    const disc = showDiscount ? Number(i.discount) : 0;
+    return s + (Number(i.qty) * Number(i.rate) * (1 - disc / 100));
+  }, 0);
+  const discountAmt = showDiscount ? subtotal * (Number(globalDiscount) / 100) : 0;
   const taxableAmt = subtotal - discountAmt;
-  const taxAmt = taxableAmt * (Number(taxRate) / 100);
+  const taxAmt = showTax && taxType !== 'export_lut' ? taxableAmt * (Number(taxRate) / 100) : 0;
   const grandTotal = taxableAmt + taxAmt;
 
   // ── Logo handling ──────────────────────────────────────────────────────────
@@ -173,7 +248,8 @@ const QuotationPage = () => {
     await new Promise(r => setTimeout(r, 300)); // let preview render
 
     try {
-      const { default: jsPDF } = await import('jspdf');
+      const jspdfModule = await import('jspdf');
+      const jsPDF = jspdfModule.jsPDF || jspdfModule.default;
       const { default: html2canvas } = await import('html2canvas');
 
       const el = previewRef.current;
@@ -200,7 +276,8 @@ const QuotationPage = () => {
       const xOffset = (pageW - imgW) / 2;
       pdf.addImage(imgData, 'PNG', xOffset, 0, imgW, imgH);
 
-      pdf.save(`${quoteNo || 'quotation'}.pdf`);
+      const filename = docType === 'invoice' ? `Invoice_${quoteNo || 'invoice'}` : `Quotation_${quoteNo || 'quotation'}`;
+      pdf.save(`${filename}.pdf`);
       toast.success('PDF exported successfully on a single page!');
     } catch (err) {
       toast.error('Export failed: ' + err.message);
@@ -246,9 +323,17 @@ const QuotationPage = () => {
       <div style={{ display: 'grid', gridTemplateColumns: activeTab === 'form' ? '1fr' : '1fr', gap: 20 }}>
         {/* ── FORM PANEL ────────────────────────────────────────────────────── */}
         {activeTab === 'form' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div 
+            id="split-pane-container"
+            style={{ 
+              display: 'grid', 
+              gridTemplateColumns: `${leftWidth}% 12px 1fr`, 
+              gap: 0,
+              position: 'relative'
+            }}
+          >
             {/* LEFT: Company + Client */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingRight: 10 }}>
               {/* Company Info Card */}
               <div className="card">
                 <div style={{ fontWeight: 800, fontSize: '0.9375rem', marginBottom: 16, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -342,6 +427,27 @@ const QuotationPage = () => {
                     <label style={label}>Phone</label>
                     <input style={inp} value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" />
                   </div>
+                  <div>
+                    <label style={label}>Client GST No</label>
+                    <input style={inp} value={clientGST} onChange={e => setClientGST(e.target.value)} placeholder="GST No." />
+                  </div>
+                  <div>
+                    <label style={label}>Client Ref</label>
+                    <input style={inp} value={clientRef} onChange={e => setClientRef(e.target.value)} placeholder="Client Ref/Reference Info" />
+                  </div>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={label}>GST / Tax Type</label>
+                    <select 
+                      style={inp} 
+                      value={taxType} 
+                      onChange={e => setTaxType(e.target.value)}
+                    >
+                      <option value="cgst_sgst">Local (CGST + SGST) - e.g., Chennai / Tamil Nadu</option>
+                      <option value="igst">Inter-State (IGST) - e.g., Bangalore / Karnataka</option>
+                      <option value="export_lut">Export of Services (under LUT) - 0% GST (e.g., US, UK)</option>
+                      <option value="export_igst">Export of Services (with IGST Payment) - e.g., US, UK</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -368,40 +474,99 @@ const QuotationPage = () => {
 
               {/* Bank Account Details Card */}
               <div className="card">
-                <div style={{ fontWeight: 800, fontSize: '0.9375rem', marginBottom: 16, color: 'var(--text-primary)' }}>
-                  🏦 Bank Account Details
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>
+                    🏦 Bank Account Details
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={showBankDetails} 
+                      onChange={(e) => setShowBankDetails(e.target.checked)}
+                      style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        accentColor: 'var(--accent)', 
+                        cursor: 'pointer' 
+                      }} 
+                    />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Show in Document</span>
+                  </label>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  gap: 10,
+                  opacity: showBankDetails ? 1 : 0.4,
+                  pointerEvents: showBankDetails ? 'auto' : 'none',
+                  transition: 'opacity 0.3s ease'
+                }}>
                   <div>
                     <label style={label}>Bank Name</label>
-                    <input style={inp} value={bankName} onChange={e => setBankName(e.target.value)} />
+                    <input style={inp} value={bankName} onChange={e => setBankName(e.target.value)} disabled={!showBankDetails} />
                   </div>
                   <div>
                     <label style={label}>Branch</label>
-                    <input style={inp} value={bankBranch} onChange={e => setBankBranch(e.target.value)} />
+                    <input style={inp} value={bankBranch} onChange={e => setBankBranch(e.target.value)} disabled={!showBankDetails} />
                   </div>
                   <div>
                     <label style={label}>Account Number</label>
-                    <input style={inp} value={bankAccNo} onChange={e => setBankAccNo(e.target.value)} />
+                    <input style={inp} value={bankAccNo} onChange={e => setBankAccNo(e.target.value)} disabled={!showBankDetails} />
                   </div>
                   <div>
                     <label style={label}>IFSC Code</label>
-                    <input style={inp} value={bankIFSC} onChange={e => setBankIFSC(e.target.value)} />
+                    <input style={inp} value={bankIFSC} onChange={e => setBankIFSC(e.target.value)} disabled={!showBankDetails} />
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Splitter Resizer Handle */}
+            <div 
+              onMouseDown={startResize}
+              style={{
+                width: 6,
+                cursor: 'col-resize',
+                background: isResizing ? 'var(--accent)' : 'transparent',
+                borderLeft: '1px solid var(--border)',
+                borderRight: '1px solid var(--border)',
+                margin: '0 3px',
+                borderRadius: 3,
+                transition: 'background 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                zIndex: 10
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
+              onMouseLeave={e => { if(!isResizing) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <div style={{
+                width: 2,
+                height: 32,
+                background: 'var(--border)',
+                borderRadius: 1
+              }} />
+            </div>
+
             {/* RIGHT: Quote Details + Items */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingLeft: 10 }}>
               {/* Quote Meta */}
               <div className="card">
                 <div style={{ fontWeight: 800, fontSize: '0.9375rem', marginBottom: 16, color: 'var(--text-primary)' }}>
-                  📋 Quotation Details
+                  📋 Document Details
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={label}>Document Type</label>
+                    <select style={inp} value={docType} onChange={e => handleDocTypeChange(e.target.value)}>
+                      <option value="quotation">Quotation</option>
+                      <option value="invoice">Tax Invoice</option>
+                    </select>
+                  </div>
                   <div>
-                    <label style={label}>Quotation No.</label>
+                    <label style={label}>{docType === 'invoice' ? 'Invoice No.' : 'Quotation No.'}</label>
                     <input style={inp} value={quoteNo} onChange={e => setQuoteNo(e.target.value)} />
                   </div>
                   <div>
@@ -411,20 +576,35 @@ const QuotationPage = () => {
                     </select>
                   </div>
                   <div>
-                    <label style={label}>Quote Date</label>
+                    <label style={label}>{docType === 'invoice' ? 'Invoice Date' : 'Quote Date'}</label>
                     <input style={inp} type="date" value={quoteDate} onChange={e => setQuoteDate(e.target.value)} />
                   </div>
                   <div>
                     <label style={label}>Valid Until</label>
-                    <input style={inp} type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
+                    <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} disabled={docType === 'invoice'} style={{ ...inp, opacity: docType === 'invoice' ? 0.5 : 1 }} />
                   </div>
+                  {/* Tax toggle + field */}
                   <div>
-                    <label style={label}>Tax Rate (%)</label>
-                    <input style={inp} type="number" min="0" max="100" value={taxRate} onChange={e => setTaxRate(e.target.value)} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <label className="toggle" style={{ cursor: 'pointer', flexShrink: 0 }} title={showTax ? 'Hide Tax' : 'Show Tax'}>
+                        <input type="checkbox" checked={showTax} onChange={() => setShowTax(v => !v)} />
+                        <span className="toggle-slider" />
+                      </label>
+                      <label style={{ ...label, marginBottom: 0 }}>Tax Rate (%)</label>
+                    </div>
+                    <input style={{ ...inp, opacity: showTax ? 1 : 0.4 }} type="number" min="0" max="100" value={taxRate} onChange={e => setTaxRate(e.target.value)} disabled={!showTax} />
                   </div>
+
+                  {/* Discount toggle + field */}
                   <div>
-                    <label style={label}>Global Discount (%)</label>
-                    <input style={inp} type="number" min="0" max="100" value={globalDiscount} onChange={e => setGlobalDiscount(e.target.value)} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <label className="toggle" style={{ cursor: 'pointer', flexShrink: 0 }} title={showDiscount ? 'Hide Discount' : 'Show Discount'}>
+                        <input type="checkbox" checked={showDiscount} onChange={() => setShowDiscount(v => !v)} />
+                        <span className="toggle-slider" />
+                      </label>
+                      <label style={{ ...label, marginBottom: 0 }}>Global Discount (%)</label>
+                    </div>
+                    <input style={{ ...inp, opacity: showDiscount ? 1 : 0.4 }} type="number" min="0" max="100" value={globalDiscount} onChange={e => setGlobalDiscount(e.target.value)} disabled={!showDiscount} />
                   </div>
                 </div>
               </div>
@@ -468,14 +648,28 @@ const QuotationPage = () => {
                 {/* Line Items Table */}
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <colgroup>
+                      {/* Description */}
+                      <col style={{ width: showDiscount ? '33%' : '40%' }} />
+                      {/* Size / Dimensions */}
+                      <col style={{ width: '22%' }} />
+                      {/* Rate */}
+                      <col style={{ width: '14%' }} />
+                      {/* Disc% — only when showDiscount */}
+                      {showDiscount && <col style={{ width: '6%' }} />}
+                      {/* Amount */}
+                      <col style={{ width: '15%' }} />
+                      {/* Actions */}
+                      <col style={{ width: '10%' }} />
+                    </colgroup>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                        <th style={{ padding: '6px 4px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'left', width: '42%' }}>Description</th>
-                        <th style={{ padding: '6px 4px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center', width: '12%' }}>Size</th>
-                        <th style={{ padding: '6px 4px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', width: '14%' }}>Rate</th>
-                        <th style={{ padding: '6px 4px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center', width: '9%' }}>Disc%</th>
-                        <th style={{ padding: '6px 4px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', width: '14%' }}>Amount</th>
-                        <th style={{ width: '9%' }}></th>
+                        <th style={{ padding: '6px 6px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'left' }}>Description</th>
+                        <th style={{ padding: '6px 6px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'left' }}>Size / Dimensions</th>
+                        <th style={{ padding: '6px 6px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right' }}>Rate</th>
+                        {showDiscount && <th style={{ padding: '6px 4px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center', fontSize: '0.68rem' }}>Disc%</th>}
+                        <th style={{ padding: '6px 6px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right' }}>Amount</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -495,10 +689,12 @@ const QuotationPage = () => {
                               <input style={{ ...inp, padding: '6px 8px', textAlign: 'right', fontSize: '0.775rem' }} type="number" min="0" value={item.rate}
                                 onChange={e => updateItem(item.id, 'rate', e.target.value)} />
                             </td>
-                            <td style={{ padding: '4px 4px' }}>
-                              <input style={{ ...inp, padding: '6px 8px', textAlign: 'center', fontSize: '0.775rem' }} type="number" min="0" max="100" value={item.discount}
-                                onChange={e => updateItem(item.id, 'discount', e.target.value)} />
-                            </td>
+                            {showDiscount && (
+                              <td style={{ padding: '4px 2px' }}>
+                                <input style={{ ...inp, padding: '5px 4px', textAlign: 'center', fontSize: '0.72rem' }} type="number" min="0" max="100" value={item.discount}
+                                  onChange={e => updateItem(item.id, 'discount', e.target.value)} />
+                              </td>
+                            )}
                             <td style={{ padding: '4px 4px', color: 'var(--success)', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
                               {fmt(amt, currencyObj.symbol)}
                             </td>
@@ -526,14 +722,19 @@ const QuotationPage = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: 240, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                       <span>Subtotal</span><span style={{ fontWeight: 600 }}>{fmt(subtotal, currencyObj.symbol)}</span>
                     </div>
-                    {globalDiscount > 0 && (
+                    {showDiscount && globalDiscount > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: 240, fontSize: '0.8125rem', color: 'var(--warning)' }}>
                         <span>Discount ({globalDiscount}%)</span><span>- {fmt(discountAmt, currencyObj.symbol)}</span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', width: 240, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                      <span>Tax ({taxRate}%)</span><span>{fmt(taxAmt, currencyObj.symbol)}</span>
-                    </div>
+                    {showTax && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: 240, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                        <span>
+                          {taxType === 'cgst_sgst' ? 'Tax (CGST+SGST)' : taxType === 'igst' ? 'Tax (IGST)' : taxType === 'export_lut' ? 'Tax (LUT Zero)' : 'Tax (Export IGST)'} ({taxType === 'export_lut' ? '0' : taxRate}%)
+                        </span>
+                        <span>{fmt(taxAmt, currencyObj.symbol)}</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: 240, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 800, borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
                       <span>Total</span><span style={{ color: 'var(--success)' }}>{fmt(grandTotal, currencyObj.symbol)}</span>
                     </div>
@@ -627,7 +828,7 @@ const QuotationPage = () => {
                   {logo ? (
                     <img src={logo} alt="Logo" style={{ maxHeight: 65, maxWidth: 180, objectFit: 'contain' }} />
                   ) : (
-                    <div style={{ textAlign: 'center' }}>
+                  <div style={{ textAlign: 'center' }}>
                       <div style={{ fontWeight: 900, fontSize: 18, color: '#0f172a', letterSpacing: '-0.5px' }}>The First Step</div>
                       <div style={{ fontWeight: 700, fontSize: 12, color: '#4caf50', textTransform: 'uppercase', letterSpacing: '2px' }}>SOLUTIONS</div>
                       <div style={{ fontSize: 8, color: '#64748b', marginTop: 2 }}>Ideas. Innovation. Impact.</div>
@@ -654,21 +855,57 @@ const QuotationPage = () => {
                 </div>
               </div>
 
-              {/* Title & Date */}
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontWeight: 800, fontSize: 12, color: '#000000' }}>
-                  Quote: {clientCompany} And {companyName}
-                </div>
-                <div style={{ fontWeight: 800, fontSize: 11, color: '#000000', marginTop: 2 }}>
-                  {quoteDate.split('-').reverse().join('.')}
-                </div>
+              <div style={{ textAlign: 'center', margin: '4px 0 10px 0', position: 'relative', zIndex: 1 }}>
+                <span style={{ fontWeight: 900, fontSize: 13, textTransform: 'uppercase', letterSpacing: '1.5px', textDecoration: 'underline' }}>
+                  {docType === 'invoice' ? 'TAX INVOICE' : 'QUOTATION'}
+                </span>
               </div>
 
-              {/* Bill To */}
-              <div style={{ marginBottom: 10, fontSize: 11, lineHeight: 1.4, color: '#000000' }}>
-                <div style={{ fontWeight: 800 }}>M/s. {clientCompany}</div>
-                <div>{clientAddress}</div>
-              </div>
+              {/* Client & Document Details Table */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10, border: '1px solid #000000', color: '#000000', lineHeight: 1.4, position: 'relative', zIndex: 1 }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #000000' }}>
+                    <td style={{ padding: '4px 6px', fontWeight: 800, borderRight: '1px solid #000000', width: '60%' }}>
+                      GST No : {companyGST || '—'}
+                    </td>
+                    <td style={{ padding: '4px 6px', fontWeight: 800, width: '40%' }}>
+                      {docType === 'invoice' ? 'Invoice No : ' : 'Quote No : '}{quoteNo}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #000000' }}>
+                    <td style={{ padding: '4px 6px', borderRight: '1px solid #000000' }}>
+                      {/* Empty cell to match structure */}
+                    </td>
+                    <td style={{ padding: '4px 6px', fontWeight: 800 }}>
+                      Date : {quoteDate.split('-').reverse().join('.')}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #000000', fontWeight: 800, background: '#f8fafc' }}>
+                    <td style={{ padding: '4px 6px', borderRight: '1px solid #000000', textAlign: 'center' }}>
+                      Client Details
+                    </td>
+                    <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                      Client Ref
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '6px 8px', borderRight: '1px solid #000000', verticalAlign: 'top' }}>
+                      <div style={{ fontWeight: 800, marginBottom: 2 }}>{clientCompany || '—'}</div>
+                      <div style={{ whiteSpace: 'pre-line', marginBottom: 4 }}>{clientAddress || '—'}</div>
+                      {clientEmail && <div style={{ marginTop: 2 }}>Email Id : {clientEmail}</div>}
+                      {clientPhone && <div style={{ marginTop: 2 }}>Contact : {clientPhone}</div>}
+                    </td>
+                    <td style={{ padding: '6px 8px', verticalAlign: 'top' }}>
+                      {clientRef && <div style={{ marginBottom: 8 }}>{clientRef}</div>}
+                      {clientGST && (
+                        <div style={{ fontWeight: 800, marginTop: clientRef ? 8 : 0 }}>
+                          GST No.{clientGST}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
 
               {/* Salutation & Opening Paragraph */}
               <div style={{ marginBottom: 12, fontSize: 10.5, lineHeight: 1.4, color: '#000000' }}>
@@ -678,10 +915,12 @@ const QuotationPage = () => {
               </div>
 
               {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5, border: '1px solid #000000' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 10.5, border: '1px solid #000000', position: 'relative', zIndex: 1 }}>
                 <thead>
                   <tr style={{ background: '#81c784', border: '1px solid #000000' }}>
-                    <th colSpan={4} style={{ padding: '4px 8px', textAlign: 'center', color: '#000000', fontWeight: 800, fontSize: 11, textDecoration: 'underline', border: '1px solid #000000' }}>Quote</th>
+                    <th colSpan={4} style={{ padding: '4px 8px', textAlign: 'center', color: '#000000', fontWeight: 800, fontSize: 11, textDecoration: 'underline', border: '1px solid #000000' }}>
+                      {docType === 'invoice' ? 'Tax Invoice' : 'Quote'}
+                    </th>
                   </tr>
                   <tr style={{ background: '#e2e8f0', color: '#000000', fontWeight: 700, border: '1px solid #000000' }}>
                     <th style={{ padding: '4px 6px', textAlign: 'center', width: '8%', border: '1px solid #000000' }}>S.No</th>
@@ -692,7 +931,8 @@ const QuotationPage = () => {
                 </thead>
                 <tbody>
                   {items.map((item, idx) => {
-                    const amt = Number(item.qty) * Number(item.rate) * (1 - Number(item.discount) / 100);
+                    const disc = showDiscount ? Number(item.discount) : 0;
+                    const amt = Number(item.qty) * Number(item.rate) * (1 - disc / 100);
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid #000000' }}>
                         <td style={{ padding: '4px 6px', textAlign: 'center', border: '1px solid #000000' }}>{idx + 1}</td>
@@ -708,22 +948,66 @@ const QuotationPage = () => {
                     <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Total</td>
                     <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(subtotal).toFixed(2)}</td>
                   </tr>
-                  <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Discount</td>
-                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(discountAmt).toFixed(2)}</td>
-                  </tr>
-                  <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Sub Total</td>
-                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxableAmt).toFixed(2)}</td>
-                  </tr>
-                  <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>CGST {(taxRate / 2)}%</td>
-                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
-                  </tr>
-                  <tr style={{ fontWeight: 800 }}>
-                    <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>SGST {(taxRate / 2)}%</td>
-                    <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
-                  </tr>
+                  {showDiscount && (
+                    <tr style={{ fontWeight: 800 }}>
+                      <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Discount ({globalDiscount}%)</td>
+                      <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>-{Number(discountAmt).toFixed(2)}</td>
+                    </tr>
+                  )}
+                  {(showDiscount || showTax) && (
+                    <tr style={{ fontWeight: 800 }}>
+                      <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>Sub Total</td>
+                      <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxableAmt).toFixed(2)}</td>
+                    </tr>
+                  )}
+                  {showTax && (
+                    <>
+                      {taxType === 'cgst_sgst' && (
+                        <>
+                          <tr style={{ fontWeight: 800 }}>
+                            <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>CGST {(taxRate / 2)}%</td>
+                            <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
+                          </tr>
+                          <tr style={{ fontWeight: 800 }}>
+                            <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>SGST {(taxRate / 2)}%</td>
+                            <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt / 2).toFixed(2)}</td>
+                          </tr>
+                        </>
+                      )}
+                      {taxType === 'igst' && (
+                        <tr style={{ fontWeight: 800 }}>
+                          <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>IGST {taxRate}%</td>
+                          <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt).toFixed(2)}</td>
+                        </tr>
+                      )}
+                      {taxType === 'export_lut' && (
+                        <>
+                          <tr style={{ fontWeight: 800 }}>
+                            <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>IGST (Export under LUT) 0%</td>
+                            <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>0.00</td>
+                          </tr>
+                          <tr>
+                            <td colSpan={4} style={{ padding: '4px 6px', fontSize: '7.5px', fontStyle: 'italic', border: '1px solid #000000', background: '#f8fafc', color: '#475569', textAlign: 'center' }}>
+                              "Export of services under Letter of Undertaking (LUT) without payment of integrated tax"
+                            </td>
+                          </tr>
+                        </>
+                      )}
+                      {taxType === 'export_igst' && (
+                        <>
+                          <tr style={{ fontWeight: 800 }}>
+                            <td colSpan={3} style={{ padding: '4px 6px', textAlign: 'left', border: '1px solid #000000' }}>IGST (Export with Tax) {taxRate}%</td>
+                            <td style={{ padding: '4px 6px', textAlign: 'right', border: '1px solid #000000' }}>{Number(taxAmt).toFixed(2)}</td>
+                          </tr>
+                          <tr>
+                            <td colSpan={4} style={{ padding: '4px 6px', fontSize: '7.5px', fontStyle: 'italic', border: '1px solid #000000', background: '#f8fafc', color: '#475569', textAlign: 'center' }}>
+                              "Export of services with payment of Integrated Tax"
+                            </td>
+                          </tr>
+                        </>
+                      )}
+                    </>
+                  )}
                   <tr style={{ fontWeight: 900, background: '#f8fafc' }}>
                     <td colSpan={3} style={{ padding: '6px 6px', textAlign: 'left', fontSize: 11, border: '2px solid #000000' }}>Grand Total</td>
                     <td style={{ padding: '6px 6px', textAlign: 'right', fontSize: 11, border: '2px solid #000000', color: '#2e7d32' }}>{Number(grandTotal).toFixed(2)}</td>
@@ -755,12 +1039,21 @@ const QuotationPage = () => {
 
                 {/* Account Details Box */}
                 <div style={{ border: '1px solid #000000', padding: '6px 12px', background: '#f8fafc', borderRadius: 4, minWidth: 260, fontSize: 9.5, lineHeight: 1.35 }}>
-                  <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 2 }}>Account Details</div>
-                  <div><strong>Name of the bank :</strong> {bankName}</div>
-                  <div><strong>Branch :</strong> {bankBranch}</div>
-                  <div><strong>Acc No :</strong> {bankAccNo}</div>
-                  <div><strong>IFSC Code :</strong> {bankIFSC}</div>
-                  <div><strong>GSTIN :</strong> {companyGST}</div>
+                  {showBankDetails ? (
+                    <>
+                      <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 2 }}>Account Details</div>
+                      <div><strong>Name of the bank :</strong> {bankName}</div>
+                      <div><strong>Branch :</strong> {bankBranch}</div>
+                      <div><strong>Acc No :</strong> {bankAccNo}</div>
+                      <div><strong>IFSC Code :</strong> {bankIFSC}</div>
+                      <div><strong>GSTIN :</strong> {companyGST}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: 2 }}>Tax Details</div>
+                      <div><strong>GSTIN :</strong> {companyGST}</div>
+                    </>
+                  )}
                 </div>
               </div>
 

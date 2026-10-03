@@ -3,7 +3,7 @@ import { RiAddLine, RiPencilLine, RiDeleteBinLine, RiSearchLine } from 'react-ic
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 import api from '../../api/axios';
-import ConfirmModal from '../../components/ConfirmModal';
+import DeleteDependencyModal from '../../components/DeleteDependencyModal';
 
 const CompanyModal = ({ company, onClose, onSaved }) => {
   const [form, setForm] = useState({
@@ -101,7 +101,6 @@ const CompaniesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editCompany, setEditCompany] = useState(null);
   const [deleteCompany, setDeleteCompany] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const LIMIT = 10;
 
   const fetchCompanies = useCallback(async () => {
@@ -118,21 +117,6 @@ const CompaniesPage = () => {
 
   const handleDelete = (company) => {
     setDeleteCompany(company);
-  };
-
-  const executeDelete = async () => {
-    if (!deleteCompany) return;
-    setDeleteLoading(true);
-    try {
-      await api.delete(`/companies/${deleteCompany.id}`);
-      toast.success('Company deleted');
-      fetchCompanies();
-    } catch (err) { 
-      toast.error(err.response?.data?.message || 'Delete failed'); 
-    } finally {
-      setDeleteLoading(false);
-      setDeleteCompany(null);
-    }
   };
 
   const totalPages = Math.ceil(total / LIMIT);
@@ -218,15 +202,15 @@ const CompaniesPage = () => {
         <CompanyModal company={editCompany} onClose={() => { setShowModal(false); setEditCompany(null); }} onSaved={() => { setShowModal(false); setEditCompany(null); fetchCompanies(); }} />
       )}
 
-      <ConfirmModal 
+      <DeleteDependencyModal 
         isOpen={!!deleteCompany}
-        title="Delete Company"
-        message={`Are you sure you want to delete company "${deleteCompany?.name}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteCompany(null)}
-        loading={deleteLoading}
+        entityType="Company"
+        entityId={deleteCompany?.id}
+        entityName={deleteCompany?.name}
+        dependencyEndpoint={deleteCompany ? `/companies/${deleteCompany.id}/dependencies` : null}
+        deleteEndpoint={deleteCompany ? `/companies/${deleteCompany.id}` : null}
+        onClose={() => setDeleteCompany(null)}
+        onDeleted={fetchCompanies}
       />
     </AppLayout>
   );

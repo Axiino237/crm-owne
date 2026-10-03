@@ -3,7 +3,7 @@ import { RiAddLine, RiPencilLine, RiDeleteBinLine, RiBuildingLine, RiSearchLine 
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 import api from '../../api/axios';
-import ConfirmModal from '../../components/ConfirmModal';
+import DeleteDependencyModal from '../../components/DeleteDependencyModal';
 
 const OrgModal = ({ org, onClose, onSaved }) => {
   const [form, setForm] = useState({
@@ -97,7 +97,6 @@ const OrganizationsPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editOrg, setEditOrg] = useState(null);
   const [deleteOrg, setDeleteOrg] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const LIMIT = 10;
 
   const fetchOrgs = useCallback(async () => {
@@ -114,21 +113,6 @@ const OrganizationsPage = () => {
 
   const handleDelete = (org) => {
     setDeleteOrg(org);
-  };
-
-  const executeDelete = async () => {
-    if (!deleteOrg) return;
-    setDeleteLoading(true);
-    try {
-      await api.delete(`/organizations/${deleteOrg.id}`);
-      toast.success('Organization deleted');
-      fetchOrgs();
-    } catch (err) { 
-      toast.error(err.response?.data?.message || 'Delete failed'); 
-    } finally {
-      setDeleteLoading(false);
-      setDeleteOrg(null);
-    }
   };
 
   const totalPages = Math.ceil(total / LIMIT);
@@ -223,15 +207,15 @@ const OrganizationsPage = () => {
         <OrgModal org={editOrg} onClose={() => { setShowModal(false); setEditOrg(null); }} onSaved={() => { setShowModal(false); setEditOrg(null); fetchOrgs(); }} />
       )}
 
-      <ConfirmModal 
+      <DeleteDependencyModal 
         isOpen={!!deleteOrg}
-        title="Delete Organization"
-        message={`Are you sure you want to delete organization "${deleteOrg?.name}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteOrg(null)}
-        loading={deleteLoading}
+        entityType="Organization"
+        entityId={deleteOrg?.id}
+        entityName={deleteOrg?.name}
+        dependencyEndpoint={deleteOrg ? `/organizations/${deleteOrg.id}/dependencies` : null}
+        deleteEndpoint={deleteOrg ? `/organizations/${deleteOrg.id}` : null}
+        onClose={() => setDeleteOrg(null)}
+        onDeleted={fetchOrgs}
       />
     </AppLayout>
   );

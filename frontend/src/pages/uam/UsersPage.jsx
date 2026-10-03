@@ -10,6 +10,7 @@ import ConfirmModal from '../../components/ConfirmModal';
 
 /* ---- User Form Modal ---- */
 const UserModal = ({ user, onClose, onSaved }) => {
+  const { refreshAuth } = useAuth();
   const [form, setForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -67,6 +68,7 @@ const UserModal = ({ user, onClose, onSaved }) => {
         await api.post('/uam/users', form);
         toast.success('User created!');
       }
+      await refreshAuth();
       onSaved();
     } catch (err) {
       setError(err.response?.data?.message || 'Operation failed');

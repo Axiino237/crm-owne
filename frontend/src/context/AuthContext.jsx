@@ -17,17 +17,56 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const refreshAuth = useCallback(async () => {
+    try {
+      const res = await api.get('/auth/me');
+      if (res.data.success && res.data.user) {
+        setUser(res.data.user);
+        localStorage.setItem('crm_user', JSON.stringify(res.data.user));
+      }
+      await fetchPermissions();
+    } catch (e) {
+      console.error('Auth refresh failed:', e);
+    }
+  }, [fetchPermissions]);
+
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('crm_token');
-      const savedUser = localStorage.getItem('crm_user');
-      if (token && savedUser) {
+      if (token) {
         try {
-          const parsedUser = JSON.parse(savedUser);
-          setUser(parsedUser);
-          await fetchPermissions();
+          const res = await api.get('/auth/me');
+          if (res.data.success && res.data.user) {
+            setUser(res.data.user);
+            localStorage.setItem('crm_user', JSON.stringify(res.data.user));
+            await fetchPermissions();
+          } else {
+            localStorage.removeItem('crm_token');
+            localStorage.removeItem('crm_user');
+            setUser(null);
+            setPermissions([]);
+          }
         } catch (e) {
           console.error('Auth initialization failed:', e);
+          if (e.response && e.response.status === 401) {
+            localStorage.removeItem('crm_token');
+            localStorage.removeItem('crm_user');
+            setUser(null);
+            setPermissions([]);
+          } else {
+            const savedUser = localStorage.getItem('crm_user');
+            if (savedUser) {
+              try {
+                setUser(JSON.parse(savedUser));
+                await fetchPermissions();
+              } catch {
+                localStorage.removeItem('crm_token');
+                localStorage.removeItem('crm_user');
+                setUser(null);
+                setPermissions([]);
+              }
+            }
+          }
         }
       }
       setLoading(false);
@@ -70,9 +109,9 @@ export const AuthProvider = ({ children }) => {
   const hasPermission = useCallback((module, screen, action = 'canView') => {
     if (!user) return false;
 
-    // Core admin modules are always accessible to Super Admin to avoid lockouts
-    const isCoreAdminModule = ['uam', 'roles', 'permissions'].includes(module);
-    if (user.isSuperAdmin && isCoreAdminModule) return true;
+    // Safety guard: only prevent locking out the permissions configuration screens themselves
+    const isPermManager = module === 'permissions' && ['permissions-list', 'permission-edit'].includes(screen);
+    if (user.isSuperAdmin && isPermManager) return true;
 
     const perm = permissions.find(p => p.module === module && p.screen === screen);
     if (perm) {
@@ -84,7 +123,7 @@ export const AuthProvider = ({ children }) => {
   }, [user, permissions]);
 
   return (
-    <AuthContext.Provider value={{ user, permissions, loading, login, logout, hasPermission, fetchPermissions, updateUser }}>
+    <AuthContext.Provider value={{ user, permissions, loading, login, logout, hasPermission, fetchPermissions, updateUser, refreshAuth }}>
       {children}
     </AuthContext.Provider>
   );

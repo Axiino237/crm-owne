@@ -10,26 +10,15 @@ build/
 
 # Environment variables / credentials
 .env
+.env*
 **/.env
-.env*.local
+**/.env*
 
-# Logs
-*.log
-**/*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Editor directories and files
-.vscode/
-.idea/
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Deployment / scratch / temp scripts
+*.py
+*.ps1
+backend/find_uuid.js
+backend-nest/
 
 # Uploads or local temp dirs
 uploads/
