@@ -223,12 +223,19 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
     } = req.body;
     if (!name && !companyName) return res.status(400).json({ success: false, message: 'Either Contact Person or Company Name is required' });
 
+    const leadStatus = status || 'new';
+    // If status is 'new', it is NEVER a call made yet, so lastContactedDate must be null
+    let effectiveLastContactedDate = null;
+    if (leadStatus !== 'new') {
+      effectiveLastContactedDate = lastContactedDate || new Date().toISOString().split('T')[0];
+    }
+
     const lead = await Lead.create({
       name,
       companyName: companyName || null,
       email: email || null,
       phone: phone || null,
-      status: status || 'new',
+      status: leadStatus,
       expo: expo || 'other',
       value: value || 0,
       notes: notes || null,
@@ -238,7 +245,7 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
       expoName: expoName || null,
       address: address || null,
       expoMode: expoMode || null,
-      lastContactedDate: lastContactedDate || null,
+      lastContactedDate: effectiveLastContactedDate,
       nextFollowUp: nextFollowUp || null,
       alternatePhone: alternatePhone || null,
       paidAmount: paidAmount || 0,
@@ -310,7 +317,6 @@ router.put('/:id', async (req, res, next) => {
     if (companyName !== undefined) updates.companyName = companyName;
     if (email !== undefined) updates.email = email;
     if (phone !== undefined) updates.phone = phone;
-    if (status !== undefined) updates.status = status;
     if (expo !== undefined) updates.expo = expo;
     if (value !== undefined) updates.value = value;
     if (notes !== undefined) updates.notes = notes;
@@ -320,12 +326,32 @@ router.put('/:id', async (req, res, next) => {
     if (expoName !== undefined) updates.expoName = expoName;
     if (address !== undefined) updates.address = address;
     if (expoMode !== undefined) updates.expoMode = expoMode;
-    if (lastContactedDate !== undefined) updates.lastContactedDate = lastContactedDate || null;
     if (nextFollowUp !== undefined) updates.nextFollowUp = nextFollowUp || null;
     if (alternatePhone !== undefined) updates.alternatePhone = alternatePhone;
     if (paidAmount !== undefined) updates.paidAmount = paidAmount;
     if (vendorPaidAmount !== undefined) updates.vendorPaidAmount = vendorPaidAmount;
     if (designStatus !== undefined) updates.designStatus = designStatus;
+
+    if (status !== undefined) {
+      updates.status = status;
+      if (status === 'new') {
+        // Reverting or setting to 'new' -> MUST clear lastContactedDate so call count is 0
+        updates.lastContactedDate = null;
+      } else {
+        // Changing from new to an active/contacted status -> MUST count as a call made
+        if (lastContactedDate) {
+          updates.lastContactedDate = lastContactedDate;
+        } else if (!lead.lastContactedDate || lead.status === 'new') {
+          updates.lastContactedDate = new Date().toISOString().split('T')[0];
+        }
+      }
+    } else if (lastContactedDate !== undefined) {
+      if (lead.status === 'new') {
+        updates.lastContactedDate = null;
+      } else {
+        updates.lastContactedDate = lastContactedDate || null;
+      }
+    }
 
     await lead.update(updates);
 
@@ -489,7 +515,7 @@ router.post('/bulk-upload', checkPermission('leads', 'leads-list', 'canCreate'),
           expoName: (row['expo name'] || row['exponame'] || row['source name'] || row['sourcename'] || '').trim() || null,
           address: (row['address'] || '').trim() || null,
           expoMode: (row['expo mode'] || row['expomode'] || row['source mode'] || row['sourcemode'] || '').trim() || null,
-          lastContactedDate: parseCSVDate(row['last contacted date'] || row['lastcontacteddate']),
+          lastContactedDate: status === 'new' ? null : parseCSVDate(row['last contacted date'] || row['lastcontacteddate']),
           nextFollowUp: parseCSVDate(row['next follow up'] || row['nextfollowup']),
           alternatePhone: (row['alternate phone'] || row['alternatephone'] || '').trim() || null,
           assignedTo: assignedToId,

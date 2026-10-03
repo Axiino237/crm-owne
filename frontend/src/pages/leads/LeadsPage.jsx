@@ -226,15 +226,32 @@ const LeadModal = ({ lead, users, onClose, onSaved }) => {
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  const handleStatusChange = (newStatus) => {
+    setForm(p => ({
+      ...p,
+      status: newStatus,
+      // If status reverted to 'new', clear lastContactedDate so it is removed from Calls Made
+      // If changed from 'new' to an active status, auto-stamp today's date if empty
+      lastContactedDate: newStatus === 'new'
+        ? ''
+        : (p.lastContactedDate || new Date().toISOString().split('T')[0])
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim() && !form.companyName.trim()) return toast.error('Either Contact Person or Company Name is required');
     setSaving(true);
     try {
-      const payload = { ...form, value: parseFloat(form.value) || 0, assignedTo: form.assignedTo || null };
+      const payload = { 
+        ...form, 
+        value: parseFloat(form.value) || 0, 
+        assignedTo: form.assignedTo || null,
+        lastContactedDate: form.status === 'new' ? null : (form.lastContactedDate || null)
+      };
       if (lead) {
         await api.put(`/leads/${lead.id}`, payload);
-        toast.success('Lead updated!');
+        toast.success(form.status === 'new' ? 'Lead updated (Status is New)' : 'Lead updated!');
       } else {
         await api.post('/leads', payload);
         toast.success('Lead created!');
@@ -275,9 +292,21 @@ const LeadModal = ({ lead, users, onClose, onSaved }) => {
               <input style={inputStyle} value={form.alternatePhone} onChange={e => set('alternatePhone', e.target.value)} placeholder="Alternate number" /></div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Designation</label>
               <input style={inputStyle} value={form.designation} onChange={e => set('designation', e.target.value)} placeholder="e.g. Director, Manager" /></div>
-            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Status</label>
-              <select style={inputStyle} value={form.status} onChange={e => set('status', e.target.value)}>
-                {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Status</label>
+              <select style={inputStyle} value={form.status} onChange={e => handleStatusChange(e.target.value)}>
+                {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              {form.status === 'new' ? (
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3, display: 'block' }}>
+                  ℹ️ New lead · Not counted in Calls Made
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.7rem', color: '#10b981', marginTop: 3, display: 'block' }}>
+                  ✓ Status active · Logged in Calls Made
+                </span>
+              )}
+            </div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Expo Type</label>
               <input style={inputStyle} value={form.expoType} onChange={e => set('expoType', e.target.value)} placeholder="e.g. Social Media, Cold Call" /></div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Expo Name</label>
@@ -607,6 +636,25 @@ const LeadsPage = () => {
   const closeModal = () => { setShowModal(false); setModalLead(null); };
   const afterSave = () => { closeModal(); fetchLeads(); };
 
+  const handleQuickStatusChange = async (leadId, newStatus, currentStatus) => {
+    if (newStatus === currentStatus) return;
+    try {
+      const payload = {
+        status: newStatus,
+        lastContactedDate: newStatus === 'new' ? null : new Date().toISOString().split('T')[0]
+      };
+      await api.put(`/leads/${leadId}`, payload);
+      if (newStatus === 'new') {
+        toast.success('Lead status reverted to New (Call count removed)');
+      } else {
+        toast.success(`Status updated to ${STATUS_CONFIG[newStatus]?.label || newStatus} (Calls Made logged)`);
+      }
+      fetchLeads();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update status');
+    }
+  };
+
   // Row selection
   const isAllSelected = leads.length > 0 && leads.every(l => selected.has(l.id));
   const toggleAll = () => {
@@ -839,10 +887,37 @@ const LeadsPage = () => {
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${st.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dot }} />
-                          {st.label}
-                        </span>
+                        {canEdit ? (
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <select
+                              value={lead.status || 'new'}
+                              onChange={e => handleQuickStatusChange(lead.id, e.target.value, lead.status)}
+                              className={`badge ${st.cls}`}
+                              style={{
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                outline: 'none',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                                fontSize: '0.74rem',
+                                padding: '3px 8px',
+                                borderRadius: 16,
+                                textAlign: 'center'
+                              }}
+                              title="Click to quickly change status (New = No Call; Other = Call Made)"
+                            >
+                              {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                                <option key={k} value={k} style={{ background: '#0f172a', color: '#f8fafc' }}>
+                                  {v.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <span className={`badge ${st.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dot }} />
+                            {st.label}
+                          </span>
+                        )}
                       </td>
                       <td>
                         {lead.assignee

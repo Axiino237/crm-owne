@@ -169,7 +169,11 @@ router.get('/', checkPermission('performance', 'performance-view', 'canView'), a
       } else {
         // Sales / Telecaller statistics
         const createdQuery = { assignedTo: user.id, createdAt: { [Op.between]: [new Date(startDateStr), new Date(endDateStr)] } };
-        const contactedQuery = { assignedTo: user.id, lastContactedDate: dateWhere };
+        const contactedQuery = { 
+          assignedTo: user.id, 
+          lastContactedDate: dateWhere,
+          status: { [Op.ne]: 'new' } // Lead in 'new' status is NEVER counted as a call made
+        };
 
         [totalAssigned, convertedCount, contactedCount, newCount, inProgressCount, qualifiedCount, lostCount] = await Promise.all([
           Lead.count({ where: createdQuery }),
@@ -243,7 +247,11 @@ router.get('/', checkPermission('performance', 'performance-view', 'canView'), a
       }));
     } else {
       activities = await Lead.findAll({
-        where: { assignedTo: { [Op.in]: deptUsers.map(u => u.id) }, lastContactedDate: dateWhere },
+        where: { 
+          assignedTo: { [Op.in]: deptUsers.map(u => u.id) }, 
+          lastContactedDate: dateWhere,
+          status: { [Op.ne]: 'new' }
+        },
         attributes: ['id', 'name', 'companyName', 'status', 'lastContactedDate', 'nextFollowUp', 'notes'],
         include: [{ model: User, as: 'assignee', attributes: ['id', 'name'] }],
         order: [['lastContactedDate', 'DESC'], ['updatedAt', 'DESC']],
