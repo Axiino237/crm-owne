@@ -256,96 +256,102 @@ const PerformancePage = () => {
       ) : (
         <>
           {/* Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+          <div className="perf-stat-grid">
             
             {/* Card 1: Calls Made OR Stalls Assigned */}
-            <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(59,130,246,0.1)', color: 'rgb(59,130,246)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
+            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(59,130,246,0.1)', color: 'rgb(59,130,246)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
                 {isDesignDept ? <RiPaletteLine /> : <RiPhoneLine />}
               </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept 
                     ? (hasTeamAccess || isAdmin ? 'Total Designs' : 'My Designs')
                     : (hasTeamAccess || isAdmin ? 'Team Calls' : 'My Calls')
                   }
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{totalCalls}</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                  {totalCalls}
+                </div>
               </div>
             </div>
 
             {/* Card 2: Converted Leads OR Completed Designs */}
-            <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(16,185,129,0.1)', color: 'rgb(16,185,129)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
+            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(16,185,129,0.1)', color: 'rgb(16,185,129)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
                 {isDesignDept ? <RiCheckDoubleLine /> : <RiCheckboxCircleLine />}
               </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept 
                     ? (hasTeamAccess || isAdmin ? 'Team Completed' : 'My Completed')
                     : (hasTeamAccess || isAdmin ? 'Team Converted' : 'My Converted')
                   }
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{totalConverted}</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                  {totalConverted}
+                </div>
               </div>
             </div>
 
             {/* Card 3: Conversion Rate OR Completion Rate */}
-            <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(139,92,246,0.1)', color: 'rgb(139,92,246)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
+            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(139,92,246,0.1)', color: 'rgb(139,92,246)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
                 <RiUserHeartLine />
               </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept ? 'Completion Rate' : 'Conversion Rate'}
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap' }}>
                   {isDesignDept ? designCompletionRate : conversionRate}%
                 </div>
               </div>
             </div>
 
             {/* Card 4: Assigned Leads OR Pending Designs */}
-            <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: 'rgb(245,158,11)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
+            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(245,158,11,0.1)', color: 'rgb(245,158,11)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
                 <RiFolderUserLine />
               </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept 
                     ? (hasTeamAccess || isAdmin ? 'Team Assigned' : 'My Assigned')
                     : (hasTeamAccess || isAdmin ? 'Team Leads' : 'My Leads')
                   }
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{totalAssigned}</div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                  {totalAssigned}
+                </div>
               </div>
             </div>
 
             {/* Card 5: Closed Value OR Design Budget */}
-            <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(6,182,212,0.1)', color: 'rgb(6,182,212)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
+            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(6,182,212,0.1)', color: 'rgb(6,182,212)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
                 <RiMoneyDollarCircleLine />
               </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept ? 'Completed Budget' : 'Total Closed'}
                 </div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>
+                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {formatCurrency(totalClosedVal)}
                 </div>
               </div>
             </div>
 
             {/* Card 6: Office Profit OR Generated Revenue */}
-            <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(236,72,153,0.1)', color: 'rgb(236,72,153)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>
+            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(236,72,153,0.1)', color: 'rgb(236,72,153)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
                 <RiWallet3Line />
               </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept ? 'Generated Rev.' : 'Net Profit'}
                 </div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success)', marginTop: 4 }}>
+                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {formatCurrency(totalNetProfit)}
                 </div>
               </div>

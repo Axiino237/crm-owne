@@ -607,3 +607,29 @@ select.form-control option { background: var(--bg-card); color: var(--text-prima
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .page-title { font-size: 1.375rem; }
 }
+
+/* Performance summary cards grid: 6 on widescreen, 3x2 on laptop/desktop, 2x3 on tablet, 1 on mobile */
+.perf-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1500px) {
+  .perf-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .perf-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .perf-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
