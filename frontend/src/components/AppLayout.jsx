@@ -31,6 +31,7 @@ const Sidebar = () => {
         { to: '/organizations', icon: <RiBuildingLine />, label: 'Organizations', show: user?.isSuperAdmin && hasPermission('organizations', 'organizations-list', 'canView') },
         { to: '/companies', icon: <RiBuilding2Line />, label: 'Companies', show: hasPermission('companies', 'companies-list', 'canView') },
         { to: '/departments', icon: <RiGroupLine />, label: 'Departments', show: hasPermission('departments', 'departments-list', 'canView') },
+        { to: '/team-monitor', icon: <RiTeamLine />, label: 'Team Monitor', show: hasPermission('departments', 'departments-list', 'canView') },
         { to: '/org-overview', icon: <RiOrganizationChart />, label: 'Org Overview', show: hasPermission('dashboard', 'org-overview', 'canView') }
       ]
     },

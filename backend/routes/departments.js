@@ -7,6 +7,29 @@ const { checkPermission } = require('../middleware/permission');
 
 router.use(protect);
 
+// Helper to populate user details for dynamic hierarchy layers
+const enrichDepartmentLayers = async (dept) => {
+  const plain = dept.toJSON ? dept.toJSON() : { ...dept };
+  if (!plain.hierarchyLayers || !Array.isArray(plain.hierarchyLayers)) {
+    plain.hierarchyLayers = [];
+    return plain;
+  }
+  const allUserIds = plain.hierarchyLayers.flatMap(l => l.userIds || []);
+  if (allUserIds.length === 0) return plain;
+
+  const users = await User.findAll({
+    where: { id: { [Op.in]: allUserIds } },
+    attributes: ['id', 'name', 'email', 'phone', 'avatar']
+  });
+  const userMap = new Map(users.map(u => [u.id, u.toJSON ? u.toJSON() : u]));
+
+  plain.hierarchyLayers = plain.hierarchyLayers.map(l => ({
+    ...l,
+    users: (l.userIds || []).map(uid => userMap.get(uid)).filter(Boolean)
+  }));
+  return plain;
+};
+
 // @desc    Get all departments
 // @route   GET /api/departments
 router.get('/', checkPermission('departments', 'departments-list', 'canView'), async (req, res) => {
@@ -32,7 +55,8 @@ router.get('/', checkPermission('departments', 'departments-list', 'canView'), a
       offset: (Number(page) - 1) * Number(limit)
     });
 
-    res.json({ success: true, total: count, departments: rows });
+    const enrichedRows = await Promise.all(rows.map(d => enrichDepartmentLayers(d)));
+    res.json({ success: true, total: count, departments: enrichedRows });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
@@ -49,10 +73,11 @@ router.get('/all', async (req, res) => {
 
     const departments = await Department.findAll({
       where,
-      attributes: ['id', 'name', 'code', 'companyId'],
+      attributes: ['id', 'name', 'code', 'companyId', 'hierarchyLayers', 'headId'],
       order: [['name', 'ASC']]
     });
-    res.json({ success: true, departments });
+    const enriched = await Promise.all(departments.map(d => enrichDepartmentLayers(d)));
+    res.json({ success: true, departments: enriched });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
@@ -70,7 +95,8 @@ router.get('/:id', checkPermission('departments', 'departments-list', 'canView')
       ]
     });
     if (!dept) return res.status(404).json({ success: false, message: 'Department not found' });
-    res.json({ success: true, department: dept });
+    const enriched = await enrichDepartmentLayers(dept);
+    res.json({ success: true, department: enriched });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
@@ -80,16 +106,22 @@ router.get('/:id', checkPermission('departments', 'departments-list', 'canView')
 // @route   POST /api/departments
 router.post('/', adminOnly, checkPermission('departments', 'departments-list', 'canCreate'), async (req, res) => {
   try {
-    const { name, code, companyId, organizationId, description, headId } = req.body;
+    const { name, code, companyId, organizationId, description, headId, hierarchyLayers } = req.body;
     if (!name || !companyId || !organizationId) {
       return res.status(400).json({ success: false, message: 'Name, company and organization are required' });
     }
+
+    const layers = Array.isArray(hierarchyLayers) ? hierarchyLayers : [];
+    const primaryHeadId = layers[0]?.userIds?.[0] || headId || null;
 
     const dept = await Department.create({
       name, 
       code: code ? code.toUpperCase() : undefined, 
       companyId, organizationId,
-      description, headId: headId || null, createdById: req.user.id
+      description, 
+      headId: primaryHeadId,
+      hierarchyLayers: layers,
+      createdById: req.user.id
     });
 
     const created = await Department.findByPk(dept.id, {
@@ -99,7 +131,8 @@ router.post('/', adminOnly, checkPermission('departments', 'departments-list', '
       ]
     });
 
-    res.status(201).json({ success: true, message: 'Department created successfully', department: created });
+    const enriched = await enrichDepartmentLayers(created);
+    res.status(201).json({ success: true, message: 'Department created successfully', department: enriched });
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({ success: false, message: 'Department code already exists in this company' });
@@ -115,9 +148,15 @@ router.put('/:id', adminOnly, checkPermission('departments', 'departments-list',
     const dept = await Department.findByPk(req.params.id);
     if (!dept) return res.status(404).json({ success: false, message: 'Department not found' });
 
-    const { headId, ...rest } = req.body;
+    const { headId, hierarchyLayers, ...rest } = req.body;
     const updates = { ...rest };
-    if (headId !== undefined) updates.headId = headId || null;
+    if (hierarchyLayers !== undefined) {
+      const layers = Array.isArray(hierarchyLayers) ? hierarchyLayers : [];
+      updates.hierarchyLayers = layers;
+      updates.headId = layers[0]?.userIds?.[0] || headId || null;
+    } else if (headId !== undefined) {
+      updates.headId = headId || null;
+    }
 
     await dept.update(updates);
 
@@ -129,7 +168,211 @@ router.put('/:id', adminOnly, checkPermission('departments', 'departments-list',
       ]
     });
 
-    res.json({ success: true, message: 'Department updated successfully', department: updated });
+    const enriched = await enrichDepartmentLayers(updated);
+    res.json({ success: true, message: 'Department updated successfully', department: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @desc    Get team live monitoring data for department
+// @route   GET /api/departments/:id/team-monitor
+router.get('/:id/team-monitor', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const dept = await Department.findByPk(id, {
+      include: [
+        { model: Company, as: 'company', attributes: ['id', 'name', 'code'] },
+        { model: Organization, as: 'organization', attributes: ['id', 'name', 'code'] }
+      ]
+    });
+    if (!dept) return res.status(404).json({ success: false, message: 'Department not found' });
+
+    const enrichedDept = await enrichDepartmentLayers(dept);
+    const layers = enrichedDept.hierarchyLayers || [];
+
+    // Check viewer's authority in this department
+    const isSuperAdmin = req.user.isSuperAdmin;
+    const isOrgAdmin = req.user.role?.level === 'org_admin' || req.user.role?.level === 'company_admin';
+    
+    let viewerLayerLevel = null;
+    let viewerLayerName = null;
+    for (const l of layers) {
+      if (l.userIds && l.userIds.includes(req.user.id)) {
+        viewerLayerLevel = l.level;
+        viewerLayerName = l.name;
+        break;
+      }
+    }
+
+    const isHOD = viewerLayerLevel === 1 || dept.headId === req.user.id;
+    const isLeadOrManager = viewerLayerLevel !== null;
+    const canMonitor = isSuperAdmin || isOrgAdmin || isLeadOrManager || isHOD;
+
+    if (!canMonitor) {
+      return res.status(403).json({ success: false, message: 'You do not have permission to monitor this department.' });
+    }
+
+    // Fetch all department members
+    const members = await User.findAll({
+      where: { departmentId: id, isActive: true },
+      attributes: ['id', 'name', 'email', 'phone', 'avatar', 'createdAt'],
+      order: [['name', 'ASC']]
+    });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const { Attendance, LeaveRequest, Lead, DesignOrder } = require('../models');
+    const memberIds = members.map(m => m.id);
+
+    // Today's Attendance
+    const attendances = await Attendance.findAll({
+      where: {
+        userId: { [Op.in]: memberIds },
+        date: todayStr
+      }
+    });
+    const attMap = new Map(attendances.map(a => [a.userId, a]));
+
+    // Leaves today
+    const leaves = await LeaveRequest.findAll({
+      where: {
+        userId: { [Op.in]: memberIds },
+        startDate: { [Op.lte]: todayStr },
+        endDate: { [Op.gte]: todayStr },
+        status: 'approved'
+      }
+    });
+    const leaveMap = new Map(leaves.map(l => [l.userId, l]));
+
+    // Active Leads assigned to these members
+    const activeLeads = await Lead.findAll({
+      where: {
+        assignedTo: { [Op.in]: memberIds }
+      },
+      attributes: ['id', 'name', 'companyName', 'email', 'phone', 'status', 'value', 'nextFollowUp', 'assignedTo', 'updatedAt'],
+      order: [['updatedAt', 'DESC']]
+    });
+    const leadsByMember = new Map();
+    for (const lead of activeLeads) {
+      if (!leadsByMember.has(lead.assignedTo)) leadsByMember.set(lead.assignedTo, []);
+      leadsByMember.get(lead.assignedTo).push(lead);
+    }
+
+    // Active Designs for these members
+    const activeDesigns = await DesignOrder.findAll({
+      where: {
+        submittedBy: { [Op.in]: memberIds }
+      },
+      attributes: ['id', 'companyName', 'exhibitionName', 'stallSize', 'status', 'approxBudget', 'submittedBy', 'updatedAt'],
+      order: [['updatedAt', 'DESC']]
+    });
+    const designsByMember = new Map();
+    for (const d of activeDesigns) {
+      if (!designsByMember.has(d.submittedBy)) designsByMember.set(d.submittedBy, []);
+      designsByMember.get(d.submittedBy).push(d);
+    }
+
+    // Map monitored members with their layer and work stats
+    const monitoredMembers = members.map(m => {
+      const mPlain = m.toJSON ? m.toJSON() : m;
+      
+      let memberLayer = null;
+      for (const l of layers) {
+        if (l.userIds && l.userIds.includes(m.id)) {
+          memberLayer = { id: l.id, level: l.level, name: l.name };
+          break;
+        }
+      }
+
+      const todayAtt = attMap.get(m.id);
+      const todayLeave = leaveMap.get(m.id);
+      const memberLeads = leadsByMember.get(m.id) || [];
+      const memberDesigns = designsByMember.get(m.id) || [];
+
+      let status = 'not_clocked';
+      if (todayLeave) status = 'on_leave';
+      else if (todayAtt) status = todayAtt.clockOut ? 'clocked_out' : 'present';
+
+      const totalLeadsValue = memberLeads.reduce((sum, l) => sum + (Number(l.value) || 0), 0);
+      const convertedLeads = memberLeads.filter(l => l.status === 'converted').length;
+      const activeLeadsCount = memberLeads.filter(l => l.status !== 'converted' && l.status !== 'lost').length;
+
+      return {
+        ...mPlain,
+        layer: memberLayer,
+        attendanceStatus: status,
+        todayAttendance: todayAtt ? {
+          clockIn: todayAtt.clockIn,
+          clockOut: todayAtt.clockOut,
+          duration: todayAtt.duration
+        } : null,
+        todayLeave: todayLeave ? {
+          type: todayLeave.leaveType,
+          reason: todayLeave.reason
+        } : null,
+        workSummary: {
+          totalLeads: memberLeads.length,
+          activeLeads: activeLeadsCount,
+          convertedLeads,
+          totalLeadsValue,
+          totalDesigns: memberDesigns.length,
+          pendingDesigns: memberDesigns.filter(d => d.status === 'pending' || d.status === 'in_progress').length
+        },
+        leads: memberLeads,
+        designs: memberDesigns
+      };
+    });
+
+    const presentCount = monitoredMembers.filter(m => m.attendanceStatus === 'present' || m.attendanceStatus === 'clocked_out').length;
+    const leaveCount = monitoredMembers.filter(m => m.attendanceStatus === 'on_leave').length;
+    const totalLeadsAssigned = activeLeads.length;
+    const totalPipelineValue = activeLeads.reduce((s, l) => s + (Number(l.value) || 0), 0);
+    const totalOngoingDesigns = activeDesigns.filter(d => d.status === 'pending' || d.status === 'in_progress').length;
+
+    res.json({
+      success: true,
+      department: enrichedDept,
+      viewer: {
+        isSuperAdmin,
+        isOrgAdmin,
+        layerLevel: viewerLayerLevel,
+        layerName: viewerLayerName,
+        isHOD
+      },
+      summary: {
+        totalMembers: members.length,
+        presentCount,
+        leaveCount,
+        notClockedCount: members.length - (presentCount + leaveCount),
+        totalLeadsAssigned,
+        totalPipelineValue,
+        totalOngoingDesigns
+      },
+      members: monitoredMembers
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @desc    Reassign a lead to another department member
+// @route   POST /api/departments/reassign-lead
+router.post('/reassign-lead', async (req, res) => {
+  try {
+    const { leadId, newAssignedToUserId } = req.body;
+    if (!leadId || !newAssignedToUserId) {
+      return res.status(400).json({ success: false, message: 'Lead ID and New Assignee are required' });
+    }
+
+    const { Lead } = require('../models');
+    const lead = await Lead.findByPk(leadId);
+    if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+
+    const newUser = await User.findByPk(newAssignedToUserId);
+    if (!newUser) return res.status(404).json({ success: false, message: 'Target user not found' });
+
+    await lead.update({ assignedTo: newAssignedToUserId });
+    res.json({ success: true, message: `Lead "${lead.name || 'Lead'}" reassigned to ${newUser.name} successfully!` });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }

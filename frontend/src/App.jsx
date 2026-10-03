@@ -13,6 +13,7 @@ import OrganizationsPage from './pages/orgs/OrganizationsPage';
 import CompaniesPage from './pages/orgs/CompaniesPage';
 import DepartmentsPage from './pages/orgs/DepartmentsPage';
 import OrgOverviewPage from './pages/orgs/OrgOverviewPage';
+import TeamMonitorPage from './pages/orgs/TeamMonitorPage';
 import LeadsPage from './pages/leads/LeadsPage';
 import QuotationPage from './pages/quotations/QuotationPage';
 import Unauthorized from './pages/Unauthorized';
@@ -116,6 +117,13 @@ const App = () => {
           <Route path="/departments" element={
             <ProtectedRoute module="departments" screen="departments-list" action="canView">
               <DepartmentsPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Team Monitor */}
+          <Route path="/team-monitor" element={
+            <ProtectedRoute module="departments" screen="departments-list" action="canView">
+              <TeamMonitorPage />
             </ProtectedRoute>
           } />
 

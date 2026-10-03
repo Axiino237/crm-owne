@@ -29,6 +29,10 @@ const Department = sequelize.define('Department', {
     type: DataTypes.UUID,
     allowNull: true
   },
+  hierarchyLayers: {
+    type: DataTypes.JSONB,
+    defaultValue: []
+  },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
