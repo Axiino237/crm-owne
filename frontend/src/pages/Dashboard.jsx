@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   RiTeamLine, 
   RiShieldUserLine, 
@@ -64,6 +64,61 @@ const Dashboard = () => {
   const [businessStats, setBusinessStats] = useState(null);
   const [loadingSystem, setLoadingSystem] = useState(true);
   const [loadingBusiness, setLoadingBusiness] = useState(true);
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+
+  // Prepare smooth line chart points and curves
+  const lineChartData = useMemo(() => {
+    const rawData = businessStats?.stats?.monthlyData || [];
+    
+    // Rolling monthly timeline for 2026
+    const monthKeys = ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026'];
+    
+    const pointsData = monthKeys.map(m => {
+      const short = m.slice(0, 3).toLowerCase();
+      const match = rawData.find(d => d.month && d.month.toLowerCase().includes(short));
+      return {
+        month: m,
+        label: m.split(' ')[0],
+        profit: match ? Math.max(0, parseFloat(match.profit) || 0) : 0,
+        hasData: !!match
+      };
+    });
+
+    const maxVal = Math.max(...pointsData.map(p => p.profit), 10000);
+    const paddingLeft = 70;
+    const paddingRight = 45;
+    const chartWidth = 800 - paddingLeft - paddingRight;
+    const baselineY = 175;
+    const topY = 40;
+    const chartHeight = baselineY - topY;
+
+    const coords = pointsData.map((p, idx) => {
+      const x = paddingLeft + (idx / Math.max(1, pointsData.length - 1)) * chartWidth;
+      const y = baselineY - (p.profit > 0 ? (p.profit / maxVal) * chartHeight : 0);
+      return { ...p, x, y };
+    });
+
+    // Build smooth cubic bezier line path
+    let linePath = '';
+    if (coords.length > 0) {
+      linePath = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const p0 = coords[i];
+        const p1 = coords[i + 1];
+        const cp1x = p0.x + (p1.x - p0.x) / 2;
+        const cp1y = p0.y;
+        const cp2x = p0.x + (p1.x - p0.x) / 2;
+        const cp2y = p1.y;
+        linePath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+      }
+    }
+
+    const last = coords[coords.length - 1] || { x: 755, y: baselineY };
+    const first = coords[0] || { x: paddingLeft, y: baselineY };
+    const areaPath = linePath ? `${linePath} L ${last.x.toFixed(1)} ${baselineY} L ${first.x.toFixed(1)} ${baselineY} Z` : '';
+
+    return { coords, linePath, areaPath, maxVal, baselineY, topY, paddingLeft, chartWidth };
+  }, [businessStats?.stats?.monthlyData]);
 
   // Dynamic activeTab sync if permissions load late
   useEffect(() => {
@@ -374,78 +429,192 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* SVG Graph visualization */}
+          {/* SVG Line Graph visualization */}
           {hasPermission('dashboard', 'profit-trend-chart', 'canView') && (
             <div className="card" style={{ marginBottom: '24px' }}>
-              <div className="card-header">
-                <span className="card-title">Monthly Net Profit Trend (2026)</span>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="card-title">Monthly Net Profit Trend (2026)</span>
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600 }}>
+                    📈 Line Trend
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                  Peak: <strong style={{ color: 'var(--accent)' }}>{formatCurrency(lineChartData.maxVal)}</strong>
+                </div>
               </div>
+
               {loadingBusiness ? (
                 <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
               ) : (
-                <div style={{ marginTop: '16px' }}>
-                  {/* SVG Visualizer */}
-                  <div style={{ position: 'relative', height: 200, width: '100%' }}>
-                    <svg style={{ height: '100%', width: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.4" />
-                          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      {/* Grid Lines */}
-                      <line x1="0" y1="50" x2="100%" y2="50" stroke="var(--border)" strokeDasharray="5,5" />
-                      <line x1="0" y1="100" x2="100%" y2="100" stroke="var(--border)" strokeDasharray="5,5" />
-                      <line x1="0" y1="150" x2="100%" y2="150" stroke="var(--border)" strokeDasharray="5,5" />
+                <div style={{ marginTop: '16px', position: 'relative' }}>
+                  <svg 
+                    viewBox="0 0 800 230" 
+                    style={{ width: '100%', height: 'auto', maxHeight: '260px', overflow: 'visible', display: 'block' }}
+                  >
+                    <defs>
+                      {/* Gradient fill under line */}
+                      <linearGradient id="profitLineGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#6366f1" stopOpacity="0.38" />
+                        <stop offset="70%" stopColor="#6366f1" stopOpacity="0.08" />
+                        <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                      </linearGradient>
 
-                      {/* Bars or Lines representing data */}
-                      {businessStats?.stats?.monthlyData?.map((item, idx, arr) => {
-                        const totalWidth = 100; // in percentage
-                        const step = totalWidth / Math.max(1, arr.length);
-                        const x = idx * step + step / 2;
-                        const maxProfit = Math.max(...arr.map(d => d.profit), 10000);
-                        const heightPercent = (item.profit / maxProfit) * 150;
-                        const y = 180 - heightPercent;
+                      {/* Drop shadow / glow for line */}
+                      <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#6366f1" floodOpacity="0.5" />
+                      </filter>
+                    </defs>
 
-                        return (
-                          <g key={idx}>
-                            {/* Colored bar */}
-                            <rect 
-                              x={`${idx * step + step / 4}%`} 
-                              y={y} 
-                              width={`${step / 2}%`} 
-                              height={heightPercent} 
-                              fill="url(#profitGrad)"
-                              stroke="var(--accent)"
-                              strokeWidth="2"
-                              rx="4"
+                    {/* Horizontal Grid lines with currency labels */}
+                    {[
+                      { y: lineChartData.topY, val: lineChartData.maxVal },
+                      { y: lineChartData.topY + (lineChartData.baselineY - lineChartData.topY) * 0.33, val: lineChartData.maxVal * 0.66 },
+                      { y: lineChartData.topY + (lineChartData.baselineY - lineChartData.topY) * 0.66, val: lineChartData.maxVal * 0.33 },
+                      { y: lineChartData.baselineY, val: 0 }
+                    ].map((grid, idx) => (
+                      <g key={idx}>
+                        <line 
+                          x1={lineChartData.paddingLeft} 
+                          y1={grid.y} 
+                          x2={lineChartData.paddingLeft + lineChartData.chartWidth} 
+                          y2={grid.y} 
+                          stroke="rgba(255, 255, 255, 0.08)" 
+                          strokeDasharray={idx === 3 ? "none" : "5,5"} 
+                          strokeWidth={idx === 3 ? "1.5" : "1"}
+                        />
+                        <text 
+                          x={lineChartData.paddingLeft - 10} 
+                          y={grid.y + 4} 
+                          textAnchor="end" 
+                          fill="var(--text-secondary)" 
+                          fontSize="10" 
+                          fontWeight="500"
+                        >
+                          {formatCurrency(grid.val)}
+                        </text>
+                      </g>
+                    ))}
+
+                    {/* Gradient Area under the Curve */}
+                    {lineChartData.areaPath && (
+                      <path 
+                        d={lineChartData.areaPath} 
+                        fill="url(#profitLineGrad)" 
+                      />
+                    )}
+
+                    {/* The Smooth Trend Line */}
+                    {lineChartData.linePath && (
+                      <path 
+                        d={lineChartData.linePath} 
+                        fill="none" 
+                        stroke="#6366f1" 
+                        strokeWidth="3.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                        filter="url(#neonGlow)"
+                      />
+                    )}
+
+                    {/* Hover Guide line */}
+                    {hoveredPoint && (
+                      <line 
+                        x1={hoveredPoint.x} 
+                        y1={lineChartData.topY - 10} 
+                        x2={hoveredPoint.x} 
+                        y2={lineChartData.baselineY} 
+                        stroke="#818cf8" 
+                        strokeWidth="1.5" 
+                        strokeDasharray="3,3" 
+                        opacity="0.8"
+                      />
+                    )}
+
+                    {/* Data Points, Dots & Value Pills */}
+                    {lineChartData.coords.map((pt, idx) => {
+                      const isHovered = hoveredPoint?.month === pt.month;
+                      const hasValue = pt.profit > 0;
+
+                      return (
+                        <g 
+                          key={idx} 
+                          style={{ cursor: 'pointer' }}
+                          onMouseEnter={() => setHoveredPoint(pt)}
+                          onMouseLeave={() => setHoveredPoint(null)}
+                        >
+                          {/* Invisible wide hover target */}
+                          <rect 
+                            x={pt.x - 25} 
+                            y={lineChartData.topY} 
+                            width="50" 
+                            height={lineChartData.baselineY - lineChartData.topY + 30} 
+                            fill="transparent" 
+                          />
+
+                          {/* Outer halo on active point */}
+                          {(hasValue || isHovered) && (
+                            <circle 
+                              cx={pt.x} 
+                              cy={pt.y} 
+                              r={isHovered ? 12 : 8} 
+                              fill="rgba(99, 102, 241, 0.3)" 
+                              style={{ transition: 'all 0.2s ease' }}
                             />
-                            {/* Label value */}
-                            <text 
-                              x={`${x}%`} 
-                              y={y - 8} 
-                              textAnchor="middle" 
-                              fill="var(--text-primary)" 
-                              fontSize="11" 
-                              fontWeight="600"
-                            >
-                              {formatCurrency(item.profit)}
-                            </text>
-                            {/* Month description */}
-                            <text 
-                              x={`${x}%`} 
-                              y={200} 
-                              textAnchor="middle" 
-                              fill="var(--text-secondary)" 
-                              fontSize="11"
-                            >
-                              {item.month}
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
+                          )}
+
+                          {/* Center Dot */}
+                          <circle 
+                            cx={pt.x} 
+                            cy={pt.y} 
+                            r={isHovered ? 6 : (hasValue ? 5 : 3.5)} 
+                            fill={hasValue || isHovered ? "#6366f1" : "rgba(255, 255, 255, 0.3)"} 
+                            stroke={hasValue || isHovered ? "#ffffff" : "transparent"} 
+                            strokeWidth={hasValue || isHovered ? "2.5" : "0"} 
+                            style={{ transition: 'all 0.2s ease' }}
+                          />
+
+                          {/* Value Pill above the active point */}
+                          {(hasValue || isHovered) && (
+                            <g style={{ transition: 'transform 0.2s ease' }}>
+                              <rect 
+                                x={pt.x - 45} 
+                                y={pt.y - 34} 
+                                width="90" 
+                                height="24" 
+                                rx="6" 
+                                fill="#111425" 
+                                stroke={isHovered ? "#a5b4fc" : "#6366f1"} 
+                                strokeWidth="1.2"
+                              />
+                              <text 
+                                x={pt.x} 
+                                y={pt.y - 18} 
+                                textAnchor="middle" 
+                                fill="#e0e7ff" 
+                                fontSize="11" 
+                                fontWeight="700"
+                              >
+                                {formatCurrency(pt.profit)}
+                              </text>
+                            </g>
+                          )}
+
+                          {/* Month Label below baseline */}
+                          <text 
+                            x={pt.x} 
+                            y={lineChartData.baselineY + 22} 
+                            textAnchor="middle" 
+                            fill={hasValue || isHovered ? "var(--text-primary)" : "var(--text-secondary)"} 
+                            fontSize={hasValue || isHovered ? "12" : "11"} 
+                            fontWeight={hasValue || isHovered ? "700" : "500"}
+                          >
+                            {pt.label}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
                 </div>
               )}
             </div>
