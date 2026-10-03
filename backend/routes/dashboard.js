@@ -69,6 +69,9 @@ router.get('/stats', async (req, res) => {
       } else if (isCompanyAdmin && req.user.companyId) {
         const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
         countsWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
+      } else if (hasTeamScope && scopedDeptId) {
+        const deptUserIds = (await User.findAll({ where: { departmentId: scopedDeptId }, attributes: ['id'] })).map(u => u.id);
+        countsWhere.assignedTo = { [Op.in]: deptUserIds };
       } else {
         // dept_manager and regular users only count leads assigned directly to them
         countsWhere.assignedTo = req.user.id;
@@ -130,17 +133,53 @@ router.get('/stats', async (req, res) => {
       else if (isCompanyAdmin && req.user.companyId) {
         const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
         financialWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else if (isDeptManager && req.user.departmentId) {
-        const deptUserIds = (await User.findAll({ where: { departmentId: req.user.departmentId }, attributes: ['id'] })).map(u => u.id);
+      } else if (hasTeamScope && scopedDeptId) {
+        const deptUserIds = (await User.findAll({ where: { departmentId: scopedDeptId }, attributes: ['id'] })).map(u => u.id);
         financialWhere.assignedTo = { [Op.or]: [{ [Op.in]: deptUserIds }, null] };
       } else if (isRegular) financialWhere.assignedTo = req.user.id;
     }
 
-    const [totalLeads, totalProjects, pendingProjects, completedProjects, totalDesigns, pendingDesigns, completedDesigns, changeDesigns, financeStats, monthlyData, recentLeads, recentProjects] = await Promise.all([
+    // Converted leads represent projects in this CRM
+    const convertedProjectsWhere = { ...countsWhere, status: 'converted' };
+
+    // Total Projects = all converted leads
+    // Pending Projects = converted leads where full amount has not yet been paid
+    // Completed Projects = converted leads where full amount has been completely paid (paidAmount >= value and value > 0)
+    const completedProjectsWhere = {
+      ...convertedProjectsWhere,
+      value: { [Op.gt]: 0 },
+      [Op.and]: [
+        sequelize.where(sequelize.col('paidAmount'), '>=', sequelize.col('value'))
+      ]
+    };
+
+    const pendingProjectsWhere = {
+      ...convertedProjectsWhere,
+      [Op.or]: [
+        sequelize.where(sequelize.col('paidAmount'), '<', sequelize.col('value')),
+        { value: { [Op.lte]: 0 } },
+        { paidAmount: null }
+      ]
+    };
+
+    const [
+      totalLeads,
+      totalProjects,
+      pendingProjects,
+      completedProjects,
+      totalDesigns,
+      pendingDesigns,
+      completedDesigns,
+      changeDesigns,
+      financeStats,
+      monthlyData,
+      recentLeads,
+      recentConvertedLeads
+    ] = await Promise.all([
       Lead.count({ where: countsWhere }),
-      Project.count(),
-      Project.count({ where: { status: { [Op.in]: ['pending', 'in_progress'] } } }),
-      Project.count({ where: { status: 'completed' } }),
+      Lead.count({ where: convertedProjectsWhere }),
+      Lead.count({ where: pendingProjectsWhere }),
+      Lead.count({ where: completedProjectsWhere }),
       DesignOrder.count({ where: designOrderWhere }),
       DesignOrder.count({ where: { ...designOrderWhere, status: { [Op.in]: ['pending', 'in_progress'] } } }),
       DesignOrder.count({ where: { ...designOrderWhere, status: 'completed' } }),
@@ -148,8 +187,22 @@ router.get('/stats', async (req, res) => {
       Lead.findOne({ attributes: [[sequelize.fn('SUM', sequelize.col('value')), 'totalRevenue'], [sequelize.fn('SUM', sequelize.col('vendorPaidAmount')), 'totalDeductions']], where: financialWhere, raw: true }),
       Lead.findAll({ attributes: [[sequelize.fn('date_trunc', 'month', sequelize.col('createdAt')), 'month'], [sequelize.fn('SUM', sequelize.col('value')), 'revenue'], [sequelize.fn('SUM', sequelize.col('vendorPaidAmount')), 'deductions']], where: financialWhere, group: [sequelize.fn('date_trunc', 'month', sequelize.col('createdAt'))], order: [[sequelize.fn('date_trunc', 'month', sequelize.col('createdAt')), 'ASC']], raw: true }),
       Lead.findAll({ where: countsWhere, order: [['createdAt', 'DESC']], limit: 5 }),
-      Project.findAll({ order: [['createdAt', 'DESC']], limit: 5 })
+      Lead.findAll({ where: convertedProjectsWhere, order: [['updatedAt', 'DESC']], limit: 5 })
     ]);
+
+    const recentProjects = recentConvertedLeads.map(l => {
+      const val = parseFloat(l.value) || 0;
+      const paid = parseFloat(l.paidAmount) || 0;
+      const isCompleted = val > 0 && paid >= val;
+      return {
+        id: l.id,
+        name: l.companyName || l.name || 'Project Deal',
+        startDate: l.updatedAt ? new Date(l.updatedAt).toISOString().split('T')[0] : '',
+        revenue: val,
+        deductions: parseFloat(l.vendorPaidAmount) || 0,
+        status: isCompleted ? 'completed' : 'pending'
+      };
+    });
 
     const totalRevenue = parseFloat(financeStats?.totalRevenue || 0);
     const totalDeductions = parseFloat(financeStats?.totalDeductions || 0);
