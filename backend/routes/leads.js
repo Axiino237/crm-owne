@@ -319,6 +319,35 @@ router.put('/:id', async (req, res, next) => {
     if (vendorPaidAmount !== undefined) updates.vendorPaidAmount = vendorPaidAmount;
     if (designStatus !== undefined) updates.designStatus = designStatus;
 
+    // Enforce field-level edit permissions for financial fields
+    const isSuper = req.user.isSuperAdmin || req.user.role?.level === 'super_admin';
+    if (!isSuper) {
+      if (value !== undefined && parseFloat(value) !== parseFloat(lead.value)) {
+        const canEditVal = await Permission.findOne({
+          where: { roleId: req.user.roleId, module: 'closed_sales', screen: 'closed-sales-value', canEdit: true }
+        });
+        if (!canEditVal) {
+          delete updates.value;
+        }
+      }
+      if (paidAmount !== undefined && parseFloat(paidAmount) !== parseFloat(lead.paidAmount)) {
+        const canEditPaid = await Permission.findOne({
+          where: { roleId: req.user.roleId, module: 'closed_sales', screen: 'closed-sales-paid', canEdit: true }
+        });
+        if (!canEditPaid) {
+          delete updates.paidAmount;
+        }
+      }
+      if (vendorPaidAmount !== undefined && parseFloat(vendorPaidAmount) !== parseFloat(lead.vendorPaidAmount)) {
+        const canEditVendor = await Permission.findOne({
+          where: { roleId: req.user.roleId, module: 'closed_sales', screen: 'closed-sales-vendor-payout', canEdit: true }
+        });
+        if (!canEditVendor) {
+          delete updates.vendorPaidAmount;
+        }
+      }
+    }
+
     if (status !== undefined) {
       updates.status = status;
       if (status === 'new') {

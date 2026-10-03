@@ -24,6 +24,14 @@ const ACTIONS = [
   { key: 'canDelete', label: 'Delete', color: 'var(--danger)' },
 ];
 
+const SCREEN_LABELS = {
+  'closed-sales-list': 'Closed Sales Access',
+  'closed-sales-value': 'Deal Value (Column & Input)',
+  'closed-sales-paid': 'Paid Amount (Column & Input)',
+  'closed-sales-balance': 'Outstanding Balance (Column & View)',
+  'closed-sales-vendor-payout': 'Vendor Payout (Column & Input)'
+};
+
 const PermissionsPage = () => {
   const { roleId } = useParams();
   const navigate = useNavigate();
@@ -432,7 +440,7 @@ const PermissionsPage = () => {
                               </button>
                             )}
                             <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                              {screen.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                              {SCREEN_LABELS[screen] || screen.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                             </span>
                           </div>
 

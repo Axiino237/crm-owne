@@ -37,7 +37,13 @@ const MODULE_SCREENS = {
   leads: ['leads-list', 'lead-create', 'lead-edit', 'lead-delete'],
   quotations: ['quotations-list', 'quotation-create', 'quotation-export'],
   performance: ['performance-view'],
-  closed_sales: ['closed-sales-list'],
+  closed_sales: [
+    'closed-sales-list',
+    'closed-sales-value',
+    'closed-sales-paid',
+    'closed-sales-balance',
+    'closed-sales-vendor-payout'
+  ],
   design: ['design-list', 'my-projects-list', 'completed-models-list'],
   attendance: ['attendance-list'],
   chat: ['chat-room', 'chat-workspaces']

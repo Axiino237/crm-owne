@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   RiCheckboxCircleLine, RiSearchLine, RiRefreshLine, RiEyeLine,
   RiUserHeartLine, RiCalendarLine, RiMoneyDollarBoxLine, RiCloseLine,
-  RiEditLine, RiSaveLine, RiWallet3Line, RiCopperCoinLine, RiUserReceivedLine
+  RiEditLine, RiSaveLine, RiWallet3Line, RiCopperCoinLine, RiUserReceivedLine,
+  RiLockLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import api from '../../api/axios';
@@ -15,7 +16,9 @@ const formatCurrency = (v) => {
 };
 
 const ClosedSalesPage = () => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const isSuper = user?.isSuperAdmin || user?.role?.level === 'super_admin';
+
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -29,7 +32,21 @@ const ClosedSalesPage = () => {
   const [editForm, setEditForm] = useState({ value: '', paidAmount: '', vendorPaidAmount: '', notes: '', designStatus: 'pending' });
   const [saving, setSaving] = useState(false);
 
-  const canEdit = hasPermission('closed_sales', 'closed-sales-list', 'canEdit');
+  // Granular Field-level Permissions
+  const canViewValue = isSuper || hasPermission('closed_sales', 'closed-sales-value', 'canView');
+  const canEditValue = isSuper || hasPermission('closed_sales', 'closed-sales-value', 'canEdit');
+
+  const canViewPaid = isSuper || hasPermission('closed_sales', 'closed-sales-paid', 'canView');
+  const canEditPaid = isSuper || hasPermission('closed_sales', 'closed-sales-paid', 'canEdit');
+
+  const canViewBalance = isSuper || hasPermission('closed_sales', 'closed-sales-balance', 'canView');
+
+  const canViewVendorPay = isSuper || hasPermission('closed_sales', 'closed-sales-vendor-payout', 'canView');
+  const canEditVendorPay = isSuper || hasPermission('closed_sales', 'closed-sales-vendor-payout', 'canEdit');
+
+  const canEditList = isSuper || hasPermission('closed_sales', 'closed-sales-list', 'canEdit');
+  // Can open edit modal if user has list edit permission OR permission to edit any of the fields
+  const canEdit = canEditList || canEditValue || canEditPaid || canEditVendorPay;
 
   const fetchClosedSales = useCallback(async () => {
     setLoading(true);
@@ -60,9 +77,9 @@ const ClosedSalesPage = () => {
   const handleEditClick = (lead) => {
     setEditLead(lead);
     setEditForm({
-      value: lead.value || '',
-      paidAmount: lead.paidAmount || '',
-      vendorPaidAmount: lead.vendorPaidAmount || '',
+      value: lead.value ?? '',
+      paidAmount: lead.paidAmount ?? '',
+      vendorPaidAmount: lead.vendorPaidAmount ?? '',
       notes: lead.notes || '',
       designStatus: lead.designStatus || 'pending'
     });
@@ -72,13 +89,21 @@ const ClosedSalesPage = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await api.put(`/leads/${editLead.id}`, {
-        value: parseFloat(editForm.value) || 0,
-        paidAmount: parseFloat(editForm.paidAmount) || 0,
-        vendorPaidAmount: parseFloat(editForm.vendorPaidAmount) || 0,
+      const payload = {
         notes: editForm.notes,
         designStatus: editForm.designStatus
-      });
+      };
+      if (canEditValue) {
+        payload.value = parseFloat(editForm.value) || 0;
+      }
+      if (canEditPaid) {
+        payload.paidAmount = parseFloat(editForm.paidAmount) || 0;
+      }
+      if (canEditVendorPay) {
+        payload.vendorPaidAmount = parseFloat(editForm.vendorPaidAmount) || 0;
+      }
+
+      const res = await api.put(`/leads/${editLead.id}`, payload);
       if (res.data.success) {
         toast.success('Sales financial details updated successfully!');
         setEditLead(null);
@@ -106,45 +131,53 @@ const ClosedSalesPage = () => {
       {/* Aggregate Overview Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
         
-        <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(59,130,246,0.1)', color: 'rgb(59,130,246)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
-            <RiMoneyDollarBoxLine />
+        {canViewValue && (
+          <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(59,130,246,0.1)', color: 'rgb(59,130,246)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
+              <RiMoneyDollarBoxLine />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Total Deal Value</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{formatCurrency(totalValue)}</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Total Deal Value</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{formatCurrency(totalValue)}</div>
-          </div>
-        </div>
+        )}
 
-        <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(16,185,129,0.1)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
-            <RiWallet3Line />
+        {canViewPaid && (
+          <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(16,185,129,0.1)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
+              <RiWallet3Line />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Amount Paid</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)', marginTop: 2 }}>{formatCurrency(totalPaid)}</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Amount Paid</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)', marginTop: 2 }}>{formatCurrency(totalPaid)}</div>
-          </div>
-        </div>
+        )}
 
-        <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
-            <RiCopperCoinLine />
+        {canViewBalance && (
+          <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
+              <RiCopperCoinLine />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Pending Balance</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--danger)', marginTop: 2 }}>{formatCurrency(totalBalance)}</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Pending Balance</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--danger)', marginTop: 2 }}>{formatCurrency(totalBalance)}</div>
-          </div>
-        </div>
+        )}
 
-        <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: 'rgb(245,158,11)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
-            <RiUserReceivedLine />
+        {canViewVendorPay && (
+          <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: 'rgb(245,158,11)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem' }}>
+              <RiUserReceivedLine />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Paid to Vendor</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'rgb(245,158,11)', marginTop: 2 }}>{formatCurrency(totalVendor)}</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Paid to Vendor</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'rgb(245,158,11)', marginTop: 2 }}>{formatCurrency(totalVendor)}</div>
-          </div>
-        </div>
+        )}
 
       </div>
 
@@ -191,10 +224,10 @@ const ClosedSalesPage = () => {
                     <tr>
                       <th>Deal Details</th>
                       <th>Company Name</th>
-                      <th style={{ textAlign: 'right' }}>Value</th>
-                      <th style={{ textAlign: 'right' }}>Paid</th>
-                      <th style={{ textAlign: 'right' }}>Balance</th>
-                      <th style={{ textAlign: 'right' }}>Vendor Payout</th>
+                      {canViewValue && <th style={{ textAlign: 'right' }}>Value</th>}
+                      {canViewPaid && <th style={{ textAlign: 'right' }}>Paid</th>}
+                      {canViewBalance && <th style={{ textAlign: 'right' }}>Balance</th>}
+                      {canViewVendorPay && <th style={{ textAlign: 'right' }}>Vendor Payout</th>}
                       <th>Caller</th>
                       <th style={{ textAlign: 'center' }}>Actions</th>
                     </tr>
@@ -220,18 +253,26 @@ const ClosedSalesPage = () => {
                           <td>
                             <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{lead.companyName}</span>
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {formatCurrency(lead.value)}
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
-                            {formatCurrency(lead.paidAmount)}
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: bal > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                            {formatCurrency(bal)}
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'rgb(245,158,11)' }}>
-                            {formatCurrency(lead.vendorPaidAmount)}
-                          </td>
+                          {canViewValue && (
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {formatCurrency(lead.value)}
+                            </td>
+                          )}
+                          {canViewPaid && (
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
+                              {formatCurrency(lead.paidAmount)}
+                            </td>
+                          )}
+                          {canViewBalance && (
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: bal > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                              {formatCurrency(bal)}
+                            </td>
+                          )}
+                          {canViewVendorPay && (
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'rgb(245,158,11)' }}>
+                              {formatCurrency(lead.vendorPaidAmount)}
+                            </td>
+                          )}
                           <td>
                             <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                               {lead.assignee?.name || 'Unassigned'}
@@ -335,27 +376,39 @@ const ClosedSalesPage = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Deal Value</div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 700 }}>{formatCurrency(viewLead.value)}</div>
+              {(canViewValue || canViewPaid) && (
+                <div style={{ display: 'grid', gridTemplateColumns: (canViewValue && canViewPaid) ? '1fr 1fr' : '1fr', gap: 12 }}>
+                  {canViewValue && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Deal Value</div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 700 }}>{formatCurrency(viewLead.value)}</div>
+                    </div>
+                  )}
+                  {canViewPaid && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Amount Paid</div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--success)', fontWeight: 700 }}>{formatCurrency(viewLead.paidAmount)}</div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Amount Paid</div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--success)', fontWeight: 700 }}>{formatCurrency(viewLead.paidAmount)}</div>
-                </div>
-              </div>
+              )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding Balance</div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--danger)', fontWeight: 700 }}>{formatCurrency((parseFloat(viewLead.value) || 0) - (parseFloat(viewLead.paidAmount) || 0))}</div>
+              {(canViewBalance || canViewVendorPay) && (
+                <div style={{ display: 'grid', gridTemplateColumns: (canViewBalance && canViewVendorPay) ? '1fr 1fr' : '1fr', gap: 12 }}>
+                  {canViewBalance && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding Balance</div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--danger)', fontWeight: 700 }}>{formatCurrency((parseFloat(viewLead.value) || 0) - (parseFloat(viewLead.paidAmount) || 0))}</div>
+                    </div>
+                  )}
+                  {canViewVendorPay && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Vendor Payout</div>
+                      <div style={{ fontSize: '0.875rem', color: 'rgb(245,158,11)', fontWeight: 700 }}>{formatCurrency(viewLead.vendorPaidAmount)}</div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Vendor Payout</div>
-                  <div style={{ fontSize: '0.875rem', color: 'rgb(245,158,11)', fontWeight: 700 }}>{formatCurrency(viewLead.vendorPaidAmount)}</div>
-                </div>
-              </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -415,42 +468,96 @@ const ClosedSalesPage = () => {
             <form onSubmit={handleSaveEdit}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
                 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Deal Value (INR) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={editForm.value}
-                    onChange={e => setEditForm(p => ({ ...p, value: e.target.value }))}
-                    required
-                    placeholder="Total deal value"
-                  />
-                </div>
+                {canViewValue && (
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Deal Value (INR) {canEditValue && '*'}</span>
+                      {!canEditValue && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <RiLockLine /> Read Only
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={editForm.value}
+                      onChange={e => setEditForm(p => ({ ...p, value: e.target.value }))}
+                      required={canEditValue}
+                      disabled={!canEditValue}
+                      placeholder="Total deal value"
+                      style={!canEditValue ? { opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' } : {}}
+                    />
+                  </div>
+                )}
 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Paid Amount (INR)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={editForm.paidAmount}
-                    onChange={e => setEditForm(p => ({ ...p, paidAmount: e.target.value }))}
-                    placeholder="Amount paid by client"
-                  />
-                </div>
+                {canViewPaid && (
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Paid Amount (INR)</span>
+                      {!canEditPaid && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <RiLockLine /> Read Only
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={editForm.paidAmount}
+                      onChange={e => setEditForm(p => ({ ...p, paidAmount: e.target.value }))}
+                      disabled={!canEditPaid}
+                      placeholder="Amount paid by client"
+                      style={!canEditPaid ? { opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' } : {}}
+                    />
+                  </div>
+                )}
 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Paid to Vendor (INR)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={editForm.vendorPaidAmount}
-                    onChange={e => setEditForm(p => ({ ...p, vendorPaidAmount: e.target.value }))}
-                    placeholder="Amount paid to vendor/partner"
-                  />
-                </div>
+                {canViewBalance && (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Calculated Balance:</span>
+                    <span style={{
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                      color: ((parseFloat(editForm.value) || 0) - (parseFloat(editForm.paidAmount) || 0)) > 0 ? 'var(--danger)' : 'var(--success)'
+                    }}>
+                      {formatCurrency((parseFloat(editForm.value) || 0) - (parseFloat(editForm.paidAmount) || 0))}
+                    </span>
+                  </div>
+                )}
+
+                {canViewVendorPay && (
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Paid to Vendor (INR)</span>
+                      {!canEditVendorPay && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <RiLockLine /> Read Only
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={editForm.vendorPaidAmount}
+                      onChange={e => setEditForm(p => ({ ...p, vendorPaidAmount: e.target.value }))}
+                      disabled={!canEditVendorPay}
+                      placeholder="Amount paid to vendor/partner"
+                      style={!canEditVendorPay ? { opacity: 0.65, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)' } : {}}
+                    />
+                  </div>
+                )}
 
 
                 <div className="form-group">

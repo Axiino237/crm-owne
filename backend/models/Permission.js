@@ -33,6 +33,7 @@ const Permission = sequelize.define('Permission', {
       'quotations-list', 'quotation-create', 'quotation-export',
       'performance-view',
       'closed-sales-list',
+      'closed-sales-value', 'closed-sales-paid', 'closed-sales-balance', 'closed-sales-vendor-payout',
       'design-list',
       'my-projects-list', 'completed-models-list',
       'chat-room', 'chat-workspaces',

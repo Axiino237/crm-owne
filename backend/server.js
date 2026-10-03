@@ -183,6 +183,10 @@ const startServer = async () => {
         // ✅ Core modules
         await ensurePerm('performance', 'performance-view');
         await ensurePerm('closed_sales', 'closed-sales-list');
+        await ensurePerm('closed_sales', 'closed-sales-value');
+        await ensurePerm('closed_sales', 'closed-sales-paid');
+        await ensurePerm('closed_sales', 'closed-sales-balance');
+        await ensurePerm('closed_sales', 'closed-sales-vendor-payout');
         await ensurePerm('attendance', 'attendance-list');
 
         // ✅ Chat module
