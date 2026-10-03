@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RiAddLine, RiPencilLine, RiDeleteBinLine, RiKey2Line } from 'react-icons/ri';
-import { useNavigate } from 'react-router-dom';
+import { RiAddLine, RiPencilLine, RiDeleteBinLine } from 'react-icons/ri';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
-import ConfirmModal from '../../components/ConfirmModal';
+import DeleteDependencyModal from '../../components/DeleteDependencyModal';
 
 
 
@@ -76,18 +75,15 @@ const RoleModal = ({ role, onClose, onSaved }) => {
 /* ---- Roles List Page ---- */
 const RolesPage = () => {
   const { hasPermission } = useAuth();
-  const navigate = useNavigate();
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editRole, setEditRole] = useState(null);
   const [deleteRole, setDeleteRole] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const canCreate = hasPermission('roles', 'roles-list', 'canCreate');
   const canEdit = hasPermission('roles', 'roles-list', 'canEdit');
   const canDelete = hasPermission('roles', 'roles-list', 'canDelete');
-  const canViewPerms = hasPermission('permissions', 'permissions-list', 'canView');
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);
@@ -103,21 +99,6 @@ const RolesPage = () => {
   const handleDelete = (role) => {
     if (role.isSystem) { toast.error('System roles cannot be deleted'); return; }
     setDeleteRole(role);
-  };
-
-  const executeDelete = async () => {
-    if (!deleteRole) return;
-    setDeleteLoading(true);
-    try {
-      await api.delete(`/roles/${deleteRole.id}`);
-      toast.success('Role deleted');
-      fetchRoles();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Delete failed');
-    } finally {
-      setDeleteLoading(false);
-      setDeleteRole(null);
-    }
   };
 
   return (
@@ -173,18 +154,13 @@ const RolesPage = () => {
                     <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>{new Date(r.createdAt).toLocaleDateString()}</td>
                     <td>
                       <div className="flex gap-2">
-                        {canViewPerms && (
-                          <button className="btn btn-icon btn-sm" onClick={() => navigate(`/uam/permissions/${r.id}`)} title="Manage Permissions" id={`perms-${r.id}`}>
-                            <RiKey2Line />
-                          </button>
-                        )}
                         {canEdit && !r.isSystem && (
-                          <button className="btn btn-icon btn-sm" onClick={() => { setEditRole(r); setShowModal(true); }} title="Edit" id={`edit-role-${r.id}`}>
+                          <button className="btn btn-icon btn-sm" onClick={() => { setEditRole(r); setShowModal(true); }} title="Edit Role" id={`edit-role-${r.id}`}>
                             <RiPencilLine />
                           </button>
                         )}
                         {canDelete && !r.isSystem && (
-                          <button className="btn btn-icon btn-sm" onClick={() => handleDelete(r)} title="Delete" style={{ color: 'var(--danger)' }} id={`delete-role-${r.id}`}>
+                          <button className="btn btn-icon btn-sm" onClick={() => handleDelete(r)} title="Delete Role" style={{ color: 'var(--danger)' }} id={`delete-role-${r.id}`}>
                             <RiDeleteBinLine />
                           </button>
                         )}
@@ -206,15 +182,15 @@ const RolesPage = () => {
         />
       )}
 
-      <ConfirmModal 
+      <DeleteDependencyModal 
         isOpen={!!deleteRole}
-        title="Delete Role"
-        message={`Are you sure you want to delete role "${deleteRole?.name}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteRole(null)}
-        loading={deleteLoading}
+        entityType="Role"
+        entityId={deleteRole?.id}
+        entityName={deleteRole?.name}
+        dependencyEndpoint={deleteRole ? `/roles/${deleteRole.id}/dependencies` : null}
+        deleteEndpoint={deleteRole ? `/roles/${deleteRole.id}` : null}
+        onClose={() => setDeleteRole(null)}
+        onDeleted={fetchRoles}
       />
     </AppLayout>
   );

@@ -78,10 +78,10 @@ const App = () => {
             </ProtectedRoute>
           } />
 
-          {/* UAM - Permissions (for a specific role) */}
+          {/* UAM - Permissions */}
           <Route path="/uam/permissions" element={
             <ProtectedRoute module="permissions" screen="permissions-list" action="canView">
-              <RolesPage />
+              <PermissionsPage />
             </ProtectedRoute>
           } />
 

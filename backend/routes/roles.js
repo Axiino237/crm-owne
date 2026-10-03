@@ -121,6 +121,53 @@ router.put('/:id', adminOnly, checkPermission('roles', 'roles-list', 'canEdit'),
   }
 });
 
+// @desc    Get role dependencies
+// @route   GET /api/roles/:id/dependencies
+router.get('/:id/dependencies', adminOnly, async (req, res) => {
+  try {
+    const role = await Role.findByPk(req.params.id);
+    if (!role) return res.status(404).json({ success: false, message: 'Role not found' });
+
+    const { User } = require('../models');
+    const users = await User.findAll({
+      where: { roleId: role.id },
+      attributes: ['id', 'name', 'email']
+    });
+
+    const canDelete = !role.isSystem && users.length === 0;
+    const blockReasons = [];
+
+    if (role.isSystem) {
+      blockReasons.push({
+        type: 'SystemRole',
+        count: 1,
+        items: [role.name],
+        actionRequired: 'System roles are core default roles and cannot be deleted.'
+      });
+    }
+
+    if (users.length > 0) {
+      blockReasons.push({
+        type: 'Users',
+        count: users.length,
+        items: users.map(u => `${u.name} (${u.email})`),
+        actionRequired: `You must delete or reassign these ${users.length} user(s) currently assigned to this role first.`
+      });
+    }
+
+    res.json({
+      success: true,
+      canDelete,
+      name: role.name,
+      code: role.code,
+      mappedItems: { users },
+      blockReasons
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
 // DELETE /api/roles/:id
 router.delete('/:id', adminOnly, checkPermission('roles', 'roles-list', 'canDelete'), async (req, res) => {
   try {
@@ -129,9 +176,14 @@ router.delete('/:id', adminOnly, checkPermission('roles', 'roles-list', 'canDele
     if (role.isSystem) return res.status(403).json({ success: false, message: 'Cannot delete system role' });
 
     const { User, Permission } = require('../models');
-    const usersCount = await User.count({ where: { roleId: role.id } });
-    if (usersCount > 0)
-      return res.status(400).json({ success: false, message: `Cannot delete: ${usersCount} user(s) assigned this role` });
+    const users = await User.findAll({ where: { roleId: role.id }, attributes: ['id', 'name', 'email'] });
+    if (users.length > 0) {
+      const userNames = users.map(u => u.name).join(', ');
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete: ${users.length} user(s) assigned to this role (${userNames}). You must reassign them first.` 
+      });
+    }
 
     await Permission.destroy({ where: { roleId: role.id } });
     await role.destroy();
