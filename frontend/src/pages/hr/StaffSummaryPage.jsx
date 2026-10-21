@@ -38,8 +38,9 @@ const currentYear = new Date().getFullYear();
 const currentMonth = String(new Date().getMonth() + 1);
 
 const StaffSummaryPage = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const isSuper = user?.isSuperAdmin || user?.role?.level === 'super_admin';
+  const isAdmin = isSuper || ['org_admin', 'company_admin'].includes(user?.role?.level);
 
   // Filters state
   const [search, setSearch] = useState('');
@@ -48,6 +49,14 @@ const StaffSummaryPage = () => {
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedMonth, setSelectedMonth] = useState('');
+
+  // UAM Scoping States
+  const [canViewAllDepts, setCanViewAllDepts] = useState(false);
+  const [canViewDept, setCanViewDept] = useState(false);
+  const [scopeType, setScopeType] = useState('all'); // 'all' | 'dept' | 'own'
+  const [userDeptName, setUserDeptName] = useState('');
+
+  const canEditStaff = isAdmin || hasPermission('uam', 'staff-summary-all', 'canEdit') || hasPermission('uam', 'staff-summary-dept', 'canEdit');
 
   // Data state
   const [staff, setStaff] = useState([]);
@@ -95,6 +104,10 @@ const StaffSummaryPage = () => {
         if (res.data.filterOptions) {
           setFilterOptions(res.data.filterOptions);
         }
+        setCanViewAllDepts(res.data.canViewAllDepts ?? false);
+        setCanViewDept(res.data.canViewDept ?? false);
+        setScopeType(res.data.scopeType || 'all');
+        setUserDeptName(res.data.userDeptName || '');
       }
     } catch (err) {
       toast.error('Failed to load organization staff summary');
@@ -145,9 +158,26 @@ const StaffSummaryPage = () => {
         {/* Page Header */}
         <div className="page-header" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}>
-              <RiUserStarLine style={{ color: 'var(--accent)' }} /> Organization Staff & Payroll Summary
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}>
+                <RiUserStarLine style={{ color: 'var(--accent)' }} /> Organization Staff & Payroll Summary
+              </h1>
+              {scopeType === 'all' && (
+                <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '4px 10px', fontSize: '0.75rem', borderRadius: 6, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  🌐 Overall Org (All Departments)
+                </span>
+              )}
+              {scopeType === 'dept' && (
+                <span className="badge" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '4px 10px', fontSize: '0.75rem', borderRadius: 6, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  👥 Own Department Scope ({userDeptName || 'Assigned Dept'})
+                </span>
+              )}
+              {scopeType === 'own' && (
+                <span className="badge" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '4px 10px', fontSize: '0.75rem', borderRadius: 6, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  👤 Own Profile Only (Personal Scope)
+                </span>
+              )}
+            </div>
             <p className="page-subtitle" style={{ margin: '6px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
               Track organization workforce, evaluate leave consumption, quota balances, and salary compensation.
             </p>
@@ -270,17 +300,28 @@ const StaffSummaryPage = () => {
             )}
 
             {/* Department Dropdown */}
-            <div style={{ minWidth: 170 }}>
+            <div style={{ minWidth: 170, display: 'flex', alignItems: 'center', gap: 6 }}>
               <select
                 className="form-control"
                 value={selectedDept}
                 onChange={e => setSelectedDept(e.target.value)}
+                disabled={!canViewAllDepts && filterOptions.departments.length <= 1}
+                title={!canViewAllDepts ? 'Department locked to your assigned department' : 'Switch department'}
+                style={{
+                  cursor: canViewAllDepts ? 'pointer' : 'default',
+                  opacity: canViewAllDepts ? 1 : 0.85
+                }}
               >
-                <option value="">All Departments</option>
+                {canViewAllDepts && <option value="">All Departments</option>}
                 {filterOptions.departments.map(dept => (
                   <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
               </select>
+              {!canViewAllDepts && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  🔒 (Your Dept)
+                </span>
+              )}
             </div>
 
             {/* Role Dropdown */}
@@ -481,14 +522,18 @@ const StaffSummaryPage = () => {
 
                         {/* Action */}
                         <td style={{ textAlign: 'center' }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => openEditModal(emp)}
-                            title="Edit Employee Salary & Leave Quotas"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: '0.75rem' }}
-                          >
-                            <RiEditLine /> Edit
-                          </button>
+                          {canEditStaff ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => openEditModal(emp)}
+                              title="Edit Employee Salary & Leave Quotas"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: '0.75rem' }}
+                            >
+                              <RiEditLine /> Edit
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>-</span>
+                          )}
                         </td>
                       </tr>
                     );

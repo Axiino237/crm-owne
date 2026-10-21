@@ -1,19 +1,77 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { User, Role, Department, Organization, Company, LeaveRequest, Attendance } = require('../models');
+const { User, Role, Department, Organization, Company, LeaveRequest, Attendance, Permission } = require('../models');
 const { protect } = require('../middleware/auth');
 const { logAction } = require('../utils/auditLogger');
+const { getDeptHeadScope } = require('../utils/departmentScope');
 
 router.use(protect);
 
 // Helper to determine scoping for user summary
-const getScope = (req) => {
-  const isSuper = req.user.isSuperAdmin || req.user.role?.level === 'super_admin';
-  const isOrgAdmin = req.user.role?.level === 'org_admin';
-  const isCompanyAdmin = req.user.role?.level === 'company_admin';
-  const isDeptHead = req.user.role?.level === 'dept_head';
-  return { isSuper, isOrgAdmin, isCompanyAdmin, isDeptHead };
+const getScope = async (req) => {
+  const userRole = req.user.role?.level;
+  const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
+  const isOrgAdmin = userRole === 'org_admin';
+  const isCompanyAdmin = userRole === 'company_admin';
+  const isAdmin = isSuper || isOrgAdmin || isCompanyAdmin;
+
+  const deptScope = await getDeptHeadScope(req.user);
+  const isDeptHead = deptScope.isDeptHead;
+  const isManager = userRole === 'dept_manager';
+
+  // 1. Overall Org / All departments check
+  let canViewAllDepts = isAdmin;
+  if (!canViewAllDepts && req.user.roleId) {
+    const permAll = await Permission.findOne({
+      where: { roleId: req.user.roleId, module: 'uam', screen: 'staff-summary-all', canView: true }
+    });
+    if (permAll) canViewAllDepts = true;
+  }
+
+  // 2. Own Department check
+  let canViewDept = isAdmin || isDeptHead || isManager;
+  if (!canViewDept && req.user.roleId) {
+    const permDept = await Permission.findOne({
+      where: { roleId: req.user.roleId, module: 'uam', screen: 'staff-summary-dept', canView: true }
+    });
+    if (permDept) canViewDept = true;
+  }
+
+  // 3. Own profile check / base access
+  let hasBaseAccess = isAdmin || canViewAllDepts || canViewDept;
+  if (!hasBaseAccess && req.user.roleId) {
+    const permOwn = await Permission.findOne({
+      where: {
+        roleId: req.user.roleId,
+        module: 'uam',
+        screen: { [Op.in]: ['staff-summary', 'users-list'] },
+        canView: true
+      }
+    });
+    if (permOwn) hasBaseAccess = true;
+  }
+
+  let scopeType = 'own';
+  if (canViewAllDepts) {
+    scopeType = 'all';
+  } else if (canViewDept) {
+    scopeType = 'dept';
+  }
+
+  return {
+    isSuper,
+    isOrgAdmin,
+    isCompanyAdmin,
+    isAdmin,
+    isDeptHead,
+    isManager,
+    deptScope,
+    canViewAllDepts,
+    canViewDept,
+    hasBaseAccess,
+    scopeType
+  };
 };
 
 // @desc   Get comprehensive staff overview (leave taken, salary, attendance, department)
@@ -29,7 +87,21 @@ router.get('/', async (req, res) => {
       month // 1 to 12 (optional)
     } = req.query;
 
-    const { isSuper, isOrgAdmin, isCompanyAdmin, isDeptHead } = getScope(req);
+    const {
+      isSuper,
+      isOrgAdmin,
+      isCompanyAdmin,
+      isAdmin,
+      deptScope,
+      canViewAllDepts,
+      canViewDept,
+      hasBaseAccess,
+      scopeType
+    } = await getScope(req);
+
+    if (!hasBaseAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied: Staff overview permission required' });
+    }
 
     // Build user filter
     const where = {
@@ -42,8 +114,11 @@ router.get('/', async (req, res) => {
         return res.json({
           success: true,
           staff: [],
-          metrics: { totalStaff: 0, totalPayroll: 0, totalApprovedLeaves: 0, totalPendingLeaves: 0 },
-          filterOptions: { organizations: [], departments: [], roles: [] }
+          metrics: { totalStaff: 0, totalPayroll: 0, totalApprovedLeaves: 0, totalPendingLeaves: 0, avgLeavesPerStaff: 0 },
+          filterOptions: { organizations: [], departments: [], roles: [] },
+          canViewAllDepts,
+          canViewDept,
+          scopeType
         });
       }
       where.organizationId = req.user.organizationId;
@@ -51,15 +126,33 @@ router.get('/', async (req, res) => {
       if (isCompanyAdmin && req.user.companyId) {
         where.companyId = req.user.companyId;
       }
-      if (isDeptHead && req.user.departmentId) {
-        where.departmentId = req.user.departmentId;
-      }
     } else if (organizationId) {
       where.organizationId = organizationId;
     }
 
-    // Apply explicit query filters
-    if (departmentId) where.departmentId = departmentId;
+    // Apply Scope to User Query
+    if (scopeType === 'own') {
+      // Level 1: Own Profile Only
+      where.id = req.user.id;
+    } else if (scopeType === 'dept') {
+      // Level 2: Own Department
+      if (deptScope.managedDeptIds.length > 0) {
+        if (departmentId && deptScope.managedDeptIds.includes(departmentId)) {
+          where.departmentId = departmentId;
+        } else {
+          where.departmentId = { [Op.in]: deptScope.managedDeptIds };
+        }
+      } else if (req.user.departmentId) {
+        where.departmentId = req.user.departmentId;
+      } else {
+        where.id = req.user.id;
+      }
+    } else {
+      // Level 3: Overall Org (All Departments)
+      if (departmentId) {
+        where.departmentId = departmentId;
+      }
+    }
     if (roleId) where.roleId = roleId;
 
     if (search.trim()) {
@@ -235,20 +328,46 @@ router.get('/', async (req, res) => {
       };
     });
 
-    // Populate filter dropdown options
+    // Populate filter dropdown options based on scope
     const orgWhere = isSuper ? {} : { id: req.user.organizationId };
-    const deptWhere = isSuper ? (organizationId ? { organizationId } : {}) : { organizationId: req.user.organizationId };
-
     const organizations = await Organization.findAll({ where: orgWhere, attributes: ['id', 'name'], order: [['name', 'ASC']] });
-    const departments = await Department.findAll({ where: deptWhere, attributes: ['id', 'name'], order: [['name', 'ASC']] });
+
+    let departments = [];
+    if (scopeType === 'all') {
+      const deptWhere = isSuper ? (organizationId ? { organizationId } : {}) : { organizationId: req.user.organizationId };
+      departments = await Department.findAll({ where: deptWhere, attributes: ['id', 'name'], order: [['name', 'ASC']] });
+    } else if (scopeType === 'dept') {
+      if (deptScope.managedDeptIds.length > 0) {
+        departments = await Department.findAll({
+          where: { id: { [Op.in]: deptScope.managedDeptIds } },
+          attributes: ['id', 'name'],
+          order: [['name', 'ASC']]
+        });
+      } else if (req.user.departmentId) {
+        departments = await Department.findAll({
+          where: { id: req.user.departmentId },
+          attributes: ['id', 'name']
+        });
+      }
+    } else {
+      // scopeType === 'own'
+      if (req.user.departmentId) {
+        departments = await Department.findAll({
+          where: { id: req.user.departmentId },
+          attributes: ['id', 'name']
+        });
+      }
+    }
+
     const roles = await Role.findAll({ attributes: ['id', 'name', 'level'], order: [['name', 'ASC']] });
+    const userDeptName = departments.find(d => String(d.id) === String(req.user.departmentId))?.name || req.user.department?.name || '';
 
     res.json({
       success: true,
       staff,
       metrics: {
         totalStaff: staff.length,
-        totalPayroll,
+        totalPayroll: scopeType === 'own' ? (staff[0]?.baseSalary || 0) : totalPayroll,
         totalApprovedLeaves: totalApprovedLeavesCount,
         totalPendingLeaves: totalPendingLeavesCount,
         avgLeavesPerStaff: staff.length > 0 ? (totalApprovedLeavesCount / staff.length).toFixed(1) : 0
@@ -257,7 +376,12 @@ router.get('/', async (req, res) => {
         organizations,
         departments,
         roles
-      }
+      },
+      canViewAllDepts: Boolean(canViewAllDepts),
+      canViewDept: Boolean(canViewDept),
+      scopeType,
+      userDeptId: req.user.departmentId,
+      userDeptName
     });
   } catch (error) {
     console.error('❌ Error fetching staff summary:', error);
@@ -269,9 +393,27 @@ router.get('/', async (req, res) => {
 // @route  PUT /api/staff-summary/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { isSuper, isOrgAdmin, isCompanyAdmin } = getScope(req);
-    if (!isSuper && !isOrgAdmin && !isCompanyAdmin) {
-      return res.status(403).json({ success: false, message: 'Access denied: Admin permission required to update salary/quota' });
+    const { isSuper, isOrgAdmin, isCompanyAdmin, isAdmin, deptScope } = await getScope(req);
+
+    // Permission check for editing
+    let canEditAny = isAdmin;
+    if (!canEditAny && req.user.roleId) {
+      const permAllEdit = await Permission.findOne({
+        where: { roleId: req.user.roleId, module: 'uam', screen: 'staff-summary-all', canEdit: true }
+      });
+      if (permAllEdit) canEditAny = true;
+    }
+
+    let canEditDept = canEditAny || deptScope.isDeptHead;
+    if (!canEditDept && req.user.roleId) {
+      const permDeptEdit = await Permission.findOne({
+        where: { roleId: req.user.roleId, module: 'uam', screen: 'staff-summary-dept', canEdit: true }
+      });
+      if (permDeptEdit) canEditDept = true;
+    }
+
+    if (!canEditAny && !canEditDept) {
+      return res.status(403).json({ success: false, message: 'Access denied: Edit permission required to update employee' });
     }
 
     const employee = await User.findByPk(req.params.id);
@@ -281,6 +423,17 @@ router.put('/:id', async (req, res) => {
 
     if (!isSuper && employee.organizationId !== req.user.organizationId) {
       return res.status(403).json({ success: false, message: 'Access denied: Cannot edit employee from another organization' });
+    }
+
+    // If user only has department-level edit access, verify target employee belongs to their department
+    if (!canEditAny && canEditDept) {
+      const isAllowedDept = employee.departmentId && (
+        employee.departmentId === req.user.departmentId ||
+        (deptScope.managedDeptIds && deptScope.managedDeptIds.includes(employee.departmentId))
+      );
+      if (!isAllowedDept) {
+        return res.status(403).json({ success: false, message: 'Access denied: You can only edit employees in your own department' });
+      }
     }
 
     const { baseSalary, monthlyLeaveQuota, paidLeaves, casualLeaves, sickLeaves } = req.body;

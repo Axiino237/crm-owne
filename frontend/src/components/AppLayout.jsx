@@ -54,9 +54,9 @@ const Sidebar = ({ mobileOpen, onClose }) => {
     },
     {
       section: 'HR Management', items: [
-        { to: '/attendance', icon: <RiCalendarLine />, label: 'Attendance Portal', show: hasPermission('attendance', 'attendance-list', 'canView') },
-        { to: '/leaves', icon: <RiFileList2Line />, label: 'Leave Portal', show: hasPermission('attendance', 'attendance-list', 'canView') },
-        { to: '/staff-summary', icon: <RiUserStarLine />, label: 'Staff & Salary Summary', show: hasPermission('uam', ['staff-summary', 'users-list'], 'canView') }
+        { to: '/attendance', icon: <RiCalendarLine />, label: 'Attendance Portal', show: hasPermission('attendance', ['attendance-list', 'attendance-team', 'attendance-all-departments'], 'canView') },
+        { to: '/leaves', icon: <RiFileList2Line />, label: 'Leave Portal', show: hasPermission('attendance', ['attendance-list', 'attendance-team', 'attendance-all-departments'], 'canView') },
+        { to: '/staff-summary', icon: <RiUserStarLine />, label: 'Staff & Salary Summary', show: hasPermission('uam', ['staff-summary', 'staff-summary-dept', 'staff-summary-all', 'users-list'], 'canView') }
       ]
     },
     {

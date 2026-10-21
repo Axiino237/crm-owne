@@ -36,7 +36,12 @@ const SCREEN_LABELS = {
   'net-profit-card': 'Net Profit Card',
   'profit-trend-chart': 'Monthly Sales Trend Chart',
   'dashboard-all': 'Dashboard All Counts (Team / Org Scope)',
-  'staff-summary': 'Staff Overview & Payroll (Leaves & Salary)',
+  'staff-summary': 'Staff Overview — Own Profile Only (Personal Access)',
+  'staff-summary-dept': 'Staff Overview — Own Department (Team Staff)',
+  'staff-summary-all': 'Staff Overview — Overall Org (All Departments & Dropdown)',
+  'attendance-list': 'My Attendance (Own Punch & Logs)',
+  'attendance-team': 'Team Attendance — Own Department',
+  'attendance-all-departments': 'Attendance — Overall Org (All Departments Dropdown)',
   'performance-team': 'Team Performance View (Show Department Team)',
   'performance-all-departments': 'Switch All Departments (Department Dropdown)'
 };
@@ -50,7 +55,12 @@ const SCREEN_DESCRIPTIONS = {
   'closed-sales-vendor-payout': 'Visibility and editing of vendor payout details',
   'dashboard-all': 'User can view counts and metrics across ALL staff in the organization on the dashboard',
   'net-profit-card': 'Display Team / Personal Net Profit card on the dashboard',
-  'staff-summary': 'View organization employees summary, leaves taken, quota, and salary details',
+  'staff-summary': 'User can view their own personal staff summary, leave quota, and compensation',
+  'staff-summary-dept': 'User can view staff summary for members in their assigned department',
+  'staff-summary-all': 'User can view all staff across the organization and switch departments in dropdown',
+  'attendance-list': 'User can view their personal attendance calendar and punch check-in/out',
+  'attendance-team': 'User can view team attendance records for their assigned department',
+  'attendance-all-departments': 'User can view attendance records across all departments in the organization and switch departments in dropdown',
   'performance-team': 'User can view entire department team metrics instead of only personal performance',
   'performance-all-departments': 'User can access and switch between all departments in the Performance dropdown'
 };

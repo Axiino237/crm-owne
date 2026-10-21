@@ -9,7 +9,11 @@ async function migrate() {
     console.log('Database connected.');
 
     // 1. Enum update
-    const screens = ['staff-summary', 'dashboard-all', 'performance-team', 'performance-all-departments', 'net-profit-card'];
+    const screens = [
+      'staff-summary', 'staff-summary-dept', 'staff-summary-all',
+      'attendance-team', 'attendance-all-departments',
+      'dashboard-all', 'performance-team', 'performance-all-departments', 'net-profit-card'
+    ];
     for (const scr of screens) {
       try {
         await sequelize.query(`ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS '${scr}'`);
@@ -75,34 +79,102 @@ async function migrate() {
     console.log(`Found ${roles.length} roles.`);
 
     for (const role of roles) {
-      const isSuper = role.code === 'SUPER_ADMIN';
-      const isAdmin = role.code === 'ADMIN';
+      const isSuper = role.code === 'SUPER_ADMIN' || role.level === 'super_admin';
+      const isAdmin = role.code === 'ADMIN' || ['org_admin', 'company_admin'].includes(role.level);
       const isHR = role.code === 'HR';
+      const isDeptHead = role.level === 'dept_head' || role.code === 'DEPT_HEAD';
       const shouldHaveView = isSuper || isAdmin || isHR;
 
-      const screen = 'staff-summary';
+      // staff-summary (own profile)
       const existing = await Permission.findOne({
-        where: { roleId: role.id, module: 'uam', screen }
+        where: { roleId: role.id, module: 'uam', screen: 'staff-summary' }
       });
 
       if (!existing) {
         await Permission.create({
           roleId: role.id,
           module: 'uam',
-          screen,
+          screen: 'staff-summary',
           canView: shouldHaveView,
           canCreate: shouldHaveView,
           canEdit: shouldHaveView,
           canDelete: false
         });
-        console.log(`Created staff-summary permission for role ${role.name} (${role.code}): canView=${shouldHaveView}`);
-      } else {
-        if (shouldHaveView && !existing.canView) {
-          existing.canView = true;
-          existing.canEdit = true;
-          await existing.save();
-          console.log(`Updated staff-summary permission for role ${role.name}`);
-        }
+        console.log(`Created staff-summary permission for role ${role.name}: canView=${shouldHaveView}`);
+      } else if (shouldHaveView && !existing.canView) {
+        existing.canView = true;
+        existing.canEdit = true;
+        await existing.save();
+      }
+
+      // staff-summary-dept (own department)
+      const shouldHaveDept = isSuper || isAdmin || isHR || isDeptHead;
+      const existingStaffDept = await Permission.findOne({
+        where: { roleId: role.id, module: 'uam', screen: 'staff-summary-dept' }
+      });
+      if (!existingStaffDept) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'uam',
+          screen: 'staff-summary-dept',
+          canView: shouldHaveDept,
+          canCreate: false,
+          canEdit: shouldHaveDept,
+          canDelete: false
+        });
+        console.log(`Created staff-summary-dept for role ${role.name}: canView=${shouldHaveDept}`);
+      }
+
+      // staff-summary-all (overall org / all departments)
+      const shouldHaveAll = isSuper || isAdmin;
+      const existingStaffAll = await Permission.findOne({
+        where: { roleId: role.id, module: 'uam', screen: 'staff-summary-all' }
+      });
+      if (!existingStaffAll) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'uam',
+          screen: 'staff-summary-all',
+          canView: shouldHaveAll,
+          canCreate: false,
+          canEdit: shouldHaveAll,
+          canDelete: false
+        });
+        console.log(`Created staff-summary-all for role ${role.name}: canView=${shouldHaveAll}`);
+      }
+
+      // attendance-team (own department attendance)
+      const existingAttTeam = await Permission.findOne({
+        where: { roleId: role.id, module: 'attendance', screen: 'attendance-team' }
+      });
+      if (!existingAttTeam) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'attendance',
+          screen: 'attendance-team',
+          canView: shouldHaveDept,
+          canCreate: false,
+          canEdit: false,
+          canDelete: false
+        });
+        console.log(`Created attendance-team for role ${role.name}: canView=${shouldHaveDept}`);
+      }
+
+      // attendance-all-departments (all departments attendance)
+      const existingAttAll = await Permission.findOne({
+        where: { roleId: role.id, module: 'attendance', screen: 'attendance-all-departments' }
+      });
+      if (!existingAttAll) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'attendance',
+          screen: 'attendance-all-departments',
+          canView: shouldHaveAll,
+          canCreate: false,
+          canEdit: false,
+          canDelete: false
+        });
+        console.log(`Created attendance-all-departments for role ${role.name}: canView=${shouldHaveAll}`);
       }
 
       // dashboard-all permission

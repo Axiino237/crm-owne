@@ -211,21 +211,21 @@ const App = () => {
 
           {/* Attendance Portal */}
           <Route path="/attendance" element={
-            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+            <ProtectedRoute module="attendance" screen={['attendance-list', 'attendance-team', 'attendance-all-departments']} action="canView">
               <AttendancePage />
             </ProtectedRoute>
           } />
 
           {/* Leaves Portal */}
           <Route path="/leaves" element={
-            <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
+            <ProtectedRoute module="attendance" screen={['attendance-list', 'attendance-team', 'attendance-all-departments']} action="canView">
               <LeavesPage />
             </ProtectedRoute>
           } />
 
           {/* Staff & Payroll Summary */}
           <Route path="/staff-summary" element={
-            <ProtectedRoute module="uam" screen={['staff-summary', 'users-list']} action="canView">
+            <ProtectedRoute module="uam" screen={['staff-summary', 'staff-summary-dept', 'staff-summary-all', 'users-list']} action="canView">
               <StaffSummaryPage />
             </ProtectedRoute>
           } />

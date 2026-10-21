@@ -30,7 +30,7 @@ const MODULE_SCREENS = {
     'change-designs-widget',
     'total-designs-widget'
   ],
-  uam: ['users-list', 'user-create', 'user-edit', 'audit-logs-list', 'staff-summary'],
+  uam: ['users-list', 'user-create', 'user-edit', 'audit-logs-list', 'staff-summary', 'staff-summary-dept', 'staff-summary-all'],
   roles: ['roles-list', 'role-create', 'role-edit'],
   permissions: ['permissions-list', 'permission-edit'],
   organizations: ['organizations-list', 'organization-create', 'organization-edit'],
@@ -48,7 +48,7 @@ const MODULE_SCREENS = {
     'closed-sales-vendor-payout'
   ],
   design: ['design-list', 'my-projects-list', 'completed-models-list'],
-  attendance: ['attendance-list'],
+  attendance: ['attendance-list', 'attendance-team', 'attendance-all-departments'],
   chat: ['chat-room', 'chat-workspaces']
 };
 

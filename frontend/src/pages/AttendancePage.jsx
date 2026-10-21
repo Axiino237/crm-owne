@@ -24,7 +24,7 @@ import {
 } from '../store/apiSlice';
 
 const AttendancePage = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(user?.role?.level) || user?.isSuperAdmin;
 
   const [activeTab, setActiveTab] = useState('my-attendance');
@@ -51,13 +51,32 @@ const AttendancePage = () => {
   const holidays = summaryData?.holidays || [];
   const hasTeamAccess = summaryData?.hasTeamAccess || false;
 
+  // UAM Permissions for Attendance Scoping
+  const hasTeamPerm = hasPermission('attendance', ['attendance-team', 'attendance-all-departments'], 'canView');
+  const hasAllDeptsPerm = hasPermission('attendance', 'attendance-all-departments', 'canView');
+  const canAccessTeam = isAdmin || hasTeamAccess || hasTeamPerm;
+
   const { data: teamData, isLoading: loadingTeam, refetch: refetchTeamData } = useGetTeamTodayQuery(undefined, {
-    skip: !isAdmin && !hasTeamAccess
+    skip: !canAccessTeam
   });
   const teamAttendance = teamData?.teamAttendance || [];
+  const canSwitchAllDepts = isAdmin || hasAllDeptsPerm || Boolean(teamData?.canSwitchAllDepts);
 
-  // Calculate departments list dynamically from team attendance logs
-  const departmentsList = ['All', ...new Set(teamAttendance.map(m => m.department).filter(Boolean))];
+  // Calculate departments list dynamically from team attendance logs or user's department
+  const availableDepts = [...new Set(teamAttendance.map(m => m.department).filter(Boolean))];
+  const departmentsList = canSwitchAllDepts
+    ? ['All', ...availableDepts]
+    : (availableDepts.length > 0 ? availableDepts : [user?.department?.name || teamData?.userDeptName || 'Your Department']);
+
+  // Auto-lock selected department to user's assigned department if no all-departments permission
+  useEffect(() => {
+    if (!canSwitchAllDepts) {
+      const userDept = user?.department?.name || teamData?.userDeptName || (availableDepts[0] || '');
+      if (userDept && selectedDept !== userDept) {
+        setSelectedDept(userDept);
+      }
+    }
+  }, [canSwitchAllDepts, user?.department?.name, teamData?.userDeptName, availableDepts.length]);
 
   // Filter team attendance logs
   const filteredTeamAttendance = teamAttendance.filter(member => {
@@ -509,9 +528,9 @@ const AttendancePage = () => {
           {[
             { id: 'my-attendance', label: 'My Attendance Calendar', show: true },
             { id: 'my-regularizations', label: 'My Correction Requests', show: true },
-            { id: 'team-regularizations', label: `Correction Approvals ${teamRegs.filter(r => r.status === 'pending').length > 0 ? `(${teamRegs.filter(r => r.status === 'pending').length})` : ''}`, show: isAdmin || hasTeamAccess },
-            { id: 'payroll-summary', label: 'Monthly Payroll & Deductions', show: isAdmin || hasTeamAccess },
-            { id: 'team-attendance', label: 'Team Daily Logs', show: isAdmin || hasTeamAccess },
+            { id: 'team-regularizations', label: `Correction Approvals ${teamRegs.filter(r => r.status === 'pending').length > 0 ? `(${teamRegs.filter(r => r.status === 'pending').length})` : ''}`, show: canAccessTeam },
+            { id: 'payroll-summary', label: 'Monthly Payroll & Deductions', show: canAccessTeam },
+            { id: 'team-attendance', label: 'Team Daily Logs', show: canAccessTeam },
             { id: 'admin-holidays', label: 'Holidays Configuration', show: isAdmin }
           ].filter(tab => tab.show).map(tab => (
             <button
@@ -631,7 +650,7 @@ const AttendancePage = () => {
         )}
 
         {/* Team Attendance Logs */}
-        {activeTab === 'team-attendance' && (isAdmin || hasTeamAccess) && (
+        {activeTab === 'team-attendance' && canAccessTeam && (
           <div className="card" style={{ padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Today's Presence Dashboard</h3>
@@ -663,12 +682,24 @@ const AttendancePage = () => {
               </div>
               
               <div style={{ flex: '1 1 150px' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Department</label>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>
+                  <span>Department</span>
+                  {!canSwitchAllDepts && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>🔒 (Your Dept)</span>
+                  )}
+                </label>
                 <select 
                   className="form-control" 
                   value={selectedDept}
                   onChange={e => setSelectedDept(e.target.value)}
-                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                  disabled={!canSwitchAllDepts}
+                  title={!canSwitchAllDepts ? 'Department locked to your assigned department' : 'Switch department'}
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    cursor: canSwitchAllDepts ? 'pointer' : 'default',
+                    opacity: canSwitchAllDepts ? 1 : 0.85
+                  }}
                 >
                   {departmentsList.map(dept => (
                     <option key={dept} value={dept}>{dept}</option>

@@ -120,7 +120,23 @@ router.get('/my-summary', async (req, res) => {
     const managedUsersCount = await User.count({ where: { managerId: req.user.id } });
     const userRole = req.user.role?.level;
     const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
-    const hasTeamAccess = (managedUsersCount > 0) || deptScope.isDeptHead || (userRole === 'dept_manager') || isAdmin;
+
+    // Check UAM permission for team attendance access
+    const { Permission } = require('../models');
+    let hasTeamPerm = false;
+    if (req.user.roleId) {
+      const perm = await Permission.findOne({
+        where: {
+          roleId: req.user.roleId,
+          module: 'attendance',
+          screen: { [Op.in]: ['attendance-team', 'attendance-all-departments'] },
+          canView: true
+        }
+      });
+      if (perm) hasTeamPerm = true;
+    }
+
+    const hasTeamAccess = (managedUsersCount > 0) || deptScope.isDeptHead || (userRole === 'dept_manager') || isAdmin || hasTeamPerm;
 
     res.json({ 
       success: true, 
@@ -136,46 +152,84 @@ router.get('/my-summary', async (req, res) => {
   }
 });
 
-// @desc   Get team today's attendance (for managers/heads/admins)
+// @desc   Get team today's attendance (for managers/heads/admins/scoped roles)
 // @route  GET /api/attendance/team-today
 router.get('/team-today', async (req, res) => {
   try {
+    const { Permission } = require('../models');
     const userRole = req.user.role?.level;
-    const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
+    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
+    const isOrgAdmin = userRole === 'org_admin';
+    const isCompanyAdmin = userRole === 'company_admin';
+    const isAdmin = isSuper || isOrgAdmin || isCompanyAdmin;
 
     const deptScope = await getDeptHeadScope(req.user);
     const managedUsersCount = await User.count({ where: { managerId: req.user.id } });
     const isMappedManager = managedUsersCount > 0;
     const isDeptHead = deptScope.isDeptHead;
-    const hasTeamAccess = isMappedManager || isDeptHead || (userRole === 'dept_manager') || isAdmin;
+    const isManager = userRole === 'dept_manager';
 
-    if (!isAdmin && !hasTeamAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied: Scoped privileges required' });
+    // 1. Team access check: admins, managers, dept heads, or roles with 'attendance-team' or 'attendance-all-departments'
+    let canViewTeam = isAdmin || isDeptHead || isManager || isMappedManager;
+    if (!canViewTeam && req.user.roleId) {
+      const permTeam = await Permission.findOne({
+        where: {
+          roleId: req.user.roleId,
+          module: 'attendance',
+          screen: { [Op.in]: ['attendance-team', 'attendance-all-departments'] },
+          canView: true
+        }
+      });
+      if (permTeam) canViewTeam = true;
+    }
+
+    // 2. All departments check: admins or roles with 'attendance-all-departments'
+    let canSwitchAllDepts = isAdmin;
+    if (!canSwitchAllDepts && req.user.roleId) {
+      const permAll = await Permission.findOne({
+        where: {
+          roleId: req.user.roleId,
+          module: 'attendance',
+          screen: 'attendance-all-departments',
+          canView: true
+        }
+      });
+      if (permAll) canSwitchAllDepts = true;
+    }
+
+    if (!canViewTeam) {
+      return res.status(403).json({ success: false, message: 'Access denied: Team attendance permission required' });
     }
 
     let targetDeptId = req.query.departmentId || null;
 
     // Build user query scope
-    const userWhere = {};
+    const userWhere = { isActive: true };
     if (!req.user.isSuperAdmin && req.user.organizationId) {
       userWhere.organizationId = req.user.organizationId;
     }
 
-    if (!isAdmin) {
-      if (targetDeptId) {
+    if (!canSwitchAllDepts) {
+      // User is locked to own department or managed departments!
+      if (targetDeptId && targetDeptId !== 'All') {
         if (!deptScope.managedDeptIds.includes(targetDeptId) && targetDeptId !== req.user.departmentId) {
           return res.status(403).json({ success: false, message: 'Access denied: Department not within your managed scope' });
         }
         userWhere.departmentId = targetDeptId;
       } else {
-        const orConditions = [{ managerId: req.user.id }];
         if (deptScope.managedDeptIds.length > 0) {
-          orConditions.push({ departmentId: { [Op.in]: deptScope.managedDeptIds } });
+          userWhere.departmentId = { [Op.in]: deptScope.managedDeptIds };
+        } else if (req.user.departmentId) {
+          userWhere.departmentId = req.user.departmentId;
+        } else if (isMappedManager) {
+          userWhere.managerId = req.user.id;
+        } else {
+          userWhere.id = req.user.id;
         }
-        userWhere[Op.or] = orConditions;
       }
     } else {
-      if (targetDeptId) {
+      // User can switch all departments
+      if (targetDeptId && targetDeptId !== 'All') {
         userWhere.departmentId = targetDeptId;
       }
     }
@@ -217,10 +271,15 @@ router.get('/team-today', async (req, res) => {
       };
     });
 
+    const userDept = req.user.departmentId ? await Department.findByPk(req.user.departmentId) : null;
+
     res.json({
       success: true,
       date: todayStr,
-      isDesignDept: targetDeptId ? await Department.findByPk(targetDeptId).then(d => d && (d.name.toLowerCase().includes('design') || (d.code && d.code.toLowerCase().includes('design')))) : false,
+      canSwitchAllDepts: Boolean(canSwitchAllDepts),
+      canViewTeam: Boolean(canViewTeam),
+      userDeptName: userDept?.name || '',
+      isDesignDept: targetDeptId && targetDeptId !== 'All' ? await Department.findByPk(targetDeptId).then(d => d && (d.name.toLowerCase().includes('design') || (d.code && d.code.toLowerCase().includes('design')))) : false,
       teamAttendance
     });
   } catch (error) {

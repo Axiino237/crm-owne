@@ -23,7 +23,7 @@ const Permission = sequelize.define('Permission', {
       'profit-trend-chart', 'recent-leads-list', 'recent-projects-list',
       'org-overview', 'system-overview',
       'pending-designs-widget', 'completed-designs-widget', 'change-designs-widget', 'total-designs-widget',
-      'users-list', 'user-create', 'user-edit', 'audit-logs-list', 'staff-summary',
+      'users-list', 'user-create', 'user-edit', 'audit-logs-list', 'staff-summary', 'staff-summary-dept', 'staff-summary-all',
       'roles-list', 'role-create', 'role-edit',
       'permissions-list', 'permission-edit',
       'organizations-list', 'organization-create', 'organization-edit',
@@ -38,7 +38,7 @@ const Permission = sequelize.define('Permission', {
       'design-list',
       'my-projects-list', 'completed-models-list',
       'chat-room', 'chat-workspaces',
-      'attendance-list'
+      'attendance-list', 'attendance-team', 'attendance-all-departments'
     ),
     allowNull: false
   },
