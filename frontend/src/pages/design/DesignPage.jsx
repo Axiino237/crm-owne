@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   RiPaletteLine, RiTimeLine, RiCheckDoubleLine, RiRefreshLine,
   RiEyeLine, RiDeleteBinLine, RiImageLine, RiCloseLine, RiBuilding2Line,
-  RiGlobalLine, RiCalendarLine, RiMoneyDollarCircleLine, RiUserLine, RiDownloadLine
+  RiGlobalLine, RiCalendarLine, RiMoneyDollarCircleLine, RiUserLine, RiDownloadLine,
+  RiFileTextLine, RiFilePdfLine, RiFileExcelLine, RiFileWordLine, RiUploadCloud2Line,
+  RiAlertLine, RiFileCheckLine, RiAttachmentLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
@@ -16,11 +18,32 @@ const STATUS_CONFIG = {
   completed:   { label: 'Completed',   color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
 };
 
+// Helper to determine document type and appropriate icon/color
+const getDocTypeInfo = (url = '', name = '') => {
+  const target = (name || url || '').toLowerCase();
+  if (/\.pdf$/i.test(target)) {
+    return { type: 'PDF Document', icon: <RiFilePdfLine style={{ color: '#ef4444' }} />, color: '#ef4444' };
+  }
+  if (/\.(xlsx|xls|csv)$/i.test(target)) {
+    return { type: 'Excel Spreadsheet / CSV', icon: <RiFileExcelLine style={{ color: '#10b981' }} />, color: '#10b981' };
+  }
+  if (/\.(docx|doc)$/i.test(target)) {
+    return { type: 'Word Document', icon: <RiFileWordLine style={{ color: '#3b82f6' }} />, color: '#3b82f6' };
+  }
+  if (/\.(jpe?g|png|gif|webp)$/i.test(target)) {
+    return { type: 'Reference Image', icon: <RiImageLine style={{ color: '#8b5cf6' }} />, color: '#8b5cf6' };
+  }
+  return { type: 'Requirement Document', icon: <RiFileTextLine style={{ color: 'var(--accent)' }} />, color: 'var(--accent)' };
+};
+
 // ── View Detail Modal ────────────────────────────────────────────────────────
-const ViewDesignModal = ({ order, onClose }) => {
-  const imgUrl = order.referenceImageUrl
-    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`
+const ViewDesignModal = ({ order, onClose, onUploadClick }) => {
+  const docUrl = (order.requirementDocUrl || order.referenceImageUrl)
+    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.requirementDocUrl || order.referenceImageUrl}`
     : null;
+
+  const docInfo = getDocTypeInfo(docUrl, order.requirementDocName);
+  const isImage = /\.(jpe?g|png|gif|webp)$/i.test(docUrl || '');
 
   const Field = ({ label, value }) =>
     value ? (
@@ -45,39 +68,199 @@ const ViewDesignModal = ({ order, onClose }) => {
         {/* Scrollable Content */}
         <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 28px' }}>
-          <Field label="Company Name" value={order.companyName} />
-          <Field label="Website" value={order.website} />
-          <Field label="Exhibition Name" value={order.exhibitionName} />
-          <Field label="Stall No." value={order.stallNo} />
-          <Field label="Hall No." value={order.hallNo} />
-          <Field label="Stall Size" value={order.stallSize} />
-          <Field label="No. of Sides Open" value={order.sidesOpen} />
-          <Field label="Reception Counter" value={order.receptionCounter} />
-          <Field label="Round Table + Bar Stool" value={order.roundTableBarStool} />
-          <Field label="Closed Meeting Room" value={order.closedMeetingRoom} />
-          <Field label="Product Display Podiums" value={order.productDisplayPodiums} />
-          <Field label="Posters Required" value={order.postersRequired} />
-          <Field label="Brochure Stand" value={order.brochureStand} />
-          <Field label="Pantry / Storage Area" value={order.pantryStorageArea} />
-          <Field label="Plasma TV" value={order.plasmaTV} />
-          <Field label="Flooring Type" value={order.flooringType} />
-          <Field label="Color Scheme" value={order.colorScheme} />
-          <Field label="Approx. Budget (Rs. Lacs)" value={order.approxBudget} />
-        </div>
-        {order.productNature && <Field label="Nature / Specifications of Products" value={order.productNature} />}
-        {order.productsCount && <Field label="No. of Products / Dimensions" value={order.productsCount} />}
-        {order.otherInfo && <Field label="Any Other Information" value={order.otherInfo} />}
-
-        {imgUrl && (
-          <div style={{ marginTop: 20 }}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Reference Image</div>
-            <img src={imgUrl} alt="Reference" style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, border: '1px solid var(--border)', objectFit: 'contain' }} />
+            <Field label="Company Name" value={order.companyName} />
+            <Field label="Website" value={order.website} />
+            <Field label="Exhibition Name" value={order.exhibitionName} />
+            <Field label="Stall No." value={order.stallNo} />
+            <Field label="Hall No." value={order.hallNo} />
+            <Field label="Stall Size" value={order.stallSize} />
+            <Field label="No. of Sides Open" value={order.sidesOpen} />
+            <Field label="Reception Counter" value={order.receptionCounter} />
+            <Field label="Round Table + Bar Stool" value={order.roundTableBarStool} />
+            <Field label="Closed Meeting Room" value={order.closedMeetingRoom} />
+            <Field label="Product Display Podiums" value={order.productDisplayPodiums} />
+            <Field label="Posters Required" value={order.postersRequired} />
+            <Field label="Brochure Stand" value={order.brochureStand} />
+            <Field label="Pantry / Storage Area" value={order.pantryStorageArea} />
+            <Field label="Plasma TV" value={order.plasmaTV} />
+            <Field label="Flooring Type" value={order.flooringType} />
+            <Field label="Color Scheme" value={order.colorScheme} />
+            <Field label="Approx. Budget (Rs. Lacs)" value={order.approxBudget} />
           </div>
-        )}
+          {order.productNature && <Field label="Nature / Specifications of Products" value={order.productNature} />}
+          {order.productsCount && <Field label="No. of Products / Dimensions" value={order.productsCount} />}
+          {order.otherInfo && <Field label="Any Other Information" value={order.otherInfo} />}
+
+          {/* Requirement Document Section */}
+          <div style={{ marginTop: 20, padding: 16, background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <RiFileTextLine style={{ color: 'var(--accent)' }} /> Requirement Document (PDF, Excel, CSV, Doc)
+              </div>
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={() => { onClose(); onUploadClick(order); }}
+                style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <RiUploadCloud2Line /> {docUrl ? 'Replace Document' : 'Upload Document'}
+              </button>
+            </div>
+
+            {docUrl ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', padding: '12px 16px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ fontSize: '1.75rem', display: 'flex' }}>
+                      {docInfo.icon}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {order.requirementDocName || 'Requirement Document'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: docInfo.color, fontWeight: 600 }}>
+                        {docInfo.type}
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href={docUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="btn btn-sm btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <RiDownloadLine /> Download / View
+                  </a>
+                </div>
+
+                {isImage && (
+                  <div style={{ marginTop: 12, textAlign: 'center' }}>
+                    <img src={docUrl} alt="Requirement Reference" style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 8, border: '1px solid var(--border)', objectFit: 'contain' }} />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-secondary)', fontSize: '0.825rem' }}>
+                <div style={{ marginBottom: 6, color: '#ef4444', fontWeight: 600 }}>⚠️ No requirement document attached yet.</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 8 }}>Requirment file illama designer assign panna mudiyathu.</div>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => { onClose(); onUploadClick(order); }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <RiUploadCloud2Line /> Upload Requirement Document
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
+
+// ── Dedicated Upload Requirement Modal ──────────────────────────────────────
+const UploadRequirementModal = ({ order, onClose, onUploaded }) => {
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!file) {
+      toast.error('Please choose a requirement file (PDF, Excel, CSV, or Doc)');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('requirementDoc', file);
+
+    try {
+      const res = await api.post(`/designs/${order.id}/requirement-doc`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data.success) {
+        toast.success('Requirement document uploaded successfully!');
+        onUploaded(res.data.order);
+        onClose();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to upload document');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+      <div className="card" style={{ width: '100%', maxWidth: 480, padding: 24, position: 'relative' }}>
+        <button
+          onClick={onClose}
+          style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.25rem', display: 'flex' }}
+        >
+          <RiCloseLine />
+        </button>
+
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <RiUploadCloud2Line style={{ color: 'var(--accent)' }} /> Upload Requirement Document
+        </h3>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 18 }}>
+          Upload requirements for <strong>{order.companyName}</strong>. Accepted: PDF, Excel (.xlsx/.xls), CSV, Word (.docx/.doc), or Images.
+        </p>
+
+        {order.requirementDocUrl && (
+          <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: '0.78rem' }}>
+            <span style={{ fontWeight: 700, color: '#10b981' }}>Current File:</span> {order.requirementDocName || 'Attachment'}
+          </div>
+        )}
+
+        <form onSubmit={handleUpload}>
+          <div
+            style={{
+              border: '2px dashed var(--border)',
+              borderRadius: 12,
+              padding: '28px 16px',
+              textAlign: 'center',
+              background: 'var(--bg-secondary)',
+              cursor: 'pointer',
+              marginBottom: 20
+            }}
+            onClick={() => document.getElementById('requirement-file-input').click()}
+          >
+            <RiUploadCloud2Line style={{ fontSize: '2.5rem', color: 'var(--accent)', marginBottom: 8 }} />
+            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {file ? file.name : 'Click to select requirement file'}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              PDF, Excel, CSV, Word Doc, or Image (Max 30MB)
+            </div>
+            {file && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: 6, fontWeight: 700 }}>
+                Selected: {(file.size / 1024).toFixed(1)} KB
+              </div>
+            )}
+            <input
+              id="requirement-file-input"
+              type="file"
+              accept=".pdf,.xls,.xlsx,.csv,.doc,.docx,.txt,image/*"
+              style={{ display: 'none' }}
+              onChange={e => setFile(e.target.files[0])}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={uploading}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={uploading || !file}>
+              {uploading ? 'Uploading...' : 'Upload Document'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -86,8 +269,8 @@ const DesignPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewOrder, setViewOrder] = useState(null);
+  const [uploadDocOrder, setUploadDocOrder] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, order: null });
-  const [statusUpdating, setStatusUpdating] = useState(null);
 
   // Designer Assignment States
   const [designers, setDesigners] = useState([]);
@@ -95,6 +278,7 @@ const DesignPage = () => {
   const [selectedDesignerId, setSelectedDesignerId] = useState('');
   const [designerSearch, setDesignerSearch] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [assignDocFile, setAssignDocFile] = useState(null);
   const [savingAssign, setSavingAssign] = useState(false);
 
   const canEdit = hasPermission('design', 'design-list', 'canEdit');
@@ -130,45 +314,46 @@ const DesignPage = () => {
     setSelectedDesignerId(order.assignedDesignerId || '');
     setDeadline(order.endTime ? new Date(order.endTime).toISOString().slice(0, 16) : '');
     setDesignerSearch('');
+    setAssignDocFile(null);
   };
 
   const handleSaveAssignment = async () => {
+    const hasDoc = !!(assigningOrder.requirementDocUrl || assigningOrder.referenceImageUrl || assignDocFile);
+    
+    // ⛔ Rule: requirment file illama assign panna mudiyathu
+    if (selectedDesignerId && !hasDoc) {
+      toast.error('Requirment file illama assign panna mudiyathu! Please upload requirement doc (PDF/Excel/CSV/Doc).');
+      return;
+    }
+
     setSavingAssign(true);
     try {
-      const res = await api.put(`/designs/${assigningOrder.id}/assign`, {
-        designerId: selectedDesignerId || null,
-        endTime: deadline || null
-      });
+      let res;
+      if (assignDocFile) {
+        const formData = new FormData();
+        if (selectedDesignerId) formData.append('designerId', selectedDesignerId);
+        if (deadline) formData.append('endTime', deadline);
+        formData.append('requirementDoc', assignDocFile);
+        res = await api.put(`/designs/${assigningOrder.id}/assign`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        res = await api.put(`/designs/${assigningOrder.id}/assign`, {
+          designerId: selectedDesignerId || null,
+          endTime: deadline || null
+        });
+      }
+
       if (res.data.success) {
         setOrders(prev => prev.map(o => o.id === assigningOrder.id ? res.data.order : o));
         toast.success('Designer and deadline assigned successfully!');
         setAssigningOrder(null);
+        setAssignDocFile(null);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to assign designer');
-    }
-    setSavingAssign(false);
-  };
-
-  const handleStatusChange = async (id, status) => {
-    setStatusUpdating(id);
-    try {
-      await api.put(`/designs/${id}/status`, { status });
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-      toast.success('Status updated');
-    } catch {
-      toast.error('Failed to update status');
-    }
-    setStatusUpdating(null);
-  };
-
-  const handleGetProject = async (id) => {
-    try {
-      await api.put(`/designs/${id}/get`);
-      toast.success('Project accepted! Moved to My Projects.');
-      fetchOrders();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to accept project');
+    } finally {
+      setSavingAssign(false);
     }
   };
 
@@ -234,7 +419,7 @@ const DesignPage = () => {
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
               <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🎨</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>No design orders yet</div>
-              <div style={{ color: 'var(--text-secondary)' }}>Use "Move to Design" on a lead to create a design order</div>
+              <div style={{ color: 'var(--text-secondary)' }}>Use "Requirement Received" on a lead to create a design order</div>
             </div>
           ) : (
             <div className="table-wrapper">
@@ -254,7 +439,12 @@ const DesignPage = () => {
                 </thead>
                 <tbody>
                   {orders.map(order => {
-                    const st = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+                    const hasDoc = !!(order.requirementDocUrl || order.referenceImageUrl);
+                    const docUrl = hasDoc
+                      ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.requirementDocUrl || order.referenceImageUrl}`
+                      : null;
+                    const docInfo = getDocTypeInfo(docUrl, order.requirementDocName);
+
                     return (
                       <tr key={order.id}>
                         <td>
@@ -265,6 +455,16 @@ const DesignPage = () => {
                             <div>
                               <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{order.companyName}</div>
                               {order.website && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}><RiGlobalLine />{order.website}</div>}
+                              {/* Requirement Doc Status Tag */}
+                              {hasDoc ? (
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', padding: '2px 6px', borderRadius: 6, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 4 }}>
+                                  <RiFileCheckLine /> Req Doc Attached
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.68rem', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 6px', borderRadius: 6, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 4 }}>
+                                  <RiAlertLine /> No Req Doc
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -338,15 +538,45 @@ const DesignPage = () => {
                           </span>
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {/* View Details */}
                             <button className="btn btn-sm btn-outline" onClick={() => setViewOrder(order)} title="View Details" id={`view-design-${order.id}`}>
                               <RiEyeLine />
                             </button>
-                            {order.referenceImageUrl && (
-                              <a href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline" title="View Reference Image" style={{ display: 'flex', alignItems: 'center' }}>
-                                <RiImageLine />
+
+                            {/* Download Requirement Document (if attached) */}
+                            {hasDoc && (
+                              <a
+                                href={docUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download
+                                className="btn btn-sm btn-outline"
+                                title={`Download Requirement Doc (${order.requirementDocName || docInfo.type})`}
+                                style={{ display: 'flex', alignItems: 'center', color: '#10b981', borderColor: 'rgba(16,185,129,0.4)', background: 'rgba(16,185,129,0.1)' }}
+                              >
+                                <RiFileTextLine />
                               </a>
                             )}
+
+                            {/* Upload / Replace Requirement Document Button */}
+                            {canEdit && (
+                              <button
+                                className="btn btn-sm btn-outline"
+                                onClick={() => setUploadDocOrder(order)}
+                                title={hasDoc ? "Replace Requirement Document" : "Upload Requirement Document (PDF, Excel, CSV, Doc)"}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  color: hasDoc ? 'var(--text-secondary)' : '#f59e0b',
+                                  borderColor: hasDoc ? 'var(--border)' : 'rgba(245,158,11,0.5)',
+                                  background: hasDoc ? 'transparent' : 'rgba(245,158,11,0.12)'
+                                }}
+                              >
+                                <RiUploadCloud2Line />
+                              </button>
+                            )}
+
                             {canDelete && (
                               <button className="btn btn-sm btn-danger" onClick={() => setConfirm({ open: true, order })} title="Delete" id={`delete-design-${order.id}`}>
                                 <RiDeleteBinLine />
@@ -364,7 +594,25 @@ const DesignPage = () => {
         </div>
       </div>
 
-      {viewOrder && <ViewDesignModal order={viewOrder} onClose={() => setViewOrder(null)} />}
+      {viewOrder && (
+        <ViewDesignModal
+          order={viewOrder}
+          onClose={() => setViewOrder(null)}
+          onUploadClick={(ord) => setUploadDocOrder(ord)}
+        />
+      )}
+
+      {uploadDocOrder && (
+        <UploadRequirementModal
+          order={uploadDocOrder}
+          onClose={() => setUploadDocOrder(null)}
+          onUploaded={(updated) => {
+            setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+            if (viewOrder && viewOrder.id === updated.id) setViewOrder(updated);
+          }}
+        />
+      )}
+
       <ConfirmModal
         isOpen={confirm.open}
         title="Delete Design Order"
@@ -377,9 +625,9 @@ const DesignPage = () => {
 
       {assigningOrder && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
-          <div className="card" style={{ width: '100%', maxWidth: 450, padding: 24, position: 'relative' }}>
+          <div className="card" style={{ width: '100%', maxWidth: 460, padding: 24, position: 'relative' }}>
             <button
-              onClick={() => setAssigningOrder(null)}
+              onClick={() => { setAssigningOrder(null); setAssignDocFile(null); }}
               style={{
                 position: 'absolute', top: 16, right: 16, background: 'none',
                 border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.25rem', display: 'flex'
@@ -389,11 +637,78 @@ const DesignPage = () => {
             </button>
 
             <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6 }}>
-              👤 Assign Designer & Deadline
+              👤 Assign Designer & Target Deadline
             </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 20 }}>
-              Set designer and completion target for <strong>{assigningOrder.companyName}</strong>.
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 18 }}>
+              Set designer and target completion date for <strong>{assigningOrder.companyName}</strong>.
             </p>
+
+            {/* Requirement Document Section */}
+            {(() => {
+              const hasExistingDoc = !!(assigningOrder.requirementDocUrl || assigningOrder.referenceImageUrl);
+              return (
+                <div style={{
+                  background: hasExistingDoc ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                  border: `1px solid ${hasExistingDoc ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  marginBottom: 18
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {hasExistingDoc ? (
+                        <RiFileCheckLine style={{ color: '#10b981', fontSize: '1.35rem' }} />
+                      ) : (
+                        <RiAlertLine style={{ color: '#ef4444', fontSize: '1.35rem' }} />
+                      )}
+                      <div>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: hasExistingDoc ? '#10b981' : '#ef4444' }}>
+                          {hasExistingDoc ? 'Requirement Document Attached' : 'Requirement Document Required!'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {hasExistingDoc
+                            ? (assigningOrder.requirementDocName || 'Requirement Document')
+                            : 'Requirment file illama designer assign panna mudiyathu.'
+                          }
+                        </div>
+                      </div>
+                    </div>
+
+                    {hasExistingDoc && (
+                      <a
+                        href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${assigningOrder.requirementDocUrl || assigningOrder.referenceImageUrl}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        download
+                        className="btn btn-sm btn-outline"
+                        style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+                      >
+                        View
+                      </a>
+                    )}
+                  </div>
+
+                  {/* File input (always accessible to upload or replace) */}
+                  <div style={{ marginTop: 6 }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                      {hasExistingDoc ? 'Replace Requirement Doc (Optional):' : 'Upload Requirement Doc (PDF, Excel, CSV, Doc):'}
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.xls,.xlsx,.csv,.doc,.docx,.txt,image/*"
+                      className="form-control"
+                      style={{ fontSize: '0.78rem', padding: '5px 8px' }}
+                      onChange={e => setAssignDocFile(e.target.files[0])}
+                    />
+                    {assignDocFile && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--success)', marginTop: 4, fontWeight: 600 }}>
+                        ✓ Selected: {assignDocFile.name} ({(assignDocFile.size / 1024).toFixed(1)} KB)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Target Deadline */}
             <div className="form-group" style={{ marginBottom: 16 }}>
@@ -419,7 +734,7 @@ const DesignPage = () => {
               />
               
               <div style={{
-                maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)',
+                maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)',
                 borderRadius: 8, background: 'var(--bg-secondary)', padding: 4
               }}>
                 <div
@@ -461,10 +776,19 @@ const DesignPage = () => {
 
             {/* Actions */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button className="btn btn-outline" onClick={() => setAssigningOrder(null)} disabled={savingAssign}>
+              <button
+                className="btn btn-outline"
+                onClick={() => { setAssigningOrder(null); setAssignDocFile(null); }}
+                disabled={savingAssign}
+              >
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleSaveAssignment} disabled={savingAssign}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveAssignment}
+                disabled={savingAssign || (selectedDesignerId && !(assigningOrder.requirementDocUrl || assigningOrder.referenceImageUrl || assignDocFile))}
+                title={(selectedDesignerId && !(assigningOrder.requirementDocUrl || assigningOrder.referenceImageUrl || assignDocFile)) ? 'Requirment doc upload pannunga' : 'Save Assignment'}
+              >
                 {savingAssign ? 'Saving...' : 'Save Assignment'}
               </button>
             </div>

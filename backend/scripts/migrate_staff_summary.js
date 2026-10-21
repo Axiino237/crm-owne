@@ -60,6 +60,15 @@ async function migrate() {
       console.log(`users column note: ${err.message}`);
     }
 
+    // 2.5 Design order requirement doc columns
+    try {
+      await sequelize.query(`ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS "requirementDocUrl" TEXT`);
+      await sequelize.query(`ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS "requirementDocName" TEXT`);
+      console.log('crm_design_orders requirementDoc columns verified.');
+    } catch (err) {
+      console.log(`crm_design_orders requirementDoc columns note: ${err.message}`);
+    }
+
     // 3. Grant default permission to roles
     const roles = await Role.findAll();
     console.log(`Found ${roles.length} roles.`);

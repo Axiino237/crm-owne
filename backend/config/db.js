@@ -67,6 +67,8 @@ const connectDB = async () => {
       await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"endTime\" TIMESTAMP WITH TIME ZONE");
       await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"completedModelUrl\" TEXT");
       await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"completedAt\" TIMESTAMP WITH TIME ZONE");
+      await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"requirementDocUrl\" TEXT");
+      await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"requirementDocName\" TEXT");
       await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"publicKey\" TEXT");
       await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"paidLeaves\" INTEGER DEFAULT 12");
       await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"casualLeaves\" INTEGER DEFAULT 10");

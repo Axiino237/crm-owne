@@ -23,12 +23,11 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 30 * 1024 * 1024 }, // 30MB
   fileFilter: (_req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp|pdf/;
-    const ok = allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype);
-    if (ok) cb(null, true);
-    else cb(new Error('Only image/PDF files are allowed'));
+    const allowedExts = /\.(jpe?g|png|gif|webp|pdf|xls|xlsx|csv|doc|docx|txt)$/i;
+    if (allowedExts.test(path.extname(file.originalname))) cb(null, true);
+    else cb(new Error('Only PDF, Excel (.xls/.xlsx), CSV, Word (.doc/.docx), or Image files are allowed'));
   }
 });
 
@@ -111,7 +110,7 @@ router.get('/designers', checkPermission('design', 'design-list', 'canView'), as
 });
 
 // @route  PUT /api/designs/:id/assign
-router.put('/:id/assign', checkPermission('design', 'design-list', 'canEdit'), async (req, res) => {
+router.put('/:id/assign', checkPermission('design', 'design-list', 'canEdit'), upload.single('requirementDoc'), async (req, res) => {
   try {
     const { id } = req.params;
     const { designerId, endTime } = req.body;
@@ -119,6 +118,25 @@ router.put('/:id/assign', checkPermission('design', 'design-list', 'canEdit'), a
     const order = await DesignOrder.findByPk(id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Design order not found' });
+    }
+
+    // If a requirement document was uploaded in this request
+    if (req.file) {
+      const docUrl = `/uploads/design-references/${req.file.filename}`;
+      order.requirementDocUrl = docUrl;
+      order.requirementDocName = req.file.originalname;
+      if (!order.referenceImageUrl) order.referenceImageUrl = docUrl;
+    }
+
+    // ⛔ CRITICAL RULE: Requirment file illama assign panna mudiyathu!
+    if (designerId) {
+      const hasDoc = !!(order.requirementDocUrl || order.referenceImageUrl || req.file);
+      if (!hasDoc) {
+        return res.status(400).json({
+          success: false,
+          message: 'Requirement file illama designer assign panna mudiyathu! Please upload a requirement document (PDF, Excel, CSV, or Doc).'
+        });
+      }
     }
 
     order.assignedDesignerId = designerId || null;
@@ -165,6 +183,41 @@ router.put('/:id/assign', checkPermission('design', 'design-list', 'canEdit'), a
     res.json({ success: true, order: updatedOrder });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// @route  POST /api/designs/:id/requirement-doc
+// Upload or replace requirement document (PDF, Excel, CSV, Word Doc, Images)
+router.post('/:id/requirement-doc', checkPermission('design', 'design-list', 'canEdit'), upload.single('requirementDoc'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please select a requirement file (PDF, Excel, CSV, or Doc) to upload' });
+    }
+    const order = await DesignOrder.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: 'Design order not found' });
+
+    const docUrl = `/uploads/design-references/${req.file.filename}`;
+    order.requirementDocUrl = docUrl;
+    order.requirementDocName = req.file.originalname;
+    if (!order.referenceImageUrl) {
+      order.referenceImageUrl = docUrl;
+    }
+    await order.save();
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction(req, 'UPDATE', 'design', order.id, order.companyName, `Uploaded requirement document "${req.file.originalname}" for "${order.companyName}"`);
+
+    const updatedOrder = await DesignOrder.findByPk(order.id, {
+      include: [
+        { model: Lead, as: 'lead', attributes: ['id', 'name', 'companyName', 'phone', 'email'] },
+        { model: User, as: 'submitter', attributes: ['id', 'name', 'email'] },
+        { model: User, as: 'designer', attributes: ['id', 'name', 'email'] }
+      ]
+    });
+
+    res.json({ success: true, message: 'Requirement document uploaded successfully', order: updatedOrder });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -247,6 +300,8 @@ router.post('/', checkPermission('design', 'design-list', 'canCreate'), upload.s
     const referenceImageUrl = req.file
       ? `/uploads/design-references/${req.file.filename}`
       : null;
+    const requirementDocUrl = referenceImageUrl;
+    const requirementDocName = req.file ? req.file.originalname : null;
 
     const order = await DesignOrder.create({
       leadId: leadId || null,
@@ -256,6 +311,8 @@ router.post('/', checkPermission('design', 'design-list', 'canCreate'), upload.s
       plasmaTV, flooringType, otherInfo, colorScheme,
       approxBudget: approxBudget || null,
       referenceImageUrl,
+      requirementDocUrl,
+      requirementDocName,
       organizationId: req.user.organizationId || null,
       submittedBy: req.user.id,
       status: 'pending'

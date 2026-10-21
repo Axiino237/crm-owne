@@ -34,6 +34,8 @@ const DesignOrder = sequelize.define('DesignOrder', {
   colorScheme: { type: DataTypes.STRING, allowNull: true },
   approxBudget: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
   referenceImageUrl: { type: DataTypes.TEXT, allowNull: true },       // stored file path
+  requirementDocUrl: { type: DataTypes.TEXT, allowNull: true },       // uploaded requirement doc path (pdf, excel, csv, doc)
+  requirementDocName: { type: DataTypes.STRING, allowNull: true },    // original file name
   status: {
     type: DataTypes.ENUM('pending', 'in_progress', 'completed'),
     defaultValue: 'pending'

@@ -4,7 +4,7 @@ import {
   RiEyeLine, RiCloseLine, RiBuilding2Line,
   RiGlobalLine, RiCalendarLine, RiMoneyDollarCircleLine,
   RiUploadCloud2Line, RiFileImageLine, RiCheckLine, RiTimerLine,
-  RiDownloadLine, RiImageLine
+  RiDownloadLine, RiImageLine, RiFileTextLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
@@ -579,14 +579,16 @@ const MyProjectsPage = () => {
                           <button className="btn btn-sm btn-outline" onClick={() => setViewOrder(order)} title="View Details">
                             <RiEyeLine />
                           </button>
-                          {order.referenceImageUrl && (
+                          {(order.requirementDocUrl || order.referenceImageUrl) && (
                             <a
-                              href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`}
+                              href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.requirementDocUrl || order.referenceImageUrl}`}
                               download
-                              title="Download Reference Image"
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Download Requirement Document (${order.requirementDocName || 'Attachment'})`}
                               className="btn btn-sm"
-                              style={{ background: 'rgba(129,140,248,0.12)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <RiImageLine />
+                              style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <RiFileTextLine />
                             </a>
                           )}
                           {order.status === 'completed' && order.completedModelUrl && (
