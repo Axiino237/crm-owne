@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
+import { getFileUrl, getRequirementDocDownloadUrl } from '../../utils/fileUrl';
 
 const STATUS_CONFIG = {
   pending:     { label: 'Pending',     color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
@@ -38,11 +39,12 @@ const getDocTypeInfo = (url = '', name = '') => {
 
 // ── View Detail Modal ────────────────────────────────────────────────────────
 const ViewDesignModal = ({ order, onClose, onUploadClick }) => {
-  const docUrl = (order.requirementDocUrl || order.referenceImageUrl)
-    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.requirementDocUrl || order.referenceImageUrl}`
-    : null;
+  const hasDoc = !!(order.requirementDocUrl || order.referenceImageUrl);
+  const docUrl = hasDoc ? getFileUrl(order.requirementDocUrl || order.referenceImageUrl) : null;
+  const downloadUrl = hasDoc ? getRequirementDocDownloadUrl(order, false) : null;
+  const viewUrl = hasDoc ? getRequirementDocDownloadUrl(order, true) : null;
 
-  const docInfo = getDocTypeInfo(docUrl, order.requirementDocName);
+  const docInfo = getDocTypeInfo(order.requirementDocUrl || order.referenceImageUrl, order.requirementDocName);
   const isImage = /\.(jpe?g|png|gif|webp)$/i.test(docUrl || '');
 
   const Field = ({ label, value }) =>
@@ -122,16 +124,25 @@ const ViewDesignModal = ({ order, onClose, onUploadClick }) => {
                       </div>
                     </div>
                   </div>
-                  <a
-                    href={docUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                    className="btn btn-sm btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <RiDownloadLine /> Download / View
-                  </a>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <a
+                      href={viewUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-sm btn-outline"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <RiEyeLine /> View
+                    </a>
+                    <a
+                      href={downloadUrl}
+                      download={order.requirementDocName || 'requirement-document'}
+                      className="btn btn-sm btn-primary"
+                      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <RiDownloadLine /> Download
+                    </a>
+                  </div>
                 </div>
 
                 {isImage && (
@@ -440,10 +451,8 @@ const DesignPage = () => {
                 <tbody>
                   {orders.map(order => {
                     const hasDoc = !!(order.requirementDocUrl || order.referenceImageUrl);
-                    const docUrl = hasDoc
-                      ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.requirementDocUrl || order.referenceImageUrl}`
-                      : null;
-                    const docInfo = getDocTypeInfo(docUrl, order.requirementDocName);
+                    const docInfo = getDocTypeInfo(order.requirementDocUrl || order.referenceImageUrl, order.requirementDocName);
+                    const downloadUrl = hasDoc ? getRequirementDocDownloadUrl(order, false) : null;
 
                     return (
                       <tr key={order.id}>
@@ -547,10 +556,8 @@ const DesignPage = () => {
                             {/* Download Requirement Document (if attached) */}
                             {hasDoc && (
                               <a
-                                href={docUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                download
+                                href={downloadUrl}
+                                download={order.requirementDocName || 'requirement-document'}
                                 className="btn btn-sm btn-outline"
                                 title={`Download Requirement Doc (${order.requirementDocName || docInfo.type})`}
                                 style={{ display: 'flex', alignItems: 'center', color: '#10b981', borderColor: 'rgba(16,185,129,0.4)', background: 'rgba(16,185,129,0.1)' }}
@@ -676,14 +683,13 @@ const DesignPage = () => {
 
                     {hasExistingDoc && (
                       <a
-                        href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${assigningOrder.requirementDocUrl || assigningOrder.referenceImageUrl}`}
+                        href={getRequirementDocDownloadUrl(assigningOrder, true)}
                         target="_blank"
                         rel="noreferrer"
-                        download
                         className="btn btn-sm btn-outline"
                         style={{ fontSize: '0.72rem', padding: '3px 8px' }}
                       >
-                        View
+                        View Doc
                       </a>
                     )}
                   </div>

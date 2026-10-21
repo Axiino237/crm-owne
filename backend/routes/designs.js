@@ -221,6 +221,89 @@ router.post('/:id/requirement-doc', checkPermission('design', 'design-list', 'ca
   }
 });
 
+// @route  GET /api/designs/:id/requirement-doc
+// Stream or download requirement document (supports ?token=..., ?view=1 for inline preview)
+router.get('/:id/requirement-doc', async (req, res) => {
+  try {
+    const order = await DesignOrder.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: 'Design order not found' });
+
+    const docPath = order.requirementDocUrl || order.referenceImageUrl;
+    if (!docPath) {
+      return res.status(404).json({ success: false, message: 'No requirement document attached to this order' });
+    }
+
+    const filename = path.basename(docPath);
+    const filePath = path.join(__dirname, '../uploads/design-references', filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Requirement file not found on server' });
+    }
+
+    const ext = path.extname(filename).toLowerCase();
+    let downloadName = order.requirementDocName || filename;
+    if (!path.extname(downloadName) && ext) {
+      downloadName += ext;
+    }
+
+    const mimeTypes = {
+      '.pdf': 'application/pdf',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.xls': 'application/vnd.ms-excel',
+      '.csv': 'text/csv',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.doc': 'application/msword',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+      '.txt': 'text/plain'
+    };
+    const cType = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', cType);
+
+    // If query view=1 or inline=1, view inline (e.g. view PDF in browser tab)
+    if (req.query.view === '1' || req.query.inline === '1') {
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(downloadName)}"`);
+      return res.sendFile(filePath);
+    }
+
+    // Force download with the user's original document name
+    return res.download(filePath, downloadName);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @route  GET /api/designs/:id/completed-model
+// Download completed 3D / design model file
+router.get('/:id/completed-model', async (req, res) => {
+  try {
+    const order = await DesignOrder.findByPk(req.params.id);
+    if (!order || !order.completedModelUrl) {
+      return res.status(404).json({ success: false, message: 'Completed model not found' });
+    }
+
+    const filename = path.basename(order.completedModelUrl);
+    const filePath = path.join(__dirname, '../uploads/completed-models', filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Model file not found on server' });
+    }
+
+    const downloadName = `${(order.companyName || 'Model').replace(/[^a-zA-Z0-9_-]/g, '_')}_Model${path.extname(filename)}`;
+
+    if (req.query.view === '1' || req.query.inline === '1') {
+      return res.sendFile(filePath);
+    }
+
+    return res.download(filePath, downloadName);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // @route  GET /api/designs/my
 router.get('/my', checkPermission('design', 'my-projects-list', 'canView'), async (req, res) => {
   try {

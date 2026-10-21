@@ -7,13 +7,15 @@ import {
 import AppLayout from '../../components/AppLayout';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import { getFileUrl, getRequirementDocDownloadUrl, getCompletedModelDownloadUrl } from '../../utils/fileUrl';
 
 // ── Detail Drawer ─────────────────────────────────────────────────────────────
 const ModelDetailDrawer = ({ order, onClose }) => {
   if (!order) return null;
-  const modelUrl = order.completedModelUrl
-    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.completedModelUrl}`
-    : null;
+  const modelUrl = getFileUrl(order.completedModelUrl);
+  const modelDownloadUrl = getCompletedModelDownloadUrl(order, false);
+  const refUrl = getFileUrl(order.requirementDocUrl || order.referenceImageUrl);
+  const refDownloadUrl = getRequirementDocDownloadUrl(order, false);
   const isImage = modelUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(order.completedModelUrl);
 
   const Field = ({ label, value, icon }) =>
@@ -74,38 +76,38 @@ const ModelDetailDrawer = ({ order, onClose }) => {
                   <div style={{ color: '#10b981', fontWeight: 600, marginBottom: 4, fontSize: '0.875rem' }}>Design File Available</div>
                 </div>
               )}
-              <a href={modelUrl} download target="_blank" rel="noreferrer"
+              <a href={modelDownloadUrl} download
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, padding: '9px 16px', background: 'rgba(16,185,129,0.12)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 8, color: '#10b981', textDecoration: 'none', fontWeight: 700, fontSize: '0.83rem' }}>
                 <RiDownloadLine /> Download Model File
               </a>
             </div>
           )}
 
-          {/* Reference Image (uploaded by sales team) */}
-          {order.referenceImageUrl && (
+          {/* Reference Image / Requirement Doc (uploaded by sales team) */}
+          {(order.requirementDocUrl || order.referenceImageUrl) && (
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  📎 Reference Image (from Sales)
+                  📎 Reference / Requirement Doc (from Sales)
                 </div>
                 <a
-                  href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`}
-                  download
+                  href={refDownloadUrl}
+                  download={order.requirementDocName || 'reference-doc'}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 8, color: '#818cf8', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 700 }}
                 >
                   <RiDownloadLine /> Download
                 </a>
               </div>
-              {/\.(jpg|jpeg|png|gif|webp)$/i.test(order.referenceImageUrl) ? (
+              {/\.(jpg|jpeg|png|gif|webp)$/i.test(refUrl) ? (
                 <img
-                  src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`}
+                  src={refUrl}
                   alt="Reference"
                   style={{ width: '100%', borderRadius: 12, border: '1.5px solid rgba(129,140,248,0.3)', objectFit: 'contain', maxHeight: 260 }}
                 />
               ) : (
                 <div style={{ background: 'rgba(129,140,248,0.07)', border: '1.5px solid rgba(129,140,248,0.3)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
                   <RiFileImageLine style={{ fontSize: '2rem', color: '#818cf8', display: 'block', margin: '0 auto 8px' }} />
-                  <div style={{ color: '#818cf8', fontWeight: 600, fontSize: '0.875rem' }}>Reference File Attached</div>
+                  <div style={{ color: '#818cf8', fontWeight: 600, fontSize: '0.875rem' }}>{order.requirementDocName || 'Requirement Document Attached'}</div>
                 </div>
               )}
             </div>
@@ -319,7 +321,8 @@ const CompletedModelsPage = () => {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
           {filtered.map(order => {
-            const modelUrl = order.completedModelUrl ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.completedModelUrl}` : null;
+            const modelUrl = getFileUrl(order.completedModelUrl);
+            const refUrl = getFileUrl(order.requirementDocUrl || order.referenceImageUrl);
             const isImage = modelUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(order.completedModelUrl);
 
             return (
@@ -336,16 +339,16 @@ const CompletedModelsPage = () => {
                       <RiFileImageLine style={{ fontSize: '3rem', color: '#10b981', display: 'block', margin: '0 auto 6px' }} />
                       <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>Design File</div>
                     </div>
-                  ) : order.referenceImageUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(order.referenceImageUrl) ? (
+                  ) : refUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(refUrl) ? (
                     <>
                       <img
-                        src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`}
+                        src={refUrl}
                         alt="Reference"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }}
                       />
                       <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(129,140,248,0.9)', color: '#fff', borderRadius: 5, padding: '2px 7px', fontSize: '0.65rem', fontWeight: 700 }}>📎 Ref Image</div>
                     </>
-                  ) : order.referenceImageUrl ? (
+                  ) : refUrl ? (
                     <div style={{ textAlign: 'center' }}>
                       <RiFileImageLine style={{ fontSize: '3rem', color: '#818cf8', display: 'block', margin: '0 auto 6px' }} />
                       <div style={{ fontSize: '0.75rem', color: '#818cf8', fontWeight: 600 }}>Reference File</div>

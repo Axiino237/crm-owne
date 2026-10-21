@@ -10,6 +10,7 @@ import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
+import { getFileUrl, getRequirementDocDownloadUrl, getCompletedModelDownloadUrl } from '../../utils/fileUrl';
 
 const STATUS_CONFIG = {
   pending:     { label: 'Pending',     color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
@@ -19,12 +20,10 @@ const STATUS_CONFIG = {
 
 // ── View Detail Modal ────────────────────────────────────────────────────────
 const ViewDesignModal = ({ order, onClose }) => {
-  const imgUrl = order.referenceImageUrl
-    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.referenceImageUrl}`
-    : null;
-  const modelUrl = order.completedModelUrl
-    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.completedModelUrl}`
-    : null;
+  const imgUrl = getFileUrl(order.requirementDocUrl || order.referenceImageUrl);
+  const reqDocDownloadUrl = getRequirementDocDownloadUrl(order, false);
+  const modelUrl = getFileUrl(order.completedModelUrl);
+  const modelDownloadUrl = getCompletedModelDownloadUrl(order, false);
 
   const Field = ({ label, value }) =>
     value ? (
@@ -78,16 +77,18 @@ const ViewDesignModal = ({ order, onClose }) => {
           {imgUrl && (
             <div style={{ marginTop: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reference Image</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Requirement Document / Reference</div>
                 <a
-                  href={imgUrl}
-                  download
+                  href={reqDocDownloadUrl}
+                  download={order.requirementDocName || 'requirement-doc'}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 8, color: 'var(--accent)', textDecoration: 'none', fontSize: '0.78rem', fontWeight: 700 }}
                 >
                   <RiDownloadLine /> Download
                 </a>
               </div>
-              <img src={imgUrl} alt="Reference" style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, border: '1px solid var(--border)', objectFit: 'contain' }} />
+              {/\.(jpg|jpeg|png|gif|webp)$/i.test(imgUrl) && (
+                <img src={imgUrl} alt="Reference" style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, border: '1px solid var(--border)', objectFit: 'contain' }} />
+              )}
             </div>
           )}
 
@@ -97,7 +98,7 @@ const ViewDesignModal = ({ order, onClose }) => {
               {/\.(jpg|jpeg|png|gif|webp)$/i.test(order.completedModelUrl) ? (
                 <img src={modelUrl} alt="Completed Model" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 10, border: '2px solid rgba(16,185,129,0.4)', objectFit: 'contain' }} />
               ) : (
-                <a href={modelUrl} target="_blank" rel="noreferrer"
+                <a href={modelDownloadUrl} download
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: 'rgba(16,185,129,0.12)', border: '1.5px solid rgba(16,185,129,0.4)', borderRadius: 10, color: '#10b981', textDecoration: 'none', fontWeight: 600, fontSize: '0.875rem' }}>
                   <RiFileImageLine /> Download / View Model File
                 </a>
@@ -581,10 +582,8 @@ const MyProjectsPage = () => {
                           </button>
                           {(order.requirementDocUrl || order.referenceImageUrl) && (
                             <a
-                              href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.requirementDocUrl || order.referenceImageUrl}`}
-                              download
-                              target="_blank"
-                              rel="noreferrer"
+                              href={getRequirementDocDownloadUrl(order, false)}
+                              download={order.requirementDocName || 'requirement-document'}
                               title={`Download Requirement Document (${order.requirementDocName || 'Attachment'})`}
                               className="btn btn-sm"
                               style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -593,7 +592,7 @@ const MyProjectsPage = () => {
                           )}
                           {order.status === 'completed' && order.completedModelUrl && (
                             <a
-                              href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${order.completedModelUrl}`}
+                              href={getCompletedModelDownloadUrl(order, false)}
                               download
                               title="Download Completed Model"
                               className="btn btn-sm"
