@@ -60,11 +60,12 @@ async function migrate() {
       console.log(`users column note: ${err.message}`);
     }
 
-    // 2.5 Design order requirement doc columns
+    // 2.5 Design order requirement doc and completedFiles columns
     try {
       await sequelize.query(`ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS "requirementDocUrl" TEXT`);
       await sequelize.query(`ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS "requirementDocName" TEXT`);
-      console.log('crm_design_orders requirementDoc columns verified.');
+      await sequelize.query(`ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS "completedFiles" JSONB`);
+      console.log('crm_design_orders requirementDoc and completedFiles columns verified.');
     } catch (err) {
       console.log(`crm_design_orders requirementDoc columns note: ${err.message}`);
     }

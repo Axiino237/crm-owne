@@ -4,13 +4,20 @@ import {
   RiEyeLine, RiCloseLine, RiBuilding2Line,
   RiGlobalLine, RiCalendarLine, RiMoneyDollarCircleLine,
   RiUploadCloud2Line, RiFileImageLine, RiCheckLine, RiTimerLine,
-  RiDownloadLine, RiImageLine, RiFileTextLine
+  RiDownloadLine, RiImageLine, RiFileTextLine, RiDeleteBinLine,
+  RiVideoLine, RiFolderZipLine, RiAddLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { getFileUrl, getRequirementDocDownloadUrl, getCompletedModelDownloadUrl } from '../../utils/fileUrl';
+import {
+  getFileUrl,
+  getRequirementDocDownloadUrl,
+  getCompletedModelDownloadUrl,
+  getCompletedFileInfo,
+  formatBytes
+} from '../../utils/fileUrl';
 
 const STATUS_CONFIG = {
   pending:     { label: 'Pending',     color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
@@ -22,8 +29,9 @@ const STATUS_CONFIG = {
 const ViewDesignModal = ({ order, onClose }) => {
   const imgUrl = getFileUrl(order.requirementDocUrl || order.referenceImageUrl);
   const reqDocDownloadUrl = getRequirementDocDownloadUrl(order, false);
-  const modelUrl = getFileUrl(order.completedModelUrl);
-  const modelDownloadUrl = getCompletedModelDownloadUrl(order, false);
+  const completedFiles = Array.isArray(order.completedFiles) && order.completedFiles.length > 0
+    ? order.completedFiles
+    : (order.completedModelUrl ? [{ url: order.completedModelUrl, name: 'Completed Model' }] : []);
 
   const Field = ({ label, value }) =>
     value ? (
@@ -74,6 +82,7 @@ const ViewDesignModal = ({ order, onClose }) => {
           {order.productsCount && <Field label="No. of Products / Dimensions" value={order.productsCount} />}
           {order.otherInfo && <Field label="Any Other Information" value={order.otherInfo} />}
 
+          {/* Requirement Document from Sales */}
           {imgUrl && (
             <div style={{ marginTop: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -92,17 +101,90 @@ const ViewDesignModal = ({ order, onClose }) => {
             </div>
           )}
 
-          {modelUrl && (
-            <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>✅ Completed Design Model</div>
-              {/\.(jpg|jpeg|png|gif|webp)$/i.test(order.completedModelUrl) ? (
-                <img src={modelUrl} alt="Completed Model" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 10, border: '2px solid rgba(16,185,129,0.4)', objectFit: 'contain' }} />
-              ) : (
-                <a href={modelDownloadUrl} download
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: 'rgba(16,185,129,0.12)', border: '1.5px solid rgba(16,185,129,0.4)', borderRadius: 10, color: '#10b981', textDecoration: 'none', fontWeight: 600, fontSize: '0.875rem' }}>
-                  <RiFileImageLine /> Download / View Model File
-                </a>
-              )}
+          {/* Completed Model Files (Supports Multiple Files: MP4, CDR, ZIP, GLB, etc.) */}
+          {completedFiles.length > 0 && (
+            <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <RiCheckDoubleLine /> Completed Design Files ({completedFiles.length})
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {completedFiles.map((f, idx) => {
+                  const info = getCompletedFileInfo(f.name, f.ext);
+                  const fileDlUrl = getCompletedModelDownloadUrl(order, false, idx);
+                  const fileViewUrl = getCompletedModelDownloadUrl(order, true, idx);
+                  const isImg = info.isImage || /\.(jpe?g|png|webp|gif)$/i.test(f.url || f.name);
+                  const isVid = info.isVideo || /\.mp4$/i.test(f.url || f.name);
+
+                  return (
+                    <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: (isImg || isVid) ? 10 : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: info.bg, color: info.color, border: `1px solid ${info.color}40`, flexShrink: 0 }}>
+                            {info.label}
+                          </span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {f.name || `Model File #${idx + 1}`}
+                            </div>
+                            {f.size && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                {formatBytes(f.size)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          {(isImg || isVid || info.isPdf) && (
+                            <a
+                              href={fileViewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 7, color: 'var(--accent)', textDecoration: 'none', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              <RiEyeLine /> View
+                            </a>
+                          )}
+                          <a
+                            href={fileDlUrl}
+                            download={f.name || 'model-file'}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 7, color: '#10b981', textDecoration: 'none', fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            <RiDownloadLine /> Download
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Video Player for MP4 */}
+                      {isVid && (
+                        <div style={{ marginTop: 8, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+                          <video
+                            controls
+                            playsInline
+                            preload="metadata"
+                            style={{ width: '100%', maxHeight: 260, display: 'block' }}
+                            src={getFileUrl(f.url)}
+                          />
+                        </div>
+                      )}
+
+                      {/* Image Preview for PNG / JPG / WEBP */}
+                      {isImg && (
+                        <div style={{ marginTop: 8 }}>
+                          <img
+                            src={getFileUrl(f.url)}
+                            alt={f.name || 'Preview'}
+                            style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 8, border: '1px solid var(--border)', objectFit: 'contain' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -113,33 +195,58 @@ const ViewDesignModal = ({ order, onClose }) => {
 
 // ── Complete with Model Upload Modal ─────────────────────────────────────────
 const CompleteModelModal = ({ order, onClose, onCompleted }) => {
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const fileRef = useRef();
 
-  const handleFile = (f) => {
-    if (f) setFile(f);
+  const handleAddFiles = (fileList) => {
+    if (!fileList || fileList.length === 0) return;
+    const incoming = Array.from(fileList);
+    setFiles(prev => {
+      const existing = new Set(prev.map(f => `${f.name}_${f.size}`));
+      const fresh = incoming.filter(f => !existing.has(`${f.name}_${f.size}`));
+      return [...prev, ...fresh];
+    });
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleAddFiles(e.dataTransfer.files);
+    }
   };
 
+  const handleRemoveFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
+
   const handleSubmit = async () => {
-    if (!file) {
-      toast.error('Please select or drop a design model file first!');
+    if (files.length === 0) {
+      toast.error('Please select or drop at least one design file first!');
       return;
     }
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('model', file);
-      const res = await api.post(`/designs/${order.id}/complete-model`, formData);
-      toast.success('Design marked as completed with model uploaded!');
+      files.forEach((f) => {
+        formData.append('models', f);
+      });
+      if (files[0]) formData.append('model', files[0]);
+
+      const res = await api.post(`/designs/${order.id}/complete-model`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (evt) => {
+          if (evt.total) {
+            setUploadProgress(Math.round((evt.loaded * 100) / evt.total));
+          }
+        }
+      });
+      toast.success(res.data.message || 'Design marked as completed with model uploaded!');
       onCompleted(res.data.order);
       onClose();
     } catch (err) {
@@ -295,42 +402,151 @@ const CompleteModelModal = ({ order, onClose, onCompleted }) => {
             </div>
           </div>
 
-          {/* Upload Area */}
+          {/* Multi-File Upload Area */}
           <div style={{ marginBottom: 4 }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 10, fontWeight: 600 }}>
-              Upload Final Design Model <span style={{ color: '#ef4444', fontWeight: 600 }}>* (Required — image, PDF, or design file)</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700 }}>
+                Upload Final Design Files <span style={{ color: '#ef4444' }}>* (Multi-file allowed)</span>
+              </div>
+              {files.length > 0 && (
+                <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700 }}>
+                  {files.length} {files.length === 1 ? 'file' : 'files'} ({formatBytes(totalBytes)})
+                </span>
+              )}
             </div>
+
             <div
-              onClick={() => fileRef.current.click()}
+              onClick={() => fileRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               style={{
-                border: `2px dashed ${dragOver ? '#10b981' : file ? 'rgba(16,185,129,0.6)' : 'var(--border)'}`,
-                borderRadius: 12,
-                padding: '22px 20px',
+                border: `2px dashed ${dragOver ? '#10b981' : files.length > 0 ? 'rgba(16,185,129,0.5)' : 'var(--border)'}`,
+                borderRadius: 14,
+                padding: files.length > 0 ? '16px 18px' : '24px 20px',
                 textAlign: 'center',
                 cursor: 'pointer',
-                background: dragOver ? 'rgba(16,185,129,0.06)' : file ? 'rgba(16,185,129,0.04)' : 'transparent',
-                transition: 'all 0.2s'
+                background: dragOver ? 'rgba(16,185,129,0.08)' : files.length > 0 ? 'rgba(16,185,129,0.03)' : 'transparent',
+                transition: 'all 0.2s',
+                marginBottom: 12
               }}>
-              <input type="file" ref={fileRef} style={{ display: 'none' }}
-                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.zip,.rar,.obj,.fbx,.stl,.dwg"
-                onChange={(e) => handleFile(e.target.files[0])} />
-              {file ? (
-                <div>
-                  <RiCheckLine style={{ fontSize: '2rem', color: '#10b981', display: 'block', margin: '0 auto 8px' }} />
-                  <div style={{ fontWeight: 700, color: '#10b981', marginBottom: 4 }}>{file.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{(file.size / 1024 / 1024).toFixed(2)} MB · Click to change</div>
-                </div>
-              ) : (
-                <div>
-                  <RiUploadCloud2Line style={{ fontSize: '2.2rem', color: 'var(--text-muted)', display: 'block', margin: '0 auto 10px' }} />
-                  <div style={{ color: 'var(--text-secondary)', fontWeight: 600, marginBottom: 4 }}>Drop file here or click to browse</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Max 50MB · JPG, PNG, PDF, ZIP, OBJ, FBX, STL, DWG</div>
-                </div>
-              )}
+              <input
+                type="file"
+                ref={fileRef}
+                style={{ display: 'none' }}
+                multiple
+                accept=".zip,.rar,.7z,.cdr,.png,.jpg,.jpeg,.webp,.mp4,.pdf,.glb,.gltf,.obj,.fbx,.stl,.dwg"
+                onChange={(e) => {
+                  handleAddFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+              <RiUploadCloud2Line style={{ fontSize: '2.2rem', color: files.length > 0 ? '#10b981' : 'var(--text-muted)', display: 'block', margin: '0 auto 8px' }} />
+              <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.875rem', marginBottom: 4 }}>
+                {files.length > 0 ? 'Click or drop more files to add' : 'Drop design files here or click to browse'}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 10 }}>
+                Max 250MB per file · Upload multiple files together
+              </div>
+
+              {/* Supported Format Chips */}
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {[
+                  { ext: 'ZIP', color: '#eab308' },
+                  { ext: 'CDR', color: '#10b981' },
+                  { ext: 'PNG', color: '#a855f7' },
+                  { ext: 'JPG/JPEG', color: '#a855f7' },
+                  { ext: 'MP4', color: '#ef4444' },
+                  { ext: 'PDF', color: '#f43f5e' },
+                  { ext: 'GLB/GLTF', color: '#3b82f6' }
+                ].map(b => (
+                  <span
+                    key={b.ext}
+                    style={{
+                      fontSize: '0.66rem',
+                      padding: '2px 7px',
+                      borderRadius: 4,
+                      background: 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${b.color}40`,
+                      color: b.color,
+                      fontWeight: 700
+                    }}
+                  >
+                    {b.ext}
+                  </span>
+                ))}
+              </div>
             </div>
+
+            {/* List of Chosen Files with Delete Action */}
+            {files.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', marginBottom: 10, paddingRight: 4 }}>
+                {files.map((f, idx) => {
+                  const info = getCompletedFileInfo(f.name);
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        gap: 10
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                            background: info.bg,
+                            color: info.color,
+                            border: `1px solid ${info.color}40`,
+                            flexShrink: 0
+                          }}
+                        >
+                          {info.label}
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {f.name}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                            {formatBytes(f.size)}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFile(idx);
+                        }}
+                        title="Remove file"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          padding: 4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontSize: '1rem',
+                          borderRadius: 4
+                        }}
+                      >
+                        <RiDeleteBinLine />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -341,20 +557,26 @@ const CompleteModelModal = ({ order, onClose, onCompleted }) => {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={uploading || !file}
+            disabled={uploading || files.length === 0}
             style={{
               flex: 2, padding: '10px 20px', 
-              background: file ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--border)',
-              color: file ? '#fff' : 'var(--text-muted)', 
+              background: files.length > 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'var(--border)',
+              color: files.length > 0 ? '#fff' : 'var(--text-muted)', 
               border: 'none', borderRadius: 10, fontWeight: 700, 
-              cursor: file ? 'pointer' : 'not-allowed',
+              cursor: files.length > 0 && !uploading ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: '0.9rem',
+              boxShadow: files.length > 0 ? '0 4px 14px rgba(16,185,129,0.35)' : 'none',
               opacity: uploading ? 0.7 : 1, transition: 'all 0.2s'
             }}>
             {uploading ? (
-              <><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Uploading...</>
+              <>
+                <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
+                {uploadProgress ? `Uploading (${uploadProgress}%)...` : 'Uploading files...'}
+              </>
             ) : (
-              <><RiCheckDoubleLine /> Mark as Completed</>
+              <>
+                <RiCheckDoubleLine /> Mark as Completed ({files.length} {files.length === 1 ? 'file' : 'files'})
+              </>
             )}
           </button>
         </div>

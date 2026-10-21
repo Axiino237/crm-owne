@@ -63,6 +63,10 @@ const DesignOrder = sequelize.define('DesignOrder', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  completedFiles: {
+    type: DataTypes.JSONB,
+    allowNull: true
+  },
   completedAt: {
     type: DataTypes.DATE,
     allowNull: true

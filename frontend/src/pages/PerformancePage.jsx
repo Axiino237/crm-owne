@@ -431,35 +431,39 @@ const PerformancePage = () => {
               </div>
             </div>
 
-            {/* Card 5: Closed Value OR Design Budget */}
-            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(6,182,212,0.1)', color: 'rgb(6,182,212)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                <RiMoneyDollarCircleLine />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {isDesignDept ? 'Completed Budget' : (perfScope === 'team' ? 'Total Closed' : 'My Closed')}
+            {/* Card 5: Closed Value (Sales Only) */}
+            {!isDesignDept && (
+              <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(6,182,212,0.1)', color: 'rgb(6,182,212)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                  <RiMoneyDollarCircleLine />
                 </div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {formatCurrency(totalClosedVal)}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {perfScope === 'team' ? 'Total Closed' : 'My Closed'}
+                  </div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {formatCurrency(totalClosedVal)}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Card 6: Office Profit OR Generated Revenue */}
-            <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(236,72,153,0.1)', color: 'rgb(236,72,153)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                <RiWallet3Line />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {isDesignDept ? 'Generated Rev.' : (perfScope === 'team' ? 'Team Net Profit' : 'My Net Profit')}
+            {/* Card 6: Office Profit / Net Profit (Sales Only) */}
+            {!isDesignDept && (
+              <div className="card" style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'rgba(236,72,153,0.1)', color: 'rgb(236,72,153)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                  <RiWallet3Line />
                 </div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {formatCurrency(totalNetProfit)}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {perfScope === 'team' ? 'Team Net Profit' : 'My Net Profit'}
+                  </div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {formatCurrency(totalNetProfit)}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
           </div>
 
@@ -495,8 +499,8 @@ const PerformancePage = () => {
                         <th style={{ textAlign: 'center' }}>{isDesignDept ? 'Designs' : 'Leads'}</th>
                         {!isDesignDept && <th style={{ textAlign: 'center' }}>Calls Made</th>}
                         <th style={{ textAlign: 'center' }}>{isDesignDept ? 'Completed' : 'Converted'}</th>
-                        <th style={{ textAlign: 'right' }}>{isDesignDept ? 'Budget (₹)' : 'Closed (₹)'}</th>
-                        <th style={{ textAlign: 'right' }}>{isDesignDept ? 'Revenue (₹)' : 'Profit (₹)'}</th>
+                        {!isDesignDept && <th style={{ textAlign: 'right' }}>Closed (₹)</th>}
+                        {!isDesignDept && <th style={{ textAlign: 'right' }}>Profit (₹)</th>}
                         <th>Status Mix</th>
                       </tr>
                     </thead>
@@ -534,12 +538,16 @@ const PerformancePage = () => {
                             <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--success)' }}>
                               {member.stats?.convertedCount}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
-                              {formatCurrency(member.stats?.totalClosedVal)}
-                            </td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
-                              {formatCurrency(member.stats?.netProfit)}
-                            </td>
+                            {!isDesignDept && (
+                              <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {formatCurrency(member.stats?.totalClosedVal)}
+                              </td>
+                            )}
+                            {!isDesignDept && (
+                              <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
+                                {formatCurrency(member.stats?.netProfit)}
+                              </td>
+                            )}
                             <td>
                               <div style={{ display: 'flex', gap: 4 }}>
                                 {isDesignDept ? (

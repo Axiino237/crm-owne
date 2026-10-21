@@ -44,12 +44,12 @@ const modelStorage = multer.diskStorage({
 });
 const uploadModel = multer({
   storage: modelStorage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  limits: { fileSize: 250 * 1024 * 1024 }, // 250MB per file
   fileFilter: (_req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp|pdf|zip|rar|obj|fbx|stl|dwg/;
+    const allowed = /\.(jpe?g|png|gif|webp|pdf|zip|rar|7z|cdr|mp4|glb|gltf|obj|fbx|stl|dwg)$/i;
     const okExt = allowed.test(path.extname(file.originalname).toLowerCase());
     if (okExt) cb(null, true);
-    else cb(new Error('File type not allowed'));
+    else cb(new Error('File type not allowed. Supported formats: zip, cdr, png, jpg/jpeg, mp4, pdf, glb/gltf, obj, fbx, stl, dwg'));
   }
 });
 
@@ -277,24 +277,65 @@ router.get('/:id/requirement-doc', async (req, res) => {
 });
 
 // @route  GET /api/designs/:id/completed-model
-// Download completed 3D / design model file
+// Download or view completed 3D / design model file (supports ?fileIndex=..., ?view=1 for inline preview/streaming)
 router.get('/:id/completed-model', async (req, res) => {
   try {
     const order = await DesignOrder.findByPk(req.params.id);
-    if (!order || !order.completedModelUrl) {
-      return res.status(404).json({ success: false, message: 'Completed model not found' });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Design order not found' });
     }
 
-    const filename = path.basename(order.completedModelUrl);
+    let targetUrl = order.completedModelUrl;
+    let targetName = null;
+
+    const files = Array.isArray(order.completedFiles) ? order.completedFiles : [];
+    if (req.query.fileIndex !== undefined && files[parseInt(req.query.fileIndex, 10)]) {
+      const idx = parseInt(req.query.fileIndex, 10);
+      targetUrl = files[idx].url;
+      targetName = files[idx].name;
+    } else if (files.length > 0 && !targetUrl) {
+      targetUrl = files[0].url;
+      targetName = files[0].name;
+    }
+
+    if (!targetUrl) {
+      return res.status(404).json({ success: false, message: 'Completed model file not found' });
+    }
+
+    const filename = path.basename(targetUrl);
     const filePath = path.join(__dirname, '../uploads/completed-models', filename);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'Model file not found on server' });
     }
 
-    const downloadName = `${(order.companyName || 'Model').replace(/[^a-zA-Z0-9_-]/g, '_')}_Model${path.extname(filename)}`;
+    const ext = path.extname(filename).toLowerCase();
+    const downloadName = targetName || `${(order.companyName || 'Model').replace(/[^a-zA-Z0-9_-]/g, '_')}_Model${ext}`;
+
+    const mimeTypes = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+      '.mp4': 'video/mp4',
+      '.pdf': 'application/pdf',
+      '.zip': 'application/zip',
+      '.rar': 'application/x-rar-compressed',
+      '.7z': 'application/x-7z-compressed',
+      '.cdr': 'application/octet-stream',
+      '.glb': 'model/gltf-binary',
+      '.gltf': 'model/gltf+json',
+      '.obj': 'text/plain',
+      '.fbx': 'application/octet-stream',
+      '.stl': 'model/stl',
+      '.dwg': 'application/acad'
+    };
+    const cType = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', cType);
 
     if (req.query.view === '1' || req.query.inline === '1') {
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(downloadName)}"`);
       return res.sendFile(filePath);
     }
 
@@ -465,32 +506,39 @@ router.put('/:id/status', async (req, res, next) => {
 });
 
 // @route  POST /api/designs/:id/complete-model
-// Upload final design model file when marking as completed
-router.post('/:id/complete-model', uploadModel.single('model'), async (req, res) => {
+// Upload completed design files (supports multiple files: zip, cdr, png, jpg, mp4, pdf, glb/gltf)
+router.post('/:id/complete-model', uploadModel.any(), async (req, res) => {
   try {
-    // ⛔ Block if no file was uploaded
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'A design model file is required to mark as completed. Please upload a file.'
-      });
-    }
-
+    const files = req.files || (req.file ? [req.file] : []);
     const order = await DesignOrder.findByPk(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: 'Design order not found' });
 
-    // Delete old model file if exists
-    if (order.completedModelUrl) {
-      const oldPath = path.join(__dirname, '..', order.completedModelUrl);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    const existingFiles = Array.isArray(order.completedFiles) ? [...order.completedFiles] : [];
+
+    if (files.length === 0 && existingFiles.length === 0 && !order.completedModelUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'A design file is required (supported: zip, cdr, png, jpg/jpeg, mp4, pdf, glb/gltf). Please select at least one file.'
+      });
     }
 
-    const modelUrl = `/uploads/completed-models/${req.file.filename}`;
-    const completedAt = new Date();
+    const newUploadedFiles = files.map(file => ({
+      url: `/uploads/completed-models/${file.filename}`,
+      name: file.originalname,
+      size: file.size,
+      mimetype: file.mimetype,
+      ext: path.extname(file.originalname).toLowerCase().replace('.', ''),
+      uploadedAt: new Date().toISOString()
+    }));
+
+    const combinedFiles = [...existingFiles, ...newUploadedFiles];
+    const primaryUrl = combinedFiles[0]?.url || (files[0] ? `/uploads/completed-models/${files[0].filename}` : order.completedModelUrl);
+    const completedAt = order.completedAt || new Date();
 
     await order.update({
       status: 'completed',
-      completedModelUrl: modelUrl,
+      completedModelUrl: primaryUrl,
+      completedFiles: combinedFiles,
       completedAt
     });
 
@@ -500,11 +548,66 @@ router.post('/:id/complete-model', uploadModel.single('model'), async (req, res)
     }
 
     const { logAction } = require('../utils/auditLogger');
-    await logAction(req, 'UPDATE', 'design', order.id, order.companyName, `Marked design as completed with model upload for "${order.companyName}"`);
+    await logAction(
+      req,
+      'UPDATE',
+      'design',
+      order.id,
+      order.companyName,
+      `Marked design as completed with ${newUploadedFiles.length} file(s) for "${order.companyName}"`
+    );
 
-    res.json({ success: true, message: 'Design marked as completed with model uploaded', order });
+    const updatedOrder = await DesignOrder.findByPk(order.id, {
+      include: [
+        { model: Lead, as: 'lead', attributes: ['id', 'name', 'companyName', 'phone', 'email'] },
+        { model: User, as: 'submitter', attributes: ['id', 'name', 'email'] },
+        { model: User, as: 'designer', attributes: ['id', 'name', 'email'] }
+      ]
+    });
+
+    res.json({
+      success: true,
+      message: `Design marked as completed with ${combinedFiles.length} file(s) attached`,
+      order: updatedOrder
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// @route  DELETE /api/designs/:id/complete-files/:fileIndex
+// Delete one of the completed files from a completed order
+router.delete('/:id/complete-files/:fileIndex', async (req, res) => {
+  try {
+    const order = await DesignOrder.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: 'Design order not found' });
+
+    let files = Array.isArray(order.completedFiles) ? [...order.completedFiles] : [];
+    const index = parseInt(req.params.fileIndex, 10);
+
+    if (isNaN(index) || index < 0 || index >= files.length) {
+      return res.status(400).json({ success: false, message: 'Invalid file index' });
+    }
+
+    const removed = files[index];
+    files.splice(index, 1);
+
+    if (removed?.url) {
+      const diskPath = path.join(__dirname, '..', removed.url);
+      if (fs.existsSync(diskPath)) {
+        try { fs.unlinkSync(diskPath); } catch (_) {}
+      }
+    }
+
+    const primaryUrl = files[0]?.url || null;
+    await order.update({
+      completedFiles: files,
+      completedModelUrl: primaryUrl
+    });
+
+    res.json({ success: true, message: 'File removed successfully', completedFiles: files });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

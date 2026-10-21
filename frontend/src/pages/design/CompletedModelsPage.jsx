@@ -2,21 +2,28 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   RiCheckDoubleLine, RiRefreshLine, RiEyeLine, RiBuilding2Line,
   RiCalendarLine, RiFileImageLine, RiCloseLine, RiDownloadLine,
-  RiTimeLine, RiPaletteLine, RiUser3Line, RiPhoneLine, RiMailLine
+  RiTimeLine, RiPaletteLine, RiUser3Line, RiPhoneLine, RiMailLine,
+  RiVideoLine, RiFolderZipLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { getFileUrl, getRequirementDocDownloadUrl, getCompletedModelDownloadUrl } from '../../utils/fileUrl';
+import {
+  getFileUrl,
+  getRequirementDocDownloadUrl,
+  getCompletedModelDownloadUrl,
+  getCompletedFileInfo,
+  formatBytes
+} from '../../utils/fileUrl';
 
 // ── Detail Drawer ─────────────────────────────────────────────────────────────
 const ModelDetailDrawer = ({ order, onClose }) => {
   if (!order) return null;
-  const modelUrl = getFileUrl(order.completedModelUrl);
-  const modelDownloadUrl = getCompletedModelDownloadUrl(order, false);
+  const completedFiles = Array.isArray(order.completedFiles) && order.completedFiles.length > 0
+    ? order.completedFiles
+    : (order.completedModelUrl ? [{ url: order.completedModelUrl, name: 'Completed Model' }] : []);
   const refUrl = getFileUrl(order.requirementDocUrl || order.referenceImageUrl);
   const refDownloadUrl = getRequirementDocDownloadUrl(order, false);
-  const isImage = modelUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(order.completedModelUrl);
 
   const Field = ({ label, value, icon }) =>
     value ? (
@@ -34,7 +41,7 @@ const ModelDetailDrawer = ({ order, onClose }) => {
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000 }} />
       {/* Drawer */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 520,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 540,
         background: 'var(--bg-card)', borderLeft: '1px solid var(--border)',
         zIndex: 1001, display: 'flex', flexDirection: 'column',
         boxShadow: '-24px 0 64px rgba(0,0,0,0.5)'
@@ -49,7 +56,7 @@ const ModelDetailDrawer = ({ order, onClose }) => {
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>{order.companyName}</h2>
                 <span style={{ display: 'inline-block', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700, marginTop: 2 }}>
-                  ✅ Completed
+                  ✅ Completed ({completedFiles.length} {completedFiles.length === 1 ? 'file' : 'files'})
                 </span>
               </div>
             </div>
@@ -61,25 +68,88 @@ const ModelDetailDrawer = ({ order, onClose }) => {
 
         {/* Scrollable content */}
         <div style={{ overflowY: 'auto', flex: 1, padding: 24 }}>
-          {/* Completed Model Preview */}
-          {modelUrl && (
+          {/* Completed Model Files Section */}
+          {completedFiles.length > 0 && (
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                🎨 Final Design Model
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <RiCheckDoubleLine /> Final Design Files ({completedFiles.length})
               </div>
-              {isImage ? (
-                <img src={modelUrl} alt="Design Model"
-                  style={{ width: '100%', borderRadius: 12, border: '1.5px solid rgba(16,185,129,0.3)', objectFit: 'contain', maxHeight: 300 }} />
-              ) : (
-                <div style={{ background: 'rgba(16,185,129,0.07)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
-                  <RiFileImageLine style={{ fontSize: '2rem', color: '#10b981', display: 'block', margin: '0 auto 8px' }} />
-                  <div style={{ color: '#10b981', fontWeight: 600, marginBottom: 4, fontSize: '0.875rem' }}>Design File Available</div>
-                </div>
-              )}
-              <a href={modelDownloadUrl} download
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, padding: '9px 16px', background: 'rgba(16,185,129,0.12)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 8, color: '#10b981', textDecoration: 'none', fontWeight: 700, fontSize: '0.83rem' }}>
-                <RiDownloadLine /> Download Model File
-              </a>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {completedFiles.map((f, idx) => {
+                  const info = getCompletedFileInfo(f.name, f.ext);
+                  const fileDlUrl = getCompletedModelDownloadUrl(order, false, idx);
+                  const fileViewUrl = getCompletedModelDownloadUrl(order, true, idx);
+                  const isImg = info.isImage || /\.(jpe?g|png|webp|gif)$/i.test(f.url || f.name);
+                  const isVid = info.isVideo || /\.mp4$/i.test(f.url || f.name);
+
+                  return (
+                    <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: (isImg || isVid) ? 10 : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: info.bg, color: info.color, border: `1px solid ${info.color}40`, flexShrink: 0 }}>
+                            {info.label}
+                          </span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {f.name || `Model File #${idx + 1}`}
+                            </div>
+                            {f.size && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                {formatBytes(f.size)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          {(isImg || isVid || info.isPdf) && (
+                            <a
+                              href={fileViewUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 7, color: 'var(--accent)', textDecoration: 'none', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              <RiEyeLine /> View
+                            </a>
+                          )}
+                          <a
+                            href={fileDlUrl}
+                            download={f.name || 'model-file'}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 7, color: '#10b981', textDecoration: 'none', fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            <RiDownloadLine /> Download
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Video Player for MP4 */}
+                      {isVid && (
+                        <div style={{ marginTop: 8, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+                          <video
+                            controls
+                            playsInline
+                            preload="metadata"
+                            style={{ width: '100%', maxHeight: 260, display: 'block' }}
+                            src={getFileUrl(f.url)}
+                          />
+                        </div>
+                      )}
+
+                      {/* Image Preview for PNG / JPG / WEBP */}
+                      {isImg && (
+                        <div style={{ marginTop: 8 }}>
+                          <img
+                            src={getFileUrl(f.url)}
+                            alt={f.name || 'Preview'}
+                            style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8, border: '1px solid var(--border)', objectFit: 'contain' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -321,9 +391,15 @@ const CompletedModelsPage = () => {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
           {filtered.map(order => {
+            const completedFiles = Array.isArray(order.completedFiles) && order.completedFiles.length > 0
+              ? order.completedFiles
+              : (order.completedModelUrl ? [{ url: order.completedModelUrl, name: 'Completed Model' }] : []);
             const modelUrl = getFileUrl(order.completedModelUrl);
             const refUrl = getFileUrl(order.requirementDocUrl || order.referenceImageUrl);
-            const isImage = modelUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(order.completedModelUrl);
+            const imageFile = completedFiles.find(f => /\.(jpe?g|png|gif|webp)$/i.test(f.url || f.name));
+            const videoFile = completedFiles.find(f => /\.mp4$/i.test(f.url || f.name));
+            const isImage = !!imageFile || (modelUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(order.completedModelUrl));
+            const displayImg = imageFile ? getFileUrl(imageFile.url) : modelUrl;
 
             return (
               <div key={order.id} className="card" style={{ padding: 0, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
@@ -333,11 +409,16 @@ const CompletedModelsPage = () => {
                 {/* Model Thumbnail */}
                 <div style={{ height: 180, background: 'rgba(16,185,129,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
                   {isImage ? (
-                    <img src={modelUrl} alt="Design" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : modelUrl ? (
+                    <img src={displayImg} alt="Design" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : videoFile ? (
                     <div style={{ textAlign: 'center' }}>
-                      <RiFileImageLine style={{ fontSize: '3rem', color: '#10b981', display: 'block', margin: '0 auto 6px' }} />
-                      <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>Design File</div>
+                      <RiVideoLine style={{ fontSize: '3.2rem', color: '#ef4444', display: 'block', margin: '0 auto 6px' }} />
+                      <div style={{ fontSize: '0.78rem', color: '#ef4444', fontWeight: 700 }}>MP4 Video Walkthrough</div>
+                    </div>
+                  ) : completedFiles.length > 0 ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <RiFolderZipLine style={{ fontSize: '3rem', color: '#10b981', display: 'block', margin: '0 auto 6px' }} />
+                      <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>Design Files ({completedFiles.length})</div>
                     </div>
                   ) : refUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(refUrl) ? (
                     <>
@@ -359,6 +440,14 @@ const CompletedModelsPage = () => {
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No model file</div>
                     </div>
                   )}
+
+                  {/* Completed file count badge on top left */}
+                  {completedFiles.length > 0 && (
+                    <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '2px 8px', fontSize: '0.68rem', fontWeight: 700 }}>
+                      📁 {completedFiles.length} {completedFiles.length === 1 ? 'file' : 'files'}
+                    </div>
+                  )}
+
                   {/* Completed badge */}
                   <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(16,185,129,0.9)', color: '#fff', borderRadius: 6, padding: '2px 8px', fontSize: '0.68rem', fontWeight: 700 }}>
                     ✅ Done
