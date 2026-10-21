@@ -52,6 +52,17 @@ const LeavesPage = () => {
       return toast.error('Please fill in all leave request fields');
     }
 
+    // Check if selected leave type has 0 balance
+    const currentBalance = balances[leaveType]?.remaining ?? 0;
+    if (['paid', 'casual', 'sick'].includes(leaveType) && currentBalance <= 0) {
+      return toast.error(`Cannot apply: Your ${leaveType.toUpperCase()} Leave balance is 0. Please choose another leave type.`);
+    }
+
+    const requestedDays = leaveDuration === 'half_day' ? 0.5 : (Math.max(1, Math.round((new Date(leaveEnd) - new Date(leaveStart)) / (1000 * 60 * 60 * 24)) + 1));
+    if (['paid', 'casual', 'sick'].includes(leaveType) && requestedDays > currentBalance) {
+      return toast.error(`Requested ${requestedDays} day(s) exceeds your remaining ${leaveType.toUpperCase()} Leave balance (${currentBalance} day(s) available).`);
+    }
+
     try {
       await applyLeave({
         startDate: leaveStart,
@@ -82,6 +93,9 @@ const LeavesPage = () => {
     }
   };
 
+  const selectedBalance = balances[leaveType]?.remaining ?? 0;
+  const isSelectedZeroBalance = ['paid', 'casual', 'sick'].includes(leaveType) && selectedBalance <= 0;
+
   return (
     <AppLayout title="Leave Management Portal">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -111,9 +125,15 @@ const LeavesPage = () => {
                   <div>
                     <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 700 }}>Leave Type</label>
                     <select className="form-control" value={leaveType} onChange={e => setLeaveType(e.target.value)}>
-                      <option value="paid">Paid Leave (PL) — Balance: {balances.paid.remaining}d</option>
-                      <option value="casual">Casual Leave (CL) — Balance: {balances.casual.remaining}d</option>
-                      <option value="sick">Sick Leave (SL) — Balance: {balances.sick.remaining}d</option>
+                      <option value="paid" disabled={balances.paid.remaining <= 0}>
+                        Paid Leave (PL) — Balance: {balances.paid.remaining}d {balances.paid.remaining <= 0 ? '(0 Balance)' : ''}
+                      </option>
+                      <option value="casual" disabled={balances.casual.remaining <= 0}>
+                        Casual Leave (CL) — Balance: {balances.casual.remaining}d {balances.casual.remaining <= 0 ? '(0 Balance)' : ''}
+                      </option>
+                      <option value="sick" disabled={balances.sick.remaining <= 0}>
+                        Sick Leave (SL) — Balance: {balances.sick.remaining}d {balances.sick.remaining <= 0 ? '(0 Balance)' : ''}
+                      </option>
                       <option value="earned">Earned Leave (EL)</option>
                       <option value="other">Other</option>
                     </select>
@@ -144,14 +164,29 @@ const LeavesPage = () => {
                   <textarea className="form-control" rows="2" placeholder="Describe the reason for leave" value={leaveReason} onChange={e => setLeaveReason(e.target.value)} required />
                 </div>
 
-                {balances.monthly && (balances.monthly.remaining ?? 1) <= 0 && (
+                {/* Zero Balance Warning Notice */}
+                {isSelectedZeroBalance && (
+                  <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.12)', border: '1px solid var(--danger)', color: '#fca5a5', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>🚫</span>
+                    <span>
+                      <strong>Zero Balance Available:</strong> Your balance for <strong>{leaveType.toUpperCase()} Leave</strong> is 0 days. You cannot submit this leave application until quota is allocated.
+                    </span>
+                  </div>
+                )}
+
+                {balances.monthly && (balances.monthly.remaining ?? 1) <= 0 && !isSelectedZeroBalance && (
                   <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.76rem', lineHeight: 1.4 }}>
                     ⚠️ <strong>Monthly Quota Limit:</strong> You have used your monthly quota ({balances.monthly.quota} day(s)). Any additional leave this month will be classified as <strong>Loss of Pay (LOP)</strong> and will be deducted from your salary upon approval.
                   </div>
                 )}
 
-                <button type="submit" className="btn btn-primary" disabled={submittingLeave}>
-                  {submittingLeave ? 'Submitting request...' : 'Apply Leave'}
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={submittingLeave || isSelectedZeroBalance}
+                  style={isSelectedZeroBalance ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                >
+                  {submittingLeave ? 'Submitting request...' : isSelectedZeroBalance ? 'Cannot Apply (0 Balance)' : 'Apply Leave'}
                 </button>
               </form>
             </div>

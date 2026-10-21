@@ -15,12 +15,26 @@ import toast from 'react-hot-toast';
 
 // Status config
 const STATUS_CONFIG = {
-  new:            { label: 'New',                    cls: 'badge-info',      dot: '#06b6d4' },
-  contacted:      { label: 'Call Not Picked',        cls: 'badge-warning',   dot: '#f59e0b' },
-  qualified:      { label: 'Qualified (Interested)', cls: 'badge-accent',    dot: '#818cf8' },
-  not_interested: { label: 'Not Interested',         cls: 'badge-secondary', dot: '#c084fc' },
-  lost:           { label: 'Lost',                   cls: 'badge-danger',    dot: '#ef4444' },
-  converted:      { label: 'Converted',              cls: 'badge-success',   dot: '#10b981' },
+  new:                  { label: 'New',                  cls: 'badge-info',      dot: '#06b6d4' },
+  not_answering:        { label: 'Not Answering',        cls: 'badge-warning',   dot: '#f59e0b' },
+  number_busy:          { label: 'Number Busy',          cls: 'badge-warning',   dot: '#fb923c' },
+  not_interested:       { label: 'Not Interested',       cls: 'badge-secondary', dot: '#94a3b8' },
+  not_participating:    { label: 'Not Participating',    cls: 'badge-danger',    dot: '#f87171' },
+  requirement_received: { label: 'Requirement Received', cls: 'badge-info',      dot: '#38bdf8' },
+  call_back:            { label: 'Call Back',            cls: 'badge-warning',   dot: '#eab308' },
+  follow_ups:           { label: 'Follow Ups',           cls: 'badge-accent',    dot: '#a855f7' },
+  design_sent:          { label: 'Design Sent',          cls: 'badge-accent',    dot: '#6366f1' },
+  quote_sent:           { label: 'Quote Sent',           cls: 'badge-info',      dot: '#0284c7' },
+  converted:            { label: 'Sales Closed',         cls: 'badge-success',   dot: '#10b981' },
+};
+
+const getStatusConfig = (st) => {
+  if (st && STATUS_CONFIG[st]) return STATUS_CONFIG[st];
+  if (st === 'contacted') return STATUS_CONFIG.not_answering;
+  if (st === 'qualified') return STATUS_CONFIG.requirement_received;
+  if (st === 'lost') return STATUS_CONFIG.not_participating;
+  if (st === 'sales_closed') return STATUS_CONFIG.converted;
+  return STATUS_CONFIG.new;
 };
 
 const EXPO_LABELS = {
@@ -345,7 +359,7 @@ const LeadModal = ({ lead, users, onClose, onSaved }) => {
 // ── View Lead Modal ─────────────────────────────────────────────────────────
 const ViewLeadModal = ({ lead, onClose }) => {
   if (!lead) return null;
-  const st = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new;
+  const st = getStatusConfig(lead.status);
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 500, padding: 24 }}>
@@ -657,7 +671,7 @@ const LeadsPage = () => {
       if (newStatus === 'new') {
         toast.success('Lead status reverted to New (Call count removed)');
       } else {
-        toast.success(`Status updated to ${STATUS_CONFIG[newStatus]?.label || newStatus} (Calls Made logged)`);
+        toast.success(`Status updated to ${getStatusConfig(newStatus)?.label || newStatus} (Calls Made logged)`);
       }
       fetchLeads();
     } catch (err) {
@@ -843,7 +857,7 @@ const LeadsPage = () => {
               </thead>
               <tbody>
                 {leads.map(lead => {
-                  const st = STATUS_CONFIG[lead.status] || STATUS_CONFIG.new;
+                  const st = getStatusConfig(lead.status);
                   const isChecked = selected.has(lead.id);
                   return (
                     <tr key={lead.id} style={{ background: isChecked ? 'rgba(239,68,68,0.04)' : undefined }}>

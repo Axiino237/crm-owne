@@ -24,6 +24,24 @@ async function migrate() {
       console.log(`Enum note (enum_permissions_screen): ${err.message}`);
     }
 
+    // 1.5 Lead statuses
+    const leadStatuses = [
+      'not_answering', 'number_busy', 'not_interested', 'not_participating',
+      'requirement_received', 'call_back', 'follow_ups', 'design_sent',
+      'quote_sent', 'sales_closed'
+    ];
+    for (const st of leadStatuses) {
+      try {
+        await sequelize.query(`ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS '${st}'`);
+        console.log(`Added enum value '${st}' to enum_crm_leads_status`);
+      } catch (err) {
+        console.log(`Lead status enum note (${st}): ${err.message}`);
+      }
+      try {
+        await sequelize.query(`ALTER TYPE enum_leads_status ADD VALUE IF NOT EXISTS '${st}'`);
+      } catch (err) {}
+    }
+
     // 2. User columns
     try {
       await sequelize.query(`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS "baseSalary" NUMERIC(12, 2) DEFAULT 0`);

@@ -204,16 +204,12 @@ const ChatPage = () => {
     ? servers.find(s => s.id === userCompany.chatServerId) 
     : servers.length > 0 ? servers[0] : null; // Fallback to first server for admins
 
-  // Set default channel on load (prioritizing company channel or first direct message)
+  // Set default channel on load (prioritizing direct message)
   useEffect(() => {
-    if (!selectedChannel) {
-      if (userCompany) {
-        setSelectedChannel({ type: 'company', id: userCompany.id, name: userCompany.name || 'Company Channel' });
-      } else if (members.length > 0) {
-        setSelectedChannel({ type: 'dm', id: members[0].id, name: members[0].name });
-      }
+    if (!selectedChannel && members.length > 0) {
+      setSelectedChannel({ type: 'dm', id: members[0].id, name: members[0].name });
     }
-  }, [userCompany, members, selectedChannel]);
+  }, [members, selectedChannel]);
 
   // Active channel query parameters
   const queryParams = {
@@ -312,36 +308,6 @@ const ChatPage = () => {
           background: 'var(--bg-secondary)',
           overflowY: 'auto'
         }}>
-          {/* Company Channel (if company assigned) */}
-          {userCompany && (
-            <div>
-              <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
-                📢 Team Channel
-              </h4>
-              <button
-                onClick={() => setSelectedChannel({ type: 'company', id: userCompany.id, name: userCompany.name || 'Team Channel' })}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  background: selectedChannel?.type === 'company' ? 'var(--accent)' : 'transparent',
-                  color: selectedChannel?.type === 'company' ? '#ffffff' : 'var(--text-primary)',
-                  border: 'none',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  transition: 'background 0.2s'
-                }}
-              >
-                🏢 # {userCompany.name || 'Company Channel'}
-              </button>
-            </div>
-          )}
-
           {/* Direct Messages list */}
           <div>
             <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>

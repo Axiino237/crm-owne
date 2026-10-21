@@ -728,18 +728,27 @@ const Dashboard = () => {
                               <td><span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{lead.expo}</span></td>
                               <td><span style={{ fontWeight: 600, color: 'var(--accent)' }}>{formatCurrency(lead.value)}</span></td>
                               <td>
-                                <span className={`badge ${
-                                  lead.status === 'converted' ? 'badge-success' :
-                                  lead.status === 'lost' ? 'badge-danger' :
-                                  lead.status === 'qualified' ? 'badge-accent' :
-                                  lead.status === 'not_interested' ? 'badge-secondary' :
-                                  lead.status === 'contacted' ? 'badge-warning' : 'badge-info'
-                                }`}>
-                                  {lead.status === 'contacted' ? 'Call Not Picked' :
-                                   lead.status === 'qualified' ? 'Qualified (Interested)' :
-                                   lead.status === 'not_interested' ? 'Not Interested' :
-                                   lead.status ? (lead.status.charAt(0).toUpperCase() + lead.status.slice(1)) : 'New'}
-                                </span>
+                                {(() => {
+                                  const STATUS_FORMAT = {
+                                    new:                  { label: 'New',                  cls: 'badge-info' },
+                                    not_answering:        { label: 'Not Answering',        cls: 'badge-warning' },
+                                    number_busy:          { label: 'Number Busy',          cls: 'badge-warning' },
+                                    not_interested:       { label: 'Not Interested',       cls: 'badge-secondary' },
+                                    not_participating:    { label: 'Not Participating',    cls: 'badge-danger' },
+                                    requirement_received: { label: 'Requirement Received', cls: 'badge-info' },
+                                    call_back:            { label: 'Call Back',            cls: 'badge-warning' },
+                                    follow_ups:           { label: 'Follow Ups',           cls: 'badge-accent' },
+                                    design_sent:          { label: 'Design Sent',          cls: 'badge-accent' },
+                                    quote_sent:           { label: 'Quote Sent',           cls: 'badge-info' },
+                                    converted:            { label: 'Sales Closed',         cls: 'badge-success' },
+                                    contacted:            { label: 'Not Answering',        cls: 'badge-warning' },
+                                    qualified:            { label: 'Requirement Received', cls: 'badge-info' },
+                                    lost:                 { label: 'Not Participating',    cls: 'badge-danger' },
+                                    sales_closed:         { label: 'Sales Closed',         cls: 'badge-success' }
+                                  };
+                                  const fmt = STATUS_FORMAT[lead.status] || { label: lead.status || 'New', cls: 'badge-info' };
+                                  return <span className={`badge ${fmt.cls}`}>{fmt.label}</span>;
+                                })()}
                               </td>
                             </tr>
                           ))}

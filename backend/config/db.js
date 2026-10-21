@@ -82,6 +82,15 @@ const connectDB = async () => {
       await sequelize.query("ALTER TABLE crm_departments ADD COLUMN IF NOT EXISTS \"hierarchyLayers\" JSONB DEFAULT '[]'::jsonb");
       await sequelize.query("ALTER TABLE crm_departments ADD COLUMN IF NOT EXISTS \"headId\" UUID");
       await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'not_interested'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'not_answering'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'number_busy'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'not_participating'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'requirement_received'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'call_back'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'follow_ups'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'design_sent'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'quote_sent'");
+      await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'sales_closed'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'staff-summary'");
     } catch (err) {
       // Silently ignore if types do not exist yet (will be created by sync)

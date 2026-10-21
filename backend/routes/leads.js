@@ -59,7 +59,23 @@ const parseCSV = (buffer) => {
   return { headers, rows };
 };
 
-const VALID_STATUSES = ['new', 'contacted', 'not_interested', 'qualified', 'lost', 'converted'];
+const VALID_STATUSES = [
+  'new',
+  'not_answering',
+  'number_busy',
+  'not_interested',
+  'not_participating',
+  'requirement_received',
+  'call_back',
+  'follow_ups',
+  'design_sent',
+  'quote_sent',
+  'converted',
+  'sales_closed',
+  'contacted',
+  'qualified',
+  'lost'
+];
 const VALID_EXPOS = ['website', 'referral', 'social_media', 'cold_call', 'email', 'other'];
 
 // @desc   Get all leads
@@ -210,7 +226,8 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
     } = req.body;
     if (!name && !companyName) return res.status(400).json({ success: false, message: 'Either Contact Person or Company Name is required' });
 
-    const leadStatus = status || 'new';
+    let leadStatus = status || 'new';
+    if (leadStatus === 'sales_closed') leadStatus = 'converted';
     // If status is 'new', it is NEVER a call made yet, so lastContactedDate must be null
     let effectiveLastContactedDate = null;
     if (leadStatus !== 'new') {
@@ -357,8 +374,9 @@ router.put('/:id', async (req, res, next) => {
     }
 
     if (status !== undefined) {
-      updates.status = status;
-      if (status === 'new') {
+      let resolvedStatus = status === 'sales_closed' ? 'converted' : status;
+      updates.status = resolvedStatus;
+      if (resolvedStatus === 'new') {
         // Reverting or setting to 'new' -> MUST clear lastContactedDate so call count is 0
         updates.lastContactedDate = null;
       } else {

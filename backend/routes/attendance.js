@@ -273,7 +273,61 @@ router.post('/leave-request', async (req, res) => {
       alreadyUsedDays += days;
     });
 
+    const normType = (leaveType || 'casual').toLowerCase();
+    let allocatedForType = 0;
+    if (normType === 'casual') allocatedForType = Number(user?.casualLeaves ?? 10);
+    else if (normType === 'sick') allocatedForType = Number(user?.sickLeaves ?? 8);
+    else if (normType === 'paid' || normType === 'earned') allocatedForType = Number(user?.paidLeaves ?? 12);
+    else allocatedForType = 10;
+
     const requestedDays = leaveDuration === 'half_day' ? 0.5 : (Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1));
+
+    // Calculate all approved and pending leaves of this type in the current year
+    const currYear = new Date().getFullYear();
+    const yearStart = `${currYear}-01-01`;
+    const yearEnd = `${currYear}-12-31`;
+
+    const allApprovedOfThisType = await LeaveRequest.findAll({
+      where: {
+        userId: req.user.id,
+        status: { [Op.in]: ['approved', 'pending'] },
+        startDate: { [Op.gte]: yearStart },
+        endDate: { [Op.lte]: yearEnd }
+      }
+    });
+
+    let usedForType = 0;
+    allApprovedOfThisType.forEach(l => {
+      const t = (l.leaveType || '').toLowerCase();
+      if ((normType === 'casual' && t === 'casual') ||
+          (normType === 'sick' && t === 'sick') ||
+          ((normType === 'paid' || normType === 'earned') && (t === 'paid' || t === 'earned'))) {
+        let d = 1;
+        if (l.leaveDuration === 'half_day') d = 0.5;
+        else if (l.startDate && l.endDate) {
+          const s = new Date(l.startDate);
+          const e = new Date(l.endDate);
+          d = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
+        }
+        usedForType += d;
+      }
+    });
+
+    const remainingForType = Math.max(0, allocatedForType - usedForType);
+    if (['paid', 'casual', 'sick'].includes(normType) && remainingForType <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient leave balance! Your ${normType.toUpperCase()} Leave balance is 0. You cannot apply for this leave type.`
+      });
+    }
+
+    if (['paid', 'casual', 'sick'].includes(normType) && requestedDays > remainingForType) {
+      return res.status(400).json({
+        success: false,
+        message: `Requested ${requestedDays} day(s) exceeds your remaining ${normType.toUpperCase()} Leave balance of ${remainingForType} day(s).`
+      });
+    }
+
     const isLossOfPay = (alreadyUsedDays + requestedDays) > monthlyQuota;
 
     const leave = await LeaveRequest.create({

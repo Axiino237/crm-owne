@@ -18,7 +18,23 @@ const Lead = sequelize.define('Lead', {
   email: DataTypes.STRING,
   phone: DataTypes.STRING,
   status: {
-    type: DataTypes.ENUM('new', 'contacted', 'not_interested', 'qualified', 'lost', 'converted'),
+    type: DataTypes.ENUM(
+      'new',
+      'not_answering',
+      'number_busy',
+      'not_interested',
+      'not_participating',
+      'requirement_received',
+      'call_back',
+      'follow_ups',
+      'design_sent',
+      'quote_sent',
+      'converted',
+      'sales_closed',
+      'contacted',
+      'qualified',
+      'lost'
+    ),
     defaultValue: 'new'
   },
   expo: {

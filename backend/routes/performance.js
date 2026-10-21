@@ -111,33 +111,34 @@ router.get('/', checkPermission('performance', 'performance-view', 'canView'), a
       ? (activeDept.name.toLowerCase().includes('design') || (activeDept.code && activeDept.code.toLowerCase().includes('design')))
       : false;
 
+    // Calculate date range strings for filtering (shared across members and activities)
+    let startDateStr, endDateStr;
+    if (year) {
+      const y = Number(year);
+      if (month) {
+        const m = Number(month);
+        if (day) {
+          const d = Number(day);
+          startDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} 00:00:00`;
+          endDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} 23:59:59`;
+        } else {
+          const lastDay = new Date(y, m, 0).getDate();
+          startDateStr = `${y}-${String(m).padStart(2, '0')}-01 00:00:00`;
+          endDateStr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')} 23:59:59`;
+        }
+      } else {
+        startDateStr = `${y}-01-01 00:00:00`;
+        endDateStr = `${y}-12-31 23:59:59`;
+      }
+    } else {
+      const todayStr = new Date().toISOString().split('T')[0];
+      startDateStr = `${todayStr} 00:00:00`;
+      endDateStr = `${todayStr} 23:59:59`;
+    }
+
     // 3. Process performance stats
     const members = [];
     for (const user of deptUsers) {
-      let startDateStr, endDateStr;
-      if (year) {
-        const y = Number(year);
-        if (month) {
-          const m = Number(month);
-          if (day) {
-            const d = Number(day);
-            startDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} 00:00:00`;
-            endDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} 23:59:59`;
-          } else {
-            const lastDay = new Date(y, m, 0).getDate();
-            startDateStr = `${y}-${String(m).padStart(2, '0')}-01 00:00:00`;
-            endDateStr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')} 23:59:59`;
-          }
-        } else {
-          startDateStr = `${y}-01-01 00:00:00`;
-          endDateStr = `${y}-12-31 23:59:59`;
-        }
-      } else {
-        const todayStr = new Date().toISOString().split('T')[0];
-        startDateStr = `${todayStr} 00:00:00`;
-        endDateStr = `${todayStr} 23:59:59`;
-      }
-
       let totalAssigned = 0;
       let convertedCount = 0; // leads converted OR designs completed
       let contactedCount = 0; // calls made
