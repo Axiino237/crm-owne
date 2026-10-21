@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { 
   RiLoginBoxLine, RiLogoutBoxLine, 
-  RiTimeLine, RiDeleteBin7Line
+  RiTimeLine, RiDeleteBin7Line,
+  RiEditBoxLine, RiCheckDoubleLine, RiCloseCircleLine, RiMoneyDollarCircleLine,
+  RiFileList2Line, RiUserStarLine
 } from 'react-icons/ri';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +15,12 @@ import {
   useCheckInMutation,
   useCheckOutMutation,
   useAddHolidayMutation,
-  useDeleteHolidayMutation
+  useDeleteHolidayMutation,
+  useGetMyRegularizationsQuery,
+  useGetTeamRegularizationsQuery,
+  useApplyRegularizationMutation,
+  useUpdateRegularizationStatusMutation,
+  useGetPayrollSummaryQuery
 } from '../store/apiSlice';
 
 const AttendancePage = () => {
@@ -100,6 +107,69 @@ const AttendancePage = () => {
   const [checkOut] = useCheckOutMutation();
   const [addHoliday, { isLoading: addingHoliday }] = useAddHolidayMutation();
   const [deleteHoliday] = useDeleteHolidayMutation();
+
+  // Regularization States & Hooks
+  const [showRegularizeModal, setShowRegularizeModal] = useState(false);
+  const [regDate, setRegDate] = useState('');
+  const [regInTime, setRegInTime] = useState('09:30');
+  const [regOutTime, setRegOutTime] = useState('18:30');
+  const [regReason, setRegReason] = useState('');
+  const [submittingReg, setSubmittingReg] = useState(false);
+
+  const { data: myRegsData, isLoading: loadingMyRegs, refetch: refetchMyRegs } = useGetMyRegularizationsQuery();
+  const myRegs = myRegsData?.requests || [];
+
+  const { data: teamRegsData, isLoading: loadingTeamRegs, refetch: refetchTeamRegs } = useGetTeamRegularizationsQuery(undefined, {
+    skip: !isAdmin && !hasTeamAccess
+  });
+  const teamRegs = teamRegsData?.requests || [];
+
+  const [applyRegularization] = useApplyRegularizationMutation();
+  const [updateRegularizationStatus] = useUpdateRegularizationStatusMutation();
+
+  // Payroll Summary States & Hooks
+  const [payrollMonth, setPayrollMonth] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
+  const { data: payrollData, isLoading: loadingPayroll } = useGetPayrollSummaryQuery({ month: payrollMonth }, {
+    skip: !isAdmin && !hasTeamAccess
+  });
+  const payrollEmployees = payrollData?.employees || [];
+
+  // Handle Apply Regularization
+  const handleApplyRegularization = async (e) => {
+    e.preventDefault();
+    if (!regDate || !regReason) {
+      return toast.error('Date and reason are required');
+    }
+    setSubmittingReg(true);
+    try {
+      const res = await applyRegularization({
+        date: regDate,
+        checkIn: `${regDate}T${regInTime}:00`,
+        checkOut: `${regDate}T${regOutTime}:00`,
+        reason: regReason
+      }).unwrap();
+      toast.success(res.message || 'Correction request submitted!');
+      setShowRegularizeModal(false);
+      setRegDate('');
+      setRegReason('');
+      if (refetchMyRegs) refetchMyRegs();
+    } catch (err) {
+      toast.error(err.data?.message || 'Failed to submit correction request');
+    } finally {
+      setSubmittingReg(false);
+    }
+  };
+
+  // Handle Update Regularization Status (Approve/Reject)
+  const handleRegularizationStatus = async (id, status) => {
+    try {
+      const res = await updateRegularizationStatus({ id, status }).unwrap();
+      toast.success(res.message || `Correction request ${status}`);
+      if (refetchTeamRegs) refetchTeamRegs();
+    } catch (err) {
+      toast.error(err.data?.message || 'Failed to update request');
+    }
+  };
 
   // Check if user checked in today
   const todayStr = new Date().toLocaleDateString('en-CA');
@@ -288,7 +358,7 @@ const AttendancePage = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         
         {/* Top Widgets Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           
           {/* Check-In/Out Card */}
           <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 200 }}>
@@ -383,6 +453,15 @@ const AttendancePage = () => {
                   <RiLoginBoxLine /> Check In Now
                 </button>
               )}
+
+              {/* Missed Punch / Regularization Button */}
+              <button 
+                className="btn btn-outline" 
+                onClick={() => setShowRegularizeModal(true)} 
+                style={{ width: '100%', marginTop: 10, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                <RiEditBoxLine /> Missed Punch / Absent Correction
+              </button>
             </div>
           </div>
 
@@ -426,9 +505,12 @@ const AttendancePage = () => {
         </div>
 
         {/* Tab Selection */}
-        <div className="flex border-b" style={{ borderBottom: '1px solid var(--border)', gap: 16 }}>
+        <div className="flex border-b" style={{ borderBottom: '1px solid var(--border)', gap: 16, overflowX: 'auto' }}>
           {[
             { id: 'my-attendance', label: 'My Attendance Calendar', show: true },
+            { id: 'my-regularizations', label: 'My Correction Requests', show: true },
+            { id: 'team-regularizations', label: `Correction Approvals ${teamRegs.filter(r => r.status === 'pending').length > 0 ? `(${teamRegs.filter(r => r.status === 'pending').length})` : ''}`, show: isAdmin || hasTeamAccess },
+            { id: 'payroll-summary', label: 'Monthly Payroll & Deductions', show: isAdmin || hasTeamAccess },
             { id: 'team-attendance', label: 'Team Daily Logs', show: isAdmin || hasTeamAccess },
             { id: 'admin-holidays', label: 'Holidays Configuration', show: isAdmin }
           ].filter(tab => tab.show).map(tab => (
@@ -438,12 +520,13 @@ const AttendancePage = () => {
               style={{
                 background: 'none',
                 border: 'none',
-                padding: '12px 6px',
+                padding: '12px 8px',
                 fontSize: '0.85rem',
                 fontWeight: 700,
                 color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)',
                 borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
               {tab.label}
@@ -753,6 +836,374 @@ const AttendancePage = () => {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* My Correction Requests Tab */}
+        {activeTab === 'my-regularizations' && (
+          <div className="card" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>My Attendance Correction Requests</h3>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Requests submitted to convert absent days to present with approval from your manager.</p>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowRegularizeModal(true)}>
+                <RiEditBoxLine /> Apply New Correction
+              </button>
+            </div>
+
+            {loadingMyRegs ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner" /></div>
+            ) : myRegs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
+                No attendance correction requests submitted.
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Correction Date</th>
+                      <th>Expected In / Out</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                      <th>Approved By</th>
+                      <th>Applied On</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myRegs.map(reg => (
+                      <tr key={reg.id}>
+                        <td style={{ fontWeight: 700 }}>{reg.date}</td>
+                        <td style={{ fontSize: '0.8rem' }}>
+                          {reg.checkIn ? new Date(reg.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:30 AM'}
+                          {' — '}
+                          {reg.checkOut ? new Date(reg.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '06:30 PM'}
+                        </td>
+                        <td style={{ fontSize: '0.85rem' }}>{reg.reason}</td>
+                        <td>
+                          {reg.status === 'approved' && (
+                            <span className="badge badge-success">✅ Approved (Present)</span>
+                          )}
+                          {reg.status === 'pending' && (
+                            <span className="badge badge-warning">⏳ Pending Approval</span>
+                          )}
+                          {reg.status === 'rejected' && (
+                            <span className="badge badge-danger">❌ Rejected (Absent)</span>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                          {reg.approver?.name || '—'}
+                        </td>
+                        <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {new Date(reg.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Team Correction Approvals Tab (Mapped Manager & Admin only) */}
+        {activeTab === 'team-regularizations' && (isAdmin || hasTeamAccess) && (
+          <div className="card" style={{ padding: 24 }}>
+            <div style={{ marginBottom: 16 }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Team Attendance Correction Approvals</h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Review and approve correction requests for employees mapped to you. Approving a request marks the day as <strong>PRESENT</strong> and removes salary deduction.
+              </p>
+            </div>
+
+            {loadingTeamRegs ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner" /></div>
+            ) : teamRegs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
+                No attendance correction requests from your team members.
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Date</th>
+                      <th>Timing</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamRegs.map(reg => (
+                      <tr key={reg.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700 }}>{reg.user?.name}</span>
+                            {reg.user?.department?.name && (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 600, background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                                {reg.user.department.name}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{reg.user?.email}</div>
+                        </td>
+                        <td style={{ fontWeight: 700 }}>{reg.date}</td>
+                        <td style={{ fontSize: '0.8rem' }}>
+                          {reg.checkIn ? new Date(reg.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:30 AM'}
+                          {' — '}
+                          {reg.checkOut ? new Date(reg.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '06:30 PM'}
+                        </td>
+                        <td style={{ fontSize: '0.85rem' }}>{reg.reason}</td>
+                        <td>
+                          {reg.status === 'approved' && <span className="badge badge-success">Approved (Present)</span>}
+                          {reg.status === 'pending' && <span className="badge badge-warning">Pending Review</span>}
+                          {reg.status === 'rejected' && <span className="badge badge-danger">Rejected</span>}
+                        </td>
+                        <td>
+                          {reg.status === 'pending' ? (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button 
+                                className="btn btn-success btn-xs" 
+                                onClick={() => handleRegularizationStatus(reg.id, 'approved')}
+                                title="Approve and mark Present"
+                              >
+                                <RiCheckDoubleLine /> Approve (Mark Present)
+                              </button>
+                              <button 
+                                className="btn btn-danger btn-xs" 
+                                onClick={() => handleRegularizationStatus(reg.id, 'rejected')}
+                                title="Reject request"
+                              >
+                                <RiCloseCircleLine /> Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Reviewed</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Monthly Payroll & Deductions Summary Tab */}
+        {activeTab === 'payroll-summary' && (isAdmin || hasTeamAccess) && (
+          <div className="card" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <RiMoneyDollarCircleLine style={{ color: '#10b981', fontSize: '1.2rem' }} /> Monthly Payroll & Absent Deductions
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Salary calculation based on base salary, monthly free leave quota, unregularized absences, and excess leaves (LOP).
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Month:</label>
+                <input 
+                  type="month" 
+                  className="form-control" 
+                  style={{ width: 'auto', padding: '6px 12px' }}
+                  value={payrollMonth} 
+                  onChange={e => setPayrollMonth(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            {/* KPI Cards */}
+            {payrollData && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+                <div style={{ background: 'var(--bg-secondary)', padding: '14px 16px', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Employees</div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{payrollData.totalEmployees || 0}</div>
+                </div>
+
+                <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase' }}>Gross Base Payroll</div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#93c5fd', marginTop: 4 }}>₹{(payrollData.totalBasePayroll || 0).toLocaleString()}</div>
+                </div>
+
+                <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 700, textTransform: 'uppercase' }}>Total Deductions (Absent/LOP)</div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fca5a5', marginTop: 4 }}>-₹{(payrollData.totalDeductions || 0).toLocaleString()}</div>
+                </div>
+
+                <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 700, textTransform: 'uppercase' }}>Net Payable Payroll</div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#6ee7b7', marginTop: 4 }}>₹{(payrollData.totalNetPayroll || 0).toLocaleString()}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Payroll Table */}
+            {loadingPayroll ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner" /></div>
+            ) : payrollEmployees.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>No active employees found for this month.</div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Manager</th>
+                      <th>Base Salary</th>
+                      <th>Present</th>
+                      <th>Free Leave (Paid)</th>
+                      <th>Absent Days</th>
+                      <th>Excess Leave (LOP)</th>
+                      <th>Total Deduction</th>
+                      <th>Net Payable Salary</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payrollEmployees.map(emp => (
+                      <tr key={emp.id}>
+                        <td>
+                          <div style={{ fontWeight: 700 }}>{emp.name}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{emp.department} • {emp.role}</div>
+                        </td>
+                        <td style={{ fontSize: '0.8rem' }}>
+                          {emp.manager !== 'None' ? (
+                            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>👤 {emp.manager}</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>Direct</span>
+                          )}
+                        </td>
+                        <td>
+                          <strong style={{ color: 'var(--text-primary)' }}>₹{emp.baseSalary.toLocaleString()}</strong>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>₹{emp.perDaySalary}/day</div>
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 700, color: 'var(--success)' }}>{emp.presentDays} d</span>
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 700, color: '#38bdf8' }}>{emp.paidLeaveDays} / {emp.monthlyQuota} d</span>
+                        </td>
+                        <td>
+                          {emp.absentDays > 0 ? (
+                            <span style={{ fontWeight: 800, color: 'var(--danger)' }}>{emp.absentDays} d</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>0</span>
+                          )}
+                        </td>
+                        <td>
+                          {emp.excessLeaveDays > 0 ? (
+                            <span style={{ fontWeight: 800, color: '#f59e0b' }}>{emp.excessLeaveDays} d (LOP)</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>0</span>
+                          )}
+                        </td>
+                        <td>
+                          {emp.totalDeductionAmount > 0 ? (
+                            <div>
+                              <strong style={{ color: 'var(--danger)' }}>-₹{emp.totalDeductionAmount.toLocaleString()}</strong>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{emp.totalDeductionDays} day(s) cut</div>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--success)', fontWeight: 700 }}>₹0</span>
+                          )}
+                        </td>
+                        <td>
+                          <strong style={{ fontSize: '1rem', color: '#10b981' }}>
+                            ₹{emp.netPayableSalary.toLocaleString()}
+                          </strong>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Regularization / Attendance Correction Modal */}
+        {showRegularizeModal && (
+          <div className="modal-overlay">
+            <div className="modal" style={{ maxWidth: 480 }}>
+              <div className="modal-header">
+                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <RiEditBoxLine style={{ color: 'var(--accent)' }} /> Apply Attendance Correction
+                </h3>
+                <button className="btn btn-icon" onClick={() => setShowRegularizeModal(false)}>✕</button>
+              </div>
+              <form onSubmit={handleApplyRegularization}>
+                <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    💡 If you missed check-in or had punch errors, request a correction here. Once your mapped manager approves, your attendance will be updated to <strong>PRESENT</strong>, saving salary deductions.
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: '0.8rem' }}>Date of Correction *</label>
+                    <input 
+                      type="date" 
+                      className="form-control" 
+                      max={new Date().toLocaleDateString('en-CA')} 
+                      value={regDate} 
+                      onChange={e => setRegDate(e.target.value)} 
+                      required 
+                      id="reg-date"
+                    />
+                  </div>
+
+                  <div className="grid-2">
+                    <div>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.8rem' }}>Check-In Time</label>
+                      <input 
+                        type="time" 
+                        className="form-control" 
+                        value={regInTime} 
+                        onChange={e => setRegInTime(e.target.value)} 
+                        required 
+                        id="reg-in-time"
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.8rem' }}>Check-Out Time</label>
+                      <input 
+                        type="time" 
+                        className="form-control" 
+                        value={regOutTime} 
+                        onChange={e => setRegOutTime(e.target.value)} 
+                        required 
+                        id="reg-out-time"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: '0.8rem' }}>Reason for Correction *</label>
+                    <textarea 
+                      className="form-control" 
+                      rows="3" 
+                      placeholder="e.g. Forgot to punch in / Client on-duty visit / Network device glitch" 
+                      value={regReason} 
+                      onChange={e => setRegReason(e.target.value)} 
+                      required 
+                      id="reg-reason"
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowRegularizeModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={submittingReg} id="reg-submit-btn">
+                    {submittingReg ? 'Submitting...' : 'Submit Request'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

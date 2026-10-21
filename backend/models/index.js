@@ -14,8 +14,13 @@ const LeaveRequest = require('./LeaveRequest');
 const Holiday = require('./Holiday');
 const ChatServer = require('./ChatServer');
 const ChatMessage = require('./ChatMessage');
+const AttendanceRegularization = require('./AttendanceRegularization');
 
 // ---- Associations ----
+
+// User manager self-association
+User.belongsTo(User, { foreignKey: 'managerId', as: 'manager', constraints: false });
+User.hasMany(User, { foreignKey: 'managerId', as: 'reportees', constraints: false });
 
 // Role belongs to Organization / Company (scope)
 Role.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' });
@@ -39,6 +44,7 @@ Organization.hasMany(Company, { foreignKey: 'organizationId', as: 'companies' })
 Department.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
 Department.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' });
 Department.belongsTo(User, { foreignKey: 'headId', as: 'head', constraints: false });
+User.hasMany(Department, { foreignKey: 'headId', as: 'headedDepartments', constraints: false });
 Company.hasMany(Department, { foreignKey: 'companyId', as: 'departments' });
 Department.hasMany(User, { foreignKey: 'departmentId', as: 'members' });
 
@@ -66,6 +72,12 @@ LeaveRequest.belongsTo(User, { foreignKey: 'userId', as: 'user', constraints: fa
 User.hasMany(LeaveRequest, { foreignKey: 'userId', as: 'leaveRequests' });
 LeaveRequest.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver', constraints: false });
 
+// AttendanceRegularization associations
+AttendanceRegularization.belongsTo(User, { foreignKey: 'userId', as: 'user', constraints: false });
+AttendanceRegularization.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver', constraints: false });
+AttendanceRegularization.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization', constraints: false });
+User.hasMany(AttendanceRegularization, { foreignKey: 'userId', as: 'regularizations' });
+
 // Holiday associations
 Holiday.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization', constraints: false });
 
@@ -78,5 +90,5 @@ ChatMessage.belongsTo(ChatServer, { foreignKey: 'chatServerId', constraints: fal
 ChatMessage.belongsTo(Company, { foreignKey: 'companyId', constraints: false });
 
 module.exports = { 
-  User, Role, Permission, Organization, Company, Department, Lead, Project, DesignOrder, AuditLog, Attendance, LeaveRequest, Holiday, ChatServer, ChatMessage 
+  User, Role, Permission, Organization, Company, Department, Lead, Project, DesignOrder, AuditLog, Attendance, LeaveRequest, AttendanceRegularization, Holiday, ChatServer, ChatMessage 
 };

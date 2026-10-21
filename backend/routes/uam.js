@@ -33,7 +33,9 @@ router.get('/users', checkPermission('uam', 'users-list', 'canView'), async (req
         { model: Role, as: 'role', attributes: ['id', 'name', 'code', 'level'] },
         { model: Organization, as: 'organization', attributes: ['id', 'name', 'code'] },
         { model: Company, as: 'company', attributes: ['id', 'name', 'code'] },
-        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] }
+        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] },
+        { model: User, as: 'manager', attributes: ['id', 'name', 'email'] },
+        { model: Department, as: 'headedDepartments', attributes: ['id', 'name', 'code'] }
       ],
       order: [['createdAt', 'DESC']],
       limit: Number(limit),
@@ -46,6 +48,28 @@ router.get('/users', checkPermission('uam', 'users-list', 'canView'), async (req
   }
 });
 
+// GET /api/uam/managers - Get potential managers within organization
+router.get('/managers', checkPermission('uam', 'users-list', 'canView'), async (req, res) => {
+  try {
+    const orgId = req.user.isSuperAdmin ? (req.query.organizationId || null) : (req.user.organizationId || null);
+    const where = { isActive: true };
+    if (orgId) where.organizationId = orgId;
+
+    const managers = await User.findAll({
+      where,
+      attributes: ['id', 'name', 'email', 'organizationId'],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name', 'level'] }
+      ],
+      order: [['name', 'ASC']]
+    });
+
+    res.json({ success: true, managers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching managers', error: error.message });
+  }
+});
+
 // GET /api/uam/users/:id
 router.get('/users/:id', checkPermission('uam', 'users-list', 'canView'), async (req, res) => {
   try {
@@ -55,7 +79,9 @@ router.get('/users/:id', checkPermission('uam', 'users-list', 'canView'), async 
         { model: Role, as: 'role' },
         { model: Organization, as: 'organization', attributes: ['id', 'name', 'code'] },
         { model: Company, as: 'company', attributes: ['id', 'name', 'code'] },
-        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] }
+        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] },
+        { model: User, as: 'manager', attributes: ['id', 'name', 'email'] },
+        { model: Department, as: 'headedDepartments', attributes: ['id', 'name', 'code'] }
       ]
     });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
@@ -68,7 +94,7 @@ router.get('/users/:id', checkPermission('uam', 'users-list', 'canView'), async 
 // POST /api/uam/users
 router.post('/users', checkPermission('uam', 'users-list', 'canCreate'), async (req, res) => {
   try {
-    const { name, email, password, phone, roleId, organizationId, companyId, departmentId } = req.body;
+    const { name, email, password, phone, roleId, organizationId, companyId, departmentId, paidLeaves, casualLeaves, sickLeaves, baseSalary, monthlyLeaveQuota, managerId } = req.body;
     if (!name || !email || !password || !roleId)
       return res.status(400).json({ success: false, message: 'Name, email, password and role are required' });
 
@@ -83,12 +109,31 @@ router.post('/users', checkPermission('uam', 'users-list', 'canCreate'), async (
     const targetOrgId = req.user.isSuperAdmin ? (organizationId || null) : (req.user.organizationId || null);
     const targetCompanyId = (req.user.role?.level === 'company_admin') ? (req.user.companyId || null) : (companyId || null);
 
+    // Validate managerId within same organization
+    let validManagerId = null;
+    if (managerId) {
+      const mgr = await User.findByPk(managerId);
+      if (!mgr) {
+        return res.status(400).json({ success: false, message: 'Assigned manager not found' });
+      }
+      if (targetOrgId && mgr.organizationId && mgr.organizationId !== targetOrgId) {
+        return res.status(400).json({ success: false, message: 'Assigned manager must belong to the same organization' });
+      }
+      validManagerId = mgr.id;
+    }
+
     const user = await User.create({
       name, email: email.toLowerCase(), password, phone,
       roleId,
       organizationId: targetOrgId,
       companyId: targetCompanyId,
       departmentId: departmentId || null,
+      paidLeaves: paidLeaves !== undefined && paidLeaves !== '' ? parseInt(paidLeaves, 10) : 12,
+      casualLeaves: casualLeaves !== undefined && casualLeaves !== '' ? parseInt(casualLeaves, 10) : 10,
+      sickLeaves: sickLeaves !== undefined && sickLeaves !== '' ? parseInt(sickLeaves, 10) : 8,
+      baseSalary: baseSalary !== undefined && baseSalary !== '' ? parseFloat(baseSalary) : 0,
+      monthlyLeaveQuota: monthlyLeaveQuota !== undefined && monthlyLeaveQuota !== '' ? parseInt(monthlyLeaveQuota, 10) : 1,
+      managerId: validManagerId,
       createdById: req.user.id
     });
 
@@ -98,7 +143,8 @@ router.post('/users', checkPermission('uam', 'users-list', 'canCreate'), async (
         { model: Role, as: 'role', attributes: ['id', 'name', 'code', 'level'] },
         { model: Organization, as: 'organization', attributes: ['id', 'name', 'code'] },
         { model: Company, as: 'company', attributes: ['id', 'name', 'code'] },
-        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] }
+        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] },
+        { model: User, as: 'manager', attributes: ['id', 'name', 'email'] }
       ]
     });
 
@@ -122,7 +168,7 @@ router.put('/users/:id', checkPermission('uam', 'users-list', 'canEdit'), async 
       return res.status(403).json({ success: false, message: 'Access denied: You cannot edit users from another organization' });
     }
 
-    const { name, email, phone, roleId, organizationId, companyId, departmentId, isActive } = req.body;
+    const { name, email, phone, roleId, organizationId, companyId, departmentId, isActive, paidLeaves, casualLeaves, sickLeaves, baseSalary, monthlyLeaveQuota, managerId } = req.body;
 
     if (roleId) {
       const role = await Role.findByPk(roleId);
@@ -141,6 +187,28 @@ router.put('/users/:id', checkPermission('uam', 'users-list', 'canEdit'), async 
     if (companyId !== undefined) updates.companyId = companyId || null;
     if (departmentId !== undefined) updates.departmentId = departmentId || null;
     if (isActive !== undefined) updates.isActive = isActive;
+    if (paidLeaves !== undefined) updates.paidLeaves = paidLeaves === '' ? 0 : parseInt(paidLeaves, 10);
+    if (casualLeaves !== undefined) updates.casualLeaves = casualLeaves === '' ? 0 : parseInt(casualLeaves, 10);
+    if (sickLeaves !== undefined) updates.sickLeaves = sickLeaves === '' ? 0 : parseInt(sickLeaves, 10);
+    if (baseSalary !== undefined) updates.baseSalary = baseSalary === '' ? 0 : parseFloat(baseSalary);
+    if (monthlyLeaveQuota !== undefined) updates.monthlyLeaveQuota = monthlyLeaveQuota === '' ? 1 : parseInt(monthlyLeaveQuota, 10);
+
+    if (managerId !== undefined) {
+      if (managerId === user.id) {
+        return res.status(400).json({ success: false, message: 'User cannot be their own manager' });
+      }
+      if (managerId) {
+        const mgr = await User.findByPk(managerId);
+        if (!mgr) return res.status(400).json({ success: false, message: 'Assigned manager not found' });
+        const userOrg = updates.organizationId !== undefined ? updates.organizationId : user.organizationId;
+        if (userOrg && mgr.organizationId && mgr.organizationId !== userOrg) {
+          return res.status(400).json({ success: false, message: 'Assigned manager must belong to the same organization' });
+        }
+        updates.managerId = mgr.id;
+      } else {
+        updates.managerId = null;
+      }
+    }
 
     await user.update(updates);
 
@@ -150,7 +218,8 @@ router.put('/users/:id', checkPermission('uam', 'users-list', 'canEdit'), async 
         { model: Role, as: 'role', attributes: ['id', 'name', 'code', 'level'] },
         { model: Organization, as: 'organization', attributes: ['id', 'name', 'code'] },
         { model: Company, as: 'company', attributes: ['id', 'name', 'code'] },
-        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] }
+        { model: Department, as: 'department', attributes: ['id', 'name', 'code'] },
+        { model: User, as: 'manager', attributes: ['id', 'name', 'email'] }
       ]
     });
 

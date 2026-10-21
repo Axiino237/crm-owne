@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { Attendance, User, Department, Role, LeaveRequest, Holiday } = require('../models');
+const { Attendance, User, Department, Role, LeaveRequest, AttendanceRegularization, Holiday, Organization } = require('../models');
 const { protect } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/permission');
 const { Op } = require('sequelize');
+const { getDeptHeadScope } = require('../utils/departmentScope');
 
 router.use(protect);
 
@@ -115,11 +116,21 @@ router.get('/my-summary', async (req, res) => {
       order: [['date', 'ASC']]
     });
 
-    const managedDept = await Department.findOne({ where: { headId: req.user.id } });
-    const isDeptHead = !!managedDept;
-    const hasTeamAccess = (req.user.role?.level === 'dept_manager') || isDeptHead;
+    const deptScope = await getDeptHeadScope(req.user);
+    const managedUsersCount = await User.count({ where: { managerId: req.user.id } });
+    const userRole = req.user.role?.level;
+    const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
+    const hasTeamAccess = (managedUsersCount > 0) || deptScope.isDeptHead || (userRole === 'dept_manager') || isAdmin;
 
-    res.json({ success: true, logs, leaves, holidays, hasTeamAccess });
+    res.json({ 
+      success: true, 
+      logs, 
+      leaves, 
+      holidays, 
+      hasTeamAccess, 
+      managedUsersCount,
+      managedDeptIds: deptScope.managedDeptIds
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error retrieving summary', error: error.message });
   }
@@ -132,29 +143,41 @@ router.get('/team-today', async (req, res) => {
     const userRole = req.user.role?.level;
     const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
 
-    // Resolve target department ID for heads or admins
-    const managedDept = await Department.findOne({ where: { headId: req.user.id } });
-    const isDeptHead = !!managedDept;
-    const hasTeamAccess = (userRole === 'dept_manager') || isDeptHead;
+    const deptScope = await getDeptHeadScope(req.user);
+    const managedUsersCount = await User.count({ where: { managerId: req.user.id } });
+    const isMappedManager = managedUsersCount > 0;
+    const isDeptHead = deptScope.isDeptHead;
+    const hasTeamAccess = isMappedManager || isDeptHead || (userRole === 'dept_manager') || isAdmin;
 
-    let targetDeptId = req.query.departmentId || null;
-
-    if (!isAdmin && hasTeamAccess) {
-      targetDeptId = managedDept?.id || req.user.departmentId;
-    } else if (!isAdmin && !hasTeamAccess) {
+    if (!isAdmin && !hasTeamAccess) {
       return res.status(403).json({ success: false, message: 'Access denied: Scoped privileges required' });
     }
 
+    let targetDeptId = req.query.departmentId || null;
+
     // Build user query scope
     const userWhere = {};
-    if (targetDeptId) {
-      userWhere.departmentId = targetDeptId;
-    } else if (!isAdmin) {
-      userWhere.id = req.user.id;
-    }
-
     if (!req.user.isSuperAdmin && req.user.organizationId) {
       userWhere.organizationId = req.user.organizationId;
+    }
+
+    if (!isAdmin) {
+      if (targetDeptId) {
+        if (!deptScope.managedDeptIds.includes(targetDeptId) && targetDeptId !== req.user.departmentId) {
+          return res.status(403).json({ success: false, message: 'Access denied: Department not within your managed scope' });
+        }
+        userWhere.departmentId = targetDeptId;
+      } else {
+        const orConditions = [{ managerId: req.user.id }];
+        if (deptScope.managedDeptIds.length > 0) {
+          orConditions.push({ departmentId: { [Op.in]: deptScope.managedDeptIds } });
+        }
+        userWhere[Op.or] = orConditions;
+      }
+    } else {
+      if (targetDeptId) {
+        userWhere.departmentId = targetDeptId;
+      }
     }
 
     const deptUsers = await User.findAll({
@@ -214,6 +237,45 @@ router.post('/leave-request', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Start date, end date, and reason are required' });
     }
 
+    const user = await User.findByPk(req.user.id);
+    const monthlyQuota = Number(user?.monthlyLeaveQuota ?? 1);
+
+    // Calculate month of leave startDate
+    const sDate = new Date(startDate);
+    const y = sDate.getFullYear();
+    const m = String(sDate.getMonth() + 1).padStart(2, '0');
+    const monthStart = `${y}-${m}-01`;
+    const lastDay = new Date(y, sDate.getMonth() + 1, 0).getDate();
+    const monthEnd = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+
+    // Count already approved leaves in this month
+    const existingApproved = await LeaveRequest.findAll({
+      where: {
+        userId: req.user.id,
+        status: 'approved',
+        [Op.or]: [
+          { startDate: { [Op.between]: [monthStart, monthEnd] } },
+          { endDate: { [Op.between]: [monthStart, monthEnd] } }
+        ]
+      }
+    });
+
+    let alreadyUsedDays = 0;
+    existingApproved.forEach(l => {
+      let days = 1;
+      if (l.leaveDuration === 'half_day') {
+        days = 0.5;
+      } else if (l.startDate && l.endDate) {
+        const s = new Date(l.startDate);
+        const e = new Date(l.endDate);
+        days = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
+      }
+      alreadyUsedDays += days;
+    });
+
+    const requestedDays = leaveDuration === 'half_day' ? 0.5 : (Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1));
+    const isLossOfPay = (alreadyUsedDays + requestedDays) > monthlyQuota;
+
     const leave = await LeaveRequest.create({
       userId: req.user.id,
       startDate,
@@ -223,24 +285,114 @@ router.post('/leave-request', async (req, res) => {
       halfDaySession: leaveDuration === 'half_day' ? halfDaySession : null,
       reason,
       status: 'pending',
+      isLossOfPay,
       organizationId: req.user.organizationId
     });
 
-    res.status(201).json({ success: true, message: 'Leave request submitted successfully', leave });
+    const msg = isLossOfPay 
+      ? `Leave request submitted. (Note: Exceeds monthly quota of ${monthlyQuota} day(s); excess days will be treated as Loss of Pay)`
+      : 'Leave request submitted successfully';
+
+    res.status(201).json({ success: true, message: msg, leave, isLossOfPay });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error submitting leave request', error: error.message });
   }
 });
 
-// @desc   Get my leave requests
+// @desc   Get my leave requests and balances
 // @route  GET /api/attendance/leave-requests/my
 router.get('/leave-requests/my', async (req, res) => {
   try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'name', 'paidLeaves', 'casualLeaves', 'sickLeaves', 'monthlyLeaveQuota', 'baseSalary']
+    });
+
     const leaves = await LeaveRequest.findAll({
       where: { userId: req.user.id },
       order: [['createdAt', 'DESC']]
     });
-    res.json({ success: true, leaves });
+
+    const paidQuota = Number(user?.paidLeaves ?? 12);
+    const casualQuota = Number(user?.casualLeaves ?? 10);
+    const sickQuota = Number(user?.sickLeaves ?? 8);
+    const monthlyQuota = Number(user?.monthlyLeaveQuota ?? 1);
+
+    const now = new Date();
+    const currYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currMonthStart = `${currYearMonth}-01`;
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const currMonthEnd = `${currYearMonth}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+    let usedPaid = 0;
+    let usedCasual = 0;
+    let usedSick = 0;
+    let thisMonthUsed = 0;
+
+    leaves.filter(l => l.status === 'approved').forEach(l => {
+      let days = 1;
+      if (l.leaveDuration === 'half_day') {
+        days = 0.5;
+      } else if (l.startDate && l.endDate) {
+        const s = new Date(l.startDate);
+        const e = new Date(l.endDate);
+        const diff = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+        days = diff > 0 ? diff : 1;
+      }
+
+      const type = (l.leaveType || '').toLowerCase();
+      if (type === 'paid' || type === 'earned') {
+        usedPaid += days;
+      } else if (type === 'casual') {
+        usedCasual += days;
+      } else if (type === 'sick') {
+        usedSick += days;
+      }
+
+      // Check if within current calendar month
+      if ((l.startDate >= currMonthStart && l.startDate <= currMonthEnd) ||
+          (l.endDate >= currMonthStart && l.endDate <= currMonthEnd)) {
+        thisMonthUsed += days;
+      }
+    });
+
+    const balances = {
+      paid: {
+        allocated: paidQuota,
+        used: usedPaid,
+        remaining: Math.max(0, paidQuota - usedPaid)
+      },
+      casual: {
+        allocated: casualQuota,
+        used: usedCasual,
+        remaining: Math.max(0, casualQuota - usedCasual)
+      },
+      sick: {
+        allocated: sickQuota,
+        used: usedSick,
+        remaining: Math.max(0, sickQuota - usedSick)
+      },
+      monthly: {
+        quota: monthlyQuota,
+        used: thisMonthUsed,
+        remaining: Math.max(0, monthlyQuota - thisMonthUsed)
+      }
+    };
+
+    const deptScope = await getDeptHeadScope(req.user);
+    const managedUsersCount = await User.count({ where: { managerId: req.user.id } });
+    const userRole = req.user.role?.level;
+    const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
+    const canApproveLeaves = isAdmin || (managedUsersCount > 0) || deptScope.isDeptHead || (userRole === 'dept_manager');
+
+    res.json({ 
+      success: true, 
+      leaves, 
+      balances, 
+      monthlyQuota, 
+      canApproveLeaves, 
+      managedUsersCount,
+      managedDeptIds: deptScope.managedDeptIds
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching leave requests', error: error.message });
   }
@@ -253,28 +405,28 @@ router.get('/leave-requests/team', async (req, res) => {
     const userRole = req.user.role?.level;
     const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
 
-    const managedDept = await Department.findOne({ where: { headId: req.user.id } });
-    const isDeptHead = !!managedDept;
-    const hasTeamAccess = (userRole === 'dept_manager') || isDeptHead;
+    const deptScope = await getDeptHeadScope(req.user);
+    const managedUsersCount = await User.count({ where: { managerId: req.user.id } });
+    const hasTeamAccess = (managedUsersCount > 0) || (userRole === 'dept_manager') || deptScope.isDeptHead || isAdmin;
 
-    let targetDeptId = req.query.departmentId || null;
-
-    if (!isAdmin && hasTeamAccess) {
-      targetDeptId = managedDept?.id || req.user.departmentId;
-    } else if (!isAdmin && !hasTeamAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied: Scoped privileges required' });
+    if (!isAdmin && !hasTeamAccess) {
+      return res.json({ success: true, leaves: [], canApproveLeaves: false, managedUsersCount: 0 });
     }
 
-    // Build user query scope
     const userWhere = {};
-    if (targetDeptId) {
-      userWhere.departmentId = targetDeptId;
-    } else if (!isAdmin) {
-      userWhere.id = req.user.id;
-    }
-
     if (!req.user.isSuperAdmin && req.user.organizationId) {
       userWhere.organizationId = req.user.organizationId;
+    }
+
+    if (!isAdmin) {
+      // Must be mapped manager (managerId === req.user.id) OR department head across ANY managed department
+      const orConditions = [{ managerId: req.user.id }];
+      if (deptScope.managedDeptIds.length > 0) {
+        orConditions.push({ departmentId: { [Op.in]: deptScope.managedDeptIds } });
+      } else if (req.user.departmentId && userRole === 'dept_manager') {
+        orConditions.push({ departmentId: req.user.departmentId });
+      }
+      userWhere[Op.or] = orConditions;
     }
 
     const deptUsers = await User.findAll({
@@ -287,12 +439,17 @@ router.get('/leave-requests/team', async (req, res) => {
         userId: { [Op.in]: deptUsers.map(u => u.id) }
       },
       include: [
-        { model: User, as: 'user', attributes: ['id', 'name', 'email'] }
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name', 'email', 'avatar', 'managerId', 'departmentId', 'monthlyLeaveQuota'],
+          include: [{ model: Department, as: 'department', attributes: ['id', 'name', 'code'] }]
+        }
       ],
       order: [['createdAt', 'DESC']]
     });
 
-    res.json({ success: true, leaves });
+    res.json({ success: true, leaves, canApproveLeaves: true, managedUsersCount, managedDeptIds: deptScope.managedDeptIds });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching team leave requests', error: error.message });
   }
@@ -316,24 +473,23 @@ router.put('/leave-request/:id/status', async (req, res) => {
       return res.status(400).json({ success: false, message: 'You cannot approve or reject your own leave request' });
     }
 
-    // Verify manager/head has scope over this leave request user
+    // Verify organization boundary
+    if (!req.user.isSuperAdmin && leave.organizationId && req.user.organizationId && leave.organizationId !== req.user.organizationId) {
+      return res.status(403).json({ success: false, message: 'Access denied: User belongs to another organization' });
+    }
+
+    // Verify approver permission (mapped manager, dept head across ANY managed department, or admin)
     const userRole = req.user.role?.level;
     const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
 
-    const managedDept = await Department.findOne({ where: { headId: req.user.id } });
-    const isDeptHead = !!managedDept;
-    const hasTeamAccess = (userRole === 'dept_manager') || isDeptHead;
+    const targetUser = await User.findByPk(leave.userId);
+    const isMappedManager = targetUser?.managerId === req.user.id;
 
-    if (!isAdmin) {
-      if (!hasTeamAccess) {
-        return res.status(403).json({ success: false, message: 'Access denied' });
-      }
-      
-      const targetUser = await User.findByPk(leave.userId);
-      const targetDeptId = managedDept?.id || req.user.departmentId;
-      if (!targetUser || targetUser.departmentId !== targetDeptId) {
-        return res.status(403).json({ success: false, message: 'Access denied: User is outside your department scope' });
-      }
+    const deptScope = await getDeptHeadScope(req.user);
+    const isDeptHead = targetUser?.departmentId && deptScope.managedDeptIds.includes(targetUser.departmentId);
+
+    if (!isAdmin && !isMappedManager && !isDeptHead) {
+      return res.status(403).json({ success: false, message: 'Access denied: You are not the assigned manager, department head, or admin for this user' });
     }
 
     await leave.update({
@@ -475,4 +631,334 @@ router.delete('/holiday/:id', async (req, res) => {
   }
 });
 
+// ─── ATTENDANCE REGULARIZATION (CORRECTION) ROUTES ────────────────────────
+
+// @desc   Apply for attendance regularization (correction for absent / missed check-in)
+// @route  POST /api/attendance/regularize
+router.post('/regularize', async (req, res) => {
+  try {
+    const { date, checkIn, checkOut, reason } = req.body;
+    if (!date || !reason) {
+      return res.status(400).json({ success: false, message: 'Date and reason are required' });
+    }
+
+    const todayStr = getLocalDateString();
+    if (date > todayStr) {
+      return res.status(400).json({ success: false, message: 'Cannot apply attendance regularization for future dates' });
+    }
+
+    // Check if an existing pending regularization request exists for this date
+    const existingReq = await AttendanceRegularization.findOne({
+      where: {
+        userId: req.user.id,
+        date,
+        status: 'pending'
+      }
+    });
+
+    if (existingReq) {
+      return res.status(400).json({ success: false, message: 'A pending correction request already exists for this date' });
+    }
+
+    const regularization = await AttendanceRegularization.create({
+      userId: req.user.id,
+      organizationId: req.user.organizationId,
+      date,
+      checkIn: checkIn ? new Date(checkIn) : null,
+      checkOut: checkOut ? new Date(checkOut) : null,
+      reason,
+      status: 'pending'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Attendance correction request submitted to your mapped manager',
+      regularization
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error submitting regularization request', error: error.message });
+  }
+});
+
+// @desc   Get logged-in user's regularization requests
+// @route  GET /api/attendance/regularize/my-requests
+router.get('/regularize/my-requests', async (req, res) => {
+  try {
+    const requests = await AttendanceRegularization.findAll({
+      where: { userId: req.user.id },
+      include: [
+        { model: User, as: 'approver', attributes: ['id', 'name', 'email'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({ success: true, requests });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching regularization requests', error: error.message });
+  }
+});
+
+// @desc   Get team regularization requests (for mapped manager / admins strictly in organization)
+// @route  GET /api/attendance/regularize/team-requests
+router.get('/regularize/team-requests', async (req, res) => {
+  try {
+    const userRole = req.user.role?.level;
+    const isAdmin = ['super_admin', 'org_admin'].includes(userRole) || req.user.isSuperAdmin;
+
+    const deptScope = await getDeptHeadScope(req.user);
+    const isDeptHead = deptScope.isDeptHead;
+
+    const userWhere = {};
+    if (!req.user.isSuperAdmin && req.user.organizationId) {
+      userWhere.organizationId = req.user.organizationId;
+    }
+
+    if (!isAdmin) {
+      // Must be mapped manager (managerId === req.user.id) OR department head
+      const orConditions = [{ managerId: req.user.id }];
+      if (isDeptHead && deptScope.managedDeptIds.length > 0) {
+        orConditions.push({ departmentId: { [Op.in]: deptScope.managedDeptIds } });
+      }
+      userWhere[Op.or] = orConditions;
+    }
+
+    const deptUsers = await User.findAll({
+      where: userWhere,
+      attributes: ['id']
+    });
+
+    const requests = await AttendanceRegularization.findAll({
+      where: {
+        userId: { [Op.in]: deptUsers.map(u => u.id) }
+      },
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name', 'email', 'avatar', 'managerId', 'departmentId'],
+          include: [{ model: Department, as: 'department', attributes: ['id', 'name', 'code'] }]
+        },
+        { model: User, as: 'approver', attributes: ['id', 'name', 'email'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({ success: true, requests });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching team regularization requests', error: error.message });
+  }
+});
+
+// @desc   Approve or Reject attendance regularization request
+// @route  PUT /api/attendance/regularize/:id/status
+router.put('/regularize/:id/status', async (req, res) => {
+  try {
+    const { status, managerNotes } = req.body;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Status must be approved or rejected' });
+    }
+
+    const regularization = await AttendanceRegularization.findByPk(req.params.id);
+    if (!regularization) {
+      return res.status(404).json({ success: false, message: 'Regularization request not found' });
+    }
+
+    if (regularization.userId === req.user.id) {
+      return res.status(400).json({ success: false, message: 'You cannot approve your own attendance regularization' });
+    }
+
+    // Verify organization boundary
+    if (!req.user.isSuperAdmin && regularization.organizationId && req.user.organizationId && regularization.organizationId !== req.user.organizationId) {
+      return res.status(403).json({ success: false, message: 'Access denied: Request is outside your organization' });
+    }
+
+    const targetUser = await User.findByPk(regularization.userId);
+    const userRole = req.user.role?.level;
+    const isAdmin = ['super_admin', 'org_admin'].includes(userRole) || req.user.isSuperAdmin;
+    const isMappedManager = targetUser?.managerId === req.user.id;
+    const deptScope = await getDeptHeadScope(req.user);
+    const isDeptHead = targetUser?.departmentId && deptScope.managedDeptIds.includes(targetUser.departmentId);
+
+    if (!isAdmin && !isMappedManager && !isDeptHead) {
+      return res.status(403).json({ success: false, message: 'Access denied: Only mapped manager or admin can approve this request' });
+    }
+
+    await regularization.update({
+      status,
+      approvedBy: req.user.id,
+      managerNotes: managerNotes || null
+    });
+
+    // If approved, update or insert attendance record as 'present'
+    if (status === 'approved') {
+      const parsedCheckIn = regularization.checkIn || new Date(`${regularization.date}T09:30:00`);
+      const parsedCheckOut = regularization.checkOut || new Date(`${regularization.date}T18:30:00`);
+
+      const [record, created] = await Attendance.findOrCreate({
+        where: {
+          userId: regularization.userId,
+          date: regularization.date
+        },
+        defaults: {
+          userId: regularization.userId,
+          date: regularization.date,
+          status: 'present',
+          checkIn: parsedCheckIn,
+          checkOut: parsedCheckOut,
+          notes: `Regularized by ${req.user.name}: ${regularization.reason}`,
+          organizationId: regularization.organizationId
+        }
+      });
+
+      if (!created) {
+        await record.update({
+          status: 'present',
+          checkIn: parsedCheckIn,
+          checkOut: parsedCheckOut,
+          notes: `Regularized by ${req.user.name}: ${regularization.reason}`
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Correction request has been ${status}${status === 'approved' ? ' (Attendance marked as PRESENT)' : ''}`,
+      regularization
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error updating regularization status', error: error.message });
+  }
+});
+
+// ─── PAYROLL / SALARY DEDUCTION SUMMARY ROUTE ─────────────────────────────
+
+// @desc   Get monthly payroll and salary calculation summary (Organization-scoped)
+// @route  GET /api/attendance/payroll-summary
+router.get('/payroll-summary', async (req, res) => {
+  try {
+    const orgId = req.user.isSuperAdmin ? (req.query.organizationId || req.user.organizationId || null) : (req.user.organizationId || null);
+
+    // Resolve month (format: YYYY-MM)
+    const now = new Date();
+    const targetMonth = req.query.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const [yearStr, monthStr] = targetMonth.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+
+    const userWhere = { isActive: true };
+    if (orgId) userWhere.organizationId = orgId;
+
+    const users = await User.findAll({
+      where: userWhere,
+      attributes: ['id', 'name', 'email', 'avatar', 'baseSalary', 'monthlyLeaveQuota', 'organizationId'],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name'] },
+        { model: Department, as: 'department', attributes: ['id', 'name'] },
+        { model: User, as: 'manager', attributes: ['id', 'name'] }
+      ],
+      order: [['name', 'ASC']]
+    });
+
+    const userIds = users.map(u => u.id);
+
+    // Fetch attendance logs for all users in this month
+    const attendanceLogs = await Attendance.findAll({
+      where: {
+        userId: { [Op.in]: userIds },
+        date: { [Op.between]: [startDate, endDate] }
+      }
+    });
+
+    // Fetch approved leaves for all users in this month
+    const approvedLeaves = await LeaveRequest.findAll({
+      where: {
+        userId: { [Op.in]: userIds },
+        status: 'approved',
+        [Op.or]: [
+          { startDate: { [Op.between]: [startDate, endDate] } },
+          { endDate: { [Op.between]: [startDate, endDate] } }
+        ]
+      }
+    });
+
+    // Calculate per-employee breakdown
+    const employees = users.map(emp => {
+      const baseSalary = parseFloat(emp.baseSalary) || 0;
+      const monthlyQuota = parseInt(emp.monthlyLeaveQuota, 10) || 1;
+      const perDaySalary = baseSalary > 0 ? (baseSalary / daysInMonth) : 0;
+
+      const empLogs = attendanceLogs.filter(l => l.userId === emp.id);
+      const empLeaves = approvedLeaves.filter(l => l.userId === emp.id);
+
+      const presentDays = empLogs.filter(l => l.status === 'present' || l.status === 'late').length;
+      const absentDays = empLogs.filter(l => l.status === 'absent').length;
+
+      // Count approved leave days
+      let totalApprovedLeaveDays = 0;
+      empLeaves.forEach(l => {
+        let dCount = 1;
+        if (l.leaveDuration === 'half_day') dCount = 0.5;
+        else if (l.startDate && l.endDate) {
+          const s = new Date(Math.max(new Date(l.startDate), new Date(startDate)));
+          const e = new Date(Math.min(new Date(l.endDate), new Date(endDate)));
+          dCount = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
+        }
+        totalApprovedLeaveDays += dCount;
+      });
+
+      // Quota logic: leaves up to quota are PAID, excess leaves are UNPAID / LOSS OF PAY (LOP)
+      const paidLeaveDays = Math.min(totalApprovedLeaveDays, monthlyQuota);
+      const excessLeaveDays = Math.max(0, totalApprovedLeaveDays - monthlyQuota);
+
+      // Total days to deduct = absent days + excess leave days
+      const totalDeductionDays = absentDays + excessLeaveDays;
+      const totalDeductionAmount = Math.round(totalDeductionDays * perDaySalary);
+      const netPayableSalary = Math.max(0, Math.round(baseSalary - totalDeductionAmount));
+
+      return {
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        role: emp.role?.name || 'User',
+        department: emp.department?.name || 'General',
+        manager: emp.manager?.name || 'None',
+        baseSalary,
+        monthlyQuota,
+        perDaySalary: Math.round(perDaySalary),
+        daysInMonth,
+        presentDays,
+        absentDays,
+        approvedLeaveDays: totalApprovedLeaveDays,
+        paidLeaveDays,
+        excessLeaveDays, // LOP
+        totalDeductionDays,
+        totalDeductionAmount,
+        netPayableSalary
+      };
+    });
+
+    const totalBasePayroll = employees.reduce((acc, e) => acc + e.baseSalary, 0);
+    const totalDeductions = employees.reduce((acc, e) => acc + e.totalDeductionAmount, 0);
+    const totalNetPayroll = employees.reduce((acc, e) => acc + e.netPayableSalary, 0);
+
+    res.json({
+      success: true,
+      month: targetMonth,
+      daysInMonth,
+      totalEmployees: employees.length,
+      totalBasePayroll,
+      totalDeductions,
+      totalNetPayroll,
+      employees
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error calculating payroll summary', error: error.message });
+  }
+});
+
 module.exports = router;
+

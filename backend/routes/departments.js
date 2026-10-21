@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { Department, Company, Organization, User } = require('../models');
+const { Department, Company, Organization, User, Role } = require('../models');
 const { protect, adminOnly } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/permission');
 
@@ -449,6 +449,184 @@ router.delete('/:id', adminOnly, checkPermission('departments', 'departments-lis
   } catch (error) {
     await t.rollback();
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+// @desc    Get detailed hierarchy data for a department (for Hierarchy Studio)
+// @route   GET /api/departments/:id/hierarchy-details
+router.get('/:id/hierarchy-details', checkPermission('departments', 'departments-list', 'canView'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const dept = await Department.findByPk(id, {
+      include: [
+        { model: Company, as: 'company', attributes: ['id', 'name', 'code'] },
+        { model: Organization, as: 'organization', attributes: ['id', 'name', 'code'] },
+        { model: User, as: 'head', attributes: ['id', 'name', 'email', 'avatar'] }
+      ]
+    });
+    if (!dept) return res.status(404).json({ success: false, message: 'Department not found' });
+
+    // Fetch all company users who could belong to this department
+    const companyUsers = await User.findAll({
+      where: {
+        companyId: dept.companyId,
+        isActive: true
+      },
+      attributes: ['id', 'name', 'email', 'phone', 'avatar', 'departmentId', 'managerId', 'isActive', 'baseSalary'],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name', 'level'] },
+        { model: User, as: 'manager', attributes: ['id', 'name', 'email'] },
+        { model: Department, as: 'headedDepartments', attributes: ['id', 'name', 'code'] }
+      ],
+      order: [['name', 'ASC']]
+    });
+
+    // Compute reportee counts for all users in this company
+    const reporteeCountMap = {};
+    companyUsers.forEach(u => {
+      if (u.managerId) {
+        reporteeCountMap[u.managerId] = (reporteeCountMap[u.managerId] || 0) + 1;
+      }
+    });
+
+    const userMap = new Map(companyUsers.map(u => {
+      const plain = u.toJSON ? u.toJSON() : { ...u };
+      plain.reporteeCount = reporteeCountMap[u.id] || 0;
+      return [u.id, plain];
+    }));
+
+    const rawLayers = Array.isArray(dept.hierarchyLayers) ? dept.hierarchyLayers : [];
+    const enrichedLayers = rawLayers.map((l, idx) => {
+      const userIds = Array.isArray(l.userIds) ? l.userIds : [];
+      const layerUsers = userIds.map(uid => userMap.get(uid)).filter(Boolean);
+      return {
+        id: l.id || `layer-${idx + 1}-${Date.now()}`,
+        level: l.level || (idx + 1),
+        name: l.name || (idx === 0 ? 'Layer 1 (HOD)' : `Layer ${idx + 1}`),
+        userIds,
+        users: layerUsers
+      };
+    });
+
+    // Find users who have departmentId === dept.id but aren't in any layer
+    const allAssignedIds = new Set(rawLayers.flatMap(l => l.userIds || []));
+    const deptUsers = companyUsers.filter(u => u.departmentId === dept.id);
+    const unassignedMembers = deptUsers.filter(u => !allAssignedIds.has(u.id));
+
+    res.json({
+      success: true,
+      department: dept,
+      layers: enrichedLayers,
+      departmentUsers: deptUsers.map(u => userMap.get(u.id)),
+      companyUsers: companyUsers.map(u => userMap.get(u.id)),
+      unassignedMembers: unassignedMembers.map(u => userMap.get(u.id))
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error loading hierarchy details', error: error.message });
+  }
+});
+
+// @desc    Update hierarchy layers and direct manager reporting assignments
+// @route   PUT /api/departments/:id/hierarchy
+router.put('/:id/hierarchy', adminOnly, checkPermission('departments', 'departments-list', 'canEdit'), async (req, res) => {
+  const { sequelize } = require('../config/db');
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const { hierarchyLayers, reportingAssignments } = req.body;
+
+    const dept = await Department.findByPk(id, { transaction: t });
+    if (!dept) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Department not found' });
+    }
+
+    const layers = Array.isArray(hierarchyLayers) ? hierarchyLayers : [];
+    const primaryHeadId = layers[0]?.userIds?.[0] || null;
+
+    // Validate reporting assignments
+    if (reportingAssignments && typeof reportingAssignments === 'object') {
+      const pairs = Array.isArray(reportingAssignments) 
+        ? reportingAssignments 
+        : Object.entries(reportingAssignments).map(([userId, managerId]) => ({ userId, managerId }));
+
+      // Self-reporting check
+      for (const p of pairs) {
+        if (p.userId && p.managerId && p.userId === p.managerId) {
+          await t.rollback();
+          return res.status(400).json({ success: false, message: 'A user cannot report to themselves.' });
+        }
+      }
+
+      // Circular reporting check
+      const currentUsers = await User.findAll({
+        where: { companyId: dept.companyId },
+        attributes: ['id', 'managerId'],
+        transaction: t
+      });
+      const currentMap = {};
+      currentUsers.forEach(u => { currentMap[u.id] = u.managerId; });
+      pairs.forEach(p => { currentMap[p.userId] = p.managerId || null; });
+
+      for (const p of pairs) {
+        if (!p.managerId) continue;
+        let curr = p.managerId;
+        const visited = new Set([p.userId]);
+        while (curr) {
+          if (visited.has(curr)) {
+            await t.rollback();
+            return res.status(400).json({
+              success: false,
+              message: 'Circular reporting detected! A reporting loop was found in the hierarchy.'
+            });
+          }
+          visited.add(curr);
+          curr = currentMap[curr];
+        }
+      }
+
+      // Apply updates to users
+      for (const p of pairs) {
+        if (p.userId) {
+          await User.update(
+            { managerId: p.managerId || null },
+            { where: { id: p.userId, companyId: dept.companyId }, transaction: t }
+          );
+        }
+      }
+    }
+
+    // Assign departmentId for all users placed in layers
+    const allLayerUserIds = layers.flatMap(l => l.userIds || []);
+    if (allLayerUserIds.length > 0) {
+      await User.update(
+        { departmentId: dept.id },
+        { where: { id: { [Op.in]: allLayerUserIds }, departmentId: null }, transaction: t }
+      );
+    }
+
+    // Update department layers & primary head
+    await dept.update({
+      hierarchyLayers: layers,
+      headId: primaryHeadId
+    }, { transaction: t });
+
+    await t.commit();
+
+    const { logAction } = require('../utils/auditLogger');
+    await logAction(req, 'UPDATE', 'departments', dept.id, dept.name, {
+      description: `Configured hierarchy layers and reporting lines for department ${dept.name}`,
+      layersCount: layers.length
+    });
+
+    res.json({
+      success: true,
+      message: 'Department hierarchy and reporting lines saved successfully!',
+      headId: primaryHeadId
+    });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({ success: false, message: 'Server error saving hierarchy', error: error.message });
   }
 });
 

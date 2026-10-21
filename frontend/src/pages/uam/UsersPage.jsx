@@ -21,11 +21,18 @@ const UserModal = ({ user, onClose, onSaved }) => {
     companyId: user?.company?.id || '',
     departmentId: user?.department?.id || '',
     isActive: user?.isActive ?? true,
+    paidLeaves: user?.paidLeaves ?? 12,
+    casualLeaves: user?.casualLeaves ?? 10,
+    sickLeaves: user?.sickLeaves ?? 8,
+    baseSalary: user?.baseSalary !== undefined && user?.baseSalary !== null ? user.baseSalary : '',
+    monthlyLeaveQuota: user?.monthlyLeaveQuota !== undefined && user?.monthlyLeaveQuota !== null ? user.monthlyLeaveQuota : 1,
+    managerId: user?.manager?.id || user?.managerId || '',
   });
   const [roles, setRoles] = useState([]);
   const [orgs, setOrgs] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,6 +45,14 @@ const UserModal = ({ user, onClose, onSaved }) => {
       setOrgs(o.data.organizations || []);
     }).catch(() => {});
   }, []);
+
+  // Fetch managers strictly scoped to selected organization
+  useEffect(() => {
+    const orgParam = form.organizationId ? `?organizationId=${form.organizationId}` : '';
+    api.get(`/uam/managers${orgParam}`)
+      .then(r => setManagers(r.data.managers || []))
+      .catch(() => setManagers([]));
+  }, [form.organizationId]);
 
   useEffect(() => {
     if (form.organizationId) {
@@ -79,7 +94,7 @@ const UserModal = ({ user, onClose, onSaved }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal">
+      <div className="modal" style={{ maxWidth: 580 }}>
         <div className="modal-header">
           <h3 className="modal-title">{user ? 'Edit User' : 'Create New User'}</h3>
           <button className="btn btn-icon" onClick={onClose}>✕</button>
@@ -154,6 +169,115 @@ const UserModal = ({ user, onClose, onSaved }) => {
                   </select>
                 </div>
               )}
+            </div>
+
+            {/* Leave Allocation / Annual Quota Section */}
+            <div style={{ marginTop: 8, padding: '14px 16px', background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                📅 Annual Leave Quota Allocation (Days)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: 12 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Paid Leave (PL)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    className="form-control"
+                    value={form.paidLeaves}
+                    onChange={e => setForm(p => ({ ...p, paidLeaves: e.target.value }))}
+                    placeholder="12"
+                    id="user-paid-leaves"
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Casual Leave (CL)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    className="form-control"
+                    value={form.casualLeaves}
+                    onChange={e => setForm(p => ({ ...p, casualLeaves: e.target.value }))}
+                    placeholder="10"
+                    id="user-casual-leaves"
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Sick Leave (SL)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    className="form-control"
+                    value={form.sickLeaves}
+                    onChange={e => setForm(p => ({ ...p, sickLeaves: e.target.value }))}
+                    placeholder="8"
+                    id="user-sick-leaves"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Salary & Attendance Policy Configuration */}
+            <div style={{ marginTop: 12, padding: '14px 16px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#10b981', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                💵 Salary & Leave Policy Configuration
+              </div>
+              <div className="grid-2">
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Monthly Base Salary (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    className="form-control"
+                    value={form.baseSalary}
+                    onChange={e => setForm(p => ({ ...p, baseSalary: e.target.value }))}
+                    placeholder="e.g. 25000"
+                    id="user-base-salary"
+                  />
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                    Used for daily wage & absent deduction calculations.
+                  </small>
+                </div>
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Monthly Paid Leave Limit (Days)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="31"
+                    className="form-control"
+                    value={form.monthlyLeaveQuota}
+                    onChange={e => setForm(p => ({ ...p, monthlyLeaveQuota: e.target.value }))}
+                    placeholder="1"
+                    id="user-monthly-quota"
+                  />
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                    Leaves exceeding this quota in a month become Loss of Pay (LOP).
+                  </small>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Reporting Manager / Approver (Same Organization)</label>
+                <select
+                  className="form-control"
+                  value={form.managerId}
+                  onChange={e => setForm(p => ({ ...p, managerId: e.target.value }))}
+                  id="user-manager"
+                >
+                  <option value="">No Direct Manager (Super Admin / Direct Org Admin)</option>
+                  {managers.filter(m => !user || m.id !== user.id).map(m => (
+                    <option key={m.id} value={m.id}>
+                      👤 {m.name} ({m.role?.name || 'User'})
+                    </option>
+                  ))}
+                </select>
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                  Leave and Attendance correction requests will be routed to this manager.
+                </small>
+              </div>
             </div>
           </div>
 
@@ -237,22 +361,25 @@ const UsersPage = () => {
 
       <div className="card">
         <div className="card-header">
-          <div className="search-bar">
-            <div className="input-wrapper">
+          <div className="search-bar" style={{ minWidth: 200, maxWidth: 360, flex: '1 1 auto' }}>
+            <div className="input-wrapper" style={{ width: '100%' }}>
               <RiSearchLine className="input-icon" />
               <input
                 className="form-control"
                 placeholder="Search users..."
                 value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1); }}
-                style={{ width: 260 }}
+                style={{ width: '100%' }}
                 id="user-search"
               />
             </div>
           </div>
-          <button className="btn btn-icon" onClick={fetchUsers} title="Refresh">
-            <RiRefreshLine />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total: {total}</span>
+            <button className="btn btn-icon" onClick={fetchUsers} title="Refresh">
+              <RiRefreshLine />
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -267,16 +394,18 @@ const UsersPage = () => {
           </div>
         ) : (
           <div className="table-wrapper">
-            <table className="table">
+            <table className="table table-sticky-actions">
               <thead>
                 <tr>
-                  <th>User</th>
-                  <th>Role</th>
-                  <th>Organization</th>
-                  <th>Company</th>
-                  <th>Department</th>
-                  <th>Status</th>
-                  {(canEdit || canDelete) && <th>Actions</th>}
+                  <th style={{ minWidth: 190 }}>User</th>
+                  <th style={{ minWidth: 105 }}>Role</th>
+                  <th style={{ minWidth: 110 }}>Organization</th>
+                  <th style={{ minWidth: 105 }}>Department</th>
+                  <th style={{ minWidth: 135 }}>Reporting Manager</th>
+                  <th style={{ minWidth: 125 }}>Salary & Policy</th>
+                  <th style={{ minWidth: 165 }}>Leave Quota</th>
+                  <th style={{ minWidth: 95 }}>Status</th>
+                  {(canEdit || canDelete) && <th style={{ minWidth: 90, textAlign: 'center' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -302,16 +431,73 @@ const UsersPage = () => {
                       </span>
                     </td>
                     <td style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{u.organization?.name || '—'}</td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{u.company?.name || '—'}</td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{u.department?.name || '—'}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      <div>{u.department?.name || '—'}</div>
+                      {u.headedDepartments && u.headedDepartments.length > 0 && (
+                        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {u.headedDepartments.map(hd => (
+                            <span
+                              key={hd.id}
+                              title={`Head of Department: ${hd.name}`}
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                color: '#d97706',
+                                background: 'rgba(245, 158, 11, 0.12)',
+                                border: '1px solid rgba(245, 158, 11, 0.28)',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3
+                              }}
+                            >
+                              👑 Head: {hd.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {u.manager ? (
+                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent)', background: 'rgba(99, 102, 241, 0.08)', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                          👤 {u.manager.name}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Direct / None</span>
+                      )}
+                    </td>
+                    <td>
+                      {u.baseSalary ? (
+                        <div>
+                          <strong style={{ color: '#10b981', fontSize: '0.85rem' }}>₹{Number(u.baseSalary).toLocaleString()}</strong>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{u.monthlyLeaveQuota ?? 1} free lv/mo</div>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Not set</span>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: 6, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700 }} title="Paid Leave Quota">
+                          PL: {u.paidLeaves ?? 12}
+                        </span>
+                        <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 6, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700 }} title="Casual Leave Quota">
+                          CL: {u.casualLeaves ?? 10}
+                        </span>
+                        <span style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 6, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700 }} title="Sick Leave Quota">
+                          SL: {u.sickLeaves ?? 8}
+                        </span>
+                      </div>
+                    </td>
                     <td>
                       <span className={`badge ${u.isActive ? 'badge-success' : 'badge-danger'}`}>
                         {u.isActive ? '● Active' : '● Inactive'}
                       </span>
                     </td>
                     {(canEdit || canDelete) && (
-                      <td>
-                        <div className="flex gap-2">
+                      <td style={{ textAlign: 'center' }}>
+                        <div className="flex gap-2" style={{ justifyContent: 'center' }}>
                           {canEdit && !u.isSuperAdmin && (
                             <button className="btn btn-icon btn-sm" onClick={() => { setEditUser(u); setShowModal(true); }} title="Edit" id={`edit-user-${u.id}`}>
                               <RiPencilLine />

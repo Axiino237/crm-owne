@@ -49,6 +49,7 @@ const connectDB = async () => {
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'system-overview'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_module ADD VALUE IF NOT EXISTS 'closed_sales'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'closed-sales-list'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'closed-sales-all'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'closed-sales-value'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'closed-sales-paid'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'closed-sales-balance'");
@@ -64,13 +65,24 @@ const connectDB = async () => {
       await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"completedModelUrl\" TEXT");
       await sequelize.query("ALTER TABLE crm_design_orders ADD COLUMN IF NOT EXISTS \"completedAt\" TIMESTAMP WITH TIME ZONE");
       await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"publicKey\" TEXT");
+      await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"paidLeaves\" INTEGER DEFAULT 12");
+      await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"casualLeaves\" INTEGER DEFAULT 10");
+      await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"sickLeaves\" INTEGER DEFAULT 8");
+      await sequelize.query("ALTER TYPE enum_crm_leave_requests_leaveType ADD VALUE IF NOT EXISTS 'paid'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'completed-models-list'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_module ADD VALUE IF NOT EXISTS 'attendance'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'attendance-list'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_module ADD VALUE IF NOT EXISTS 'chat'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'chat-room'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'chat-workspaces'");
+      await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"baseSalary\" NUMERIC(12, 2) DEFAULT 0");
+      await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"monthlyLeaveQuota\" INTEGER DEFAULT 1");
+      await sequelize.query("ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS \"managerId\" UUID");
+      await sequelize.query("ALTER TABLE crm_leave_requests ADD COLUMN IF NOT EXISTS \"isLossOfPay\" BOOLEAN DEFAULT FALSE");
+      await sequelize.query("ALTER TABLE crm_departments ADD COLUMN IF NOT EXISTS \"hierarchyLayers\" JSONB DEFAULT '[]'::jsonb");
+      await sequelize.query("ALTER TABLE crm_departments ADD COLUMN IF NOT EXISTS \"headId\" UUID");
       await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'not_interested'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'staff-summary'");
     } catch (err) {
       // Silently ignore if types do not exist yet (will be created by sync)
     }

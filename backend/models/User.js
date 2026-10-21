@@ -65,6 +65,31 @@ const User = sequelize.define('User', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  paidLeaves: {
+    type: DataTypes.INTEGER,
+    defaultValue: 12
+  },
+  casualLeaves: {
+    type: DataTypes.INTEGER,
+    defaultValue: 10
+  },
+  sickLeaves: {
+    type: DataTypes.INTEGER,
+    defaultValue: 8
+  },
+  baseSalary: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0
+  },
+  monthlyLeaveQuota: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1
+  },
+  managerId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: { model: 'crm_users', key: 'id' }
+  },
   createdById: {
     type: DataTypes.UUID,
     allowNull: true

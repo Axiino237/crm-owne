@@ -61,21 +61,30 @@ body {
 .app-layout {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  position: relative;
 }
 
 .main-content {
   margin-left: var(--sidebar-width);
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: calc(100vw - var(--sidebar-width));
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   transition: margin-left 0.3s ease;
+  overflow-x: hidden;
 }
 
 .page-wrapper {
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   padding: 24px;
   margin-top: var(--header-height);
+  box-sizing: border-box;
 }
 
 /* ==================== GLASS CARD ==================== */
@@ -87,6 +96,9 @@ body {
   border-radius: var(--radius);
   padding: 24px;
   transition: var(--transition);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .card:hover { border-color: var(--border-hover); }
@@ -98,6 +110,8 @@ body {
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .card-title {
@@ -185,25 +199,37 @@ body {
 
 .form-control {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   transition: var(--transition);
   outline: none;
 }
 .form-control:focus {
   border-color: var(--accent);
-  background: rgba(129, 140, 248, 0.05);
-  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+  background: rgba(129, 140, 248, 0.06);
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
 }
 .form-control::placeholder { color: var(--text-muted); }
 .form-control:disabled { opacity: 0.5; cursor: not-allowed; }
 
-select.form-control option { background: var(--bg-card); color: var(--text-primary); }
+select.form-control {
+  padding: 0 14px;
+  height: 40px;
+  line-height: 40px;
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: menulist;
+}
+select.form-control option {
+  background: #0d1326;
+  color: #e2e8f0;
+  padding: 10px 12px;
+}
 
 /* Input with icon */
 .input-wrapper { position: relative; }
@@ -234,20 +260,43 @@ select.form-control option { background: var(--bg-card); color: var(--text-prima
 
 /* ==================== TABLE ==================== */
 .table-wrapper {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: var(--radius);
   border: 1px solid var(--border);
+  position: relative;
+  background: var(--bg-card);
+}
+
+/* Custom sleek horizontal scrollbar */
+.table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+.table-wrapper::-webkit-scrollbar-track {
+  background: rgba(10, 15, 30, 0.7);
+  border-radius: 99px;
+}
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.4);
+  border-radius: 99px;
+  border: 2px solid rgba(10, 15, 30, 0.7);
+}
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 .table {
   width: 100%;
+  min-width: 1020px;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
 
 .table th {
-  background: rgba(129, 140, 248, 0.06);
-  padding: 14px 16px;
+  background: rgba(129, 140, 248, 0.08);
+  padding: 13px 15px;
   text-align: left;
   font-size: 0.75rem;
   font-weight: 700;
@@ -259,7 +308,7 @@ select.form-control option { background: var(--bg-card); color: var(--text-prima
 }
 
 .table td {
-  padding: 14px 16px;
+  padding: 13px 15px;
   border-bottom: 1px solid rgba(129, 140, 248, 0.06);
   color: var(--text-primary);
   vertical-align: middle;
@@ -271,6 +320,22 @@ select.form-control option { background: var(--bg-card); color: var(--text-prima
   transition: background 0.15s;
 }
 .table tbody tr:hover { background: rgba(129, 140, 248, 0.04); }
+
+/* Sticky actions column so edit/delete buttons stay visible */
+.table th.sticky-action-col,
+.table td.sticky-action-col,
+.table-sticky-actions th:last-child,
+.table-sticky-actions td:last-child {
+  position: sticky;
+  right: 0;
+  background: #0d1326;
+  z-index: 2;
+  box-shadow: -4px 0 10px rgba(0, 0, 0, 0.35);
+}
+.table tbody tr:hover td.sticky-action-col,
+.table-sticky-actions tbody tr:hover td:last-child {
+  background: #141c38;
+}
 
 /* ==================== BADGES ==================== */
 .badge {
@@ -602,25 +667,69 @@ select.form-control option { background: var(--bg-card); color: var(--text-prima
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 
 /* ==================== RESPONSIVE ==================== */
+@media (max-width: 1024px) {
+  .page-wrapper { padding: 18px 16px; }
+  .card { padding: 18px 16px; }
+}
+
 @media (max-width: 768px) {
   :root { --sidebar-width: 0px; }
-  .main-content { margin-left: 0; }
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-  .page-title { font-size: 1.375rem; }
+  .main-content {
+    margin-left: 0;
+    max-width: 100vw;
+  }
+  .page-wrapper {
+    padding: 16px 12px;
+  }
+  .card {
+    padding: 16px 12px;
+    border-radius: 10px;
+  }
+  .grid-2, .grid-3, .grid-4 {
+    grid-template-columns: 1fr;
+  }
+  .page-title {
+    font-size: 1.35rem;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .page-header .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .search-bar {
+    width: 100%;
+  }
+  .search-bar .input-wrapper,
+  .search-bar .form-control {
+    width: 100% !important;
+  }
+  .modal {
+    max-width: 95vw;
+    margin: 10px;
+  }
 }
 
-/* Performance summary cards grid: 6 on widescreen, 3x2 on laptop/desktop, 2x3 on tablet, 1 on mobile */
+@media (max-width: 480px) {
+  .page-wrapper { padding: 12px 8px; }
+  .card { padding: 14px 10px; border-radius: 8px; }
+  .modal-header, .modal-body, .modal-footer { padding: 16px; }
+}
+
+/* Performance summary cards grid: Auto-fit min 215px to prevent title truncation */
 .perf-stat-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
-}
-
-@media (max-width: 1500px) {
-  .perf-stat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 768px) {

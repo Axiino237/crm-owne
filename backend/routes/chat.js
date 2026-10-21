@@ -34,24 +34,18 @@ const emitChatMessage = (req, msg) => {
 
 router.use(protect);
 
-// Helper to get organizationId (with fallback for Super Admin)
-const getOrgId = async (req) => {
-  let orgId = req.user.organizationId;
-  if (req.user.isSuperAdmin && !orgId) {
-    const { Organization } = require('../models');
-    const firstOrg = await Organization.findOne();
-    orgId = firstOrg?.id;
-  }
-  return orgId;
+// Helper to get organizationId (strictly respecting user's assigned organization)
+const getOrgId = (req) => {
+  return req.user.organizationId || null;
 };
 
 // @desc   Get all chat servers and unassigned companies in user's organization
 // @route  GET /api/chat/servers
 router.get('/servers', async (req, res) => {
   try {
-    const orgId = await getOrgId(req);
+    const orgId = getOrgId(req);
     if (!orgId) {
-      return res.status(400).json({ success: false, message: 'User does not belong to an organization' });
+      return res.json({ success: true, servers: [], companies: [] });
     }
 
     // Get all chat servers in org
@@ -304,9 +298,9 @@ router.post('/message', async (req, res) => {
 // @route  GET /api/chat/members
 router.get('/members', async (req, res) => {
   try {
-    const orgId = await getOrgId(req);
+    const orgId = getOrgId(req);
     if (!orgId) {
-      return res.status(400).json({ success: false, message: 'User does not belong to an organization' });
+      return res.json({ success: true, members: [] });
     }
 
     let targetCompanyIds = [];

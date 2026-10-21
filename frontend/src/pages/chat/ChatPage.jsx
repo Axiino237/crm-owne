@@ -19,12 +19,17 @@ import { generateE2EEKeys, encryptE2EEMessage, decryptE2EEMessage } from '../../
 
 // Sub-component to handle E2EE decryption asynchronously
 const DecryptedMessage = ({ rawMessage, privateKeyJwk, isSender }) => {
-  const [decryptedText, setDecryptedText] = useState('Decrypting secure message...');
+  const [decryptedText, setDecryptedText] = useState(rawMessage);
 
   useEffect(() => {
+    if (!rawMessage || typeof rawMessage !== 'string' || !rawMessage.startsWith('{"encryptedPayload"')) {
+      setDecryptedText(rawMessage);
+      return;
+    }
+
     const decrypt = async () => {
       if (!privateKeyJwk) {
-        setDecryptedText('🔑 [Encrypted Message - Private key missing]');
+        setDecryptedText('🔑 [Encrypted Message]');
         return;
       }
       try {
@@ -37,9 +42,11 @@ const DecryptedMessage = ({ rawMessage, privateKeyJwk, isSender }) => {
     decrypt();
   }, [rawMessage, privateKeyJwk, isSender]);
 
+  const isEncrypted = typeof rawMessage === 'string' && rawMessage.startsWith('{"encryptedPayload"');
+
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      {rawMessage.startsWith('{"encryptedPayload"') && <RiLock2Line style={{ color: 'var(--success)', display: 'inline', fontSize: '0.85rem' }} />}
+      {isEncrypted && <RiLock2Line style={{ color: 'var(--success)', display: 'inline', fontSize: '0.85rem' }} />}
       {decryptedText}
     </span>
   );
@@ -106,8 +113,10 @@ const ChatPage = () => {
     const token = localStorage.getItem('crm_token');
     if (!token) return;
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', {
-      auth: { token }
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const socket = io(socketUrl, {
+      auth: { token },
+      transports: ['websocket', 'polling']
     });
 
     socket.on('connect', () => {
@@ -195,16 +204,16 @@ const ChatPage = () => {
     ? servers.find(s => s.id === userCompany.chatServerId) 
     : servers.length > 0 ? servers[0] : null; // Fallback to first server for admins
 
-  // Set default channel on load (prioritizing Global Chat server channel)
+  // Set default channel on load (prioritizing company channel or first direct message)
   useEffect(() => {
-    if (!selectedChannel && !loadingServers) {
-      if (userServer) {
-        setSelectedChannel({ type: 'server', id: userServer.id, name: 'Global Chat' });
-      } else if (userCompany) {
-        setSelectedChannel({ type: 'company', id: userCompany.id, name: 'Private Channel' });
+    if (!selectedChannel) {
+      if (userCompany) {
+        setSelectedChannel({ type: 'company', id: userCompany.id, name: userCompany.name || 'Company Channel' });
+      } else if (members.length > 0) {
+        setSelectedChannel({ type: 'dm', id: members[0].id, name: members[0].name });
       }
     }
-  }, [loadingServers, userServer, userCompany, selectedChannel]);
+  }, [userCompany, members, selectedChannel]);
 
   // Active channel query parameters
   const queryParams = {
@@ -234,7 +243,6 @@ const ChatPage = () => {
     if (!messageText.trim() || !selectedChannel) return;
 
     let msgToSend = messageText;
-    let isEncrypted = false;
 
     if (selectedChannel.type === 'dm') {
       const receiver = members.find(m => m.id === selectedChannel.id);
@@ -245,14 +253,13 @@ const ChatPage = () => {
             JSON.parse(receiver.publicKey),
             publicKeyJwk
           );
-          isEncrypted = true;
         } catch (error) {
-          toast.error('Encryption failed. Message not sent for your security.');
-          return;
+          console.warn('E2EE encryption fallback to standard message transport:', error);
+          msgToSend = messageText;
         }
       } else {
-        toast.error('Cannot send: recipient has not registered encryption keys yet. Ask them to open the Chat page.', { duration: 5000 });
-        return;
+        // Send directly so messaging is never blocked if user is offline or hasn't generated keys!
+        msgToSend = messageText;
       }
     }
 
@@ -278,16 +285,16 @@ const ChatPage = () => {
 
   const placeholderText = selectedChannel 
     ? (selectedChannel.type === 'dm' 
-        ? (isE2EEDM ? `🔒 Send secure E2EE message to ${selectedChannel.name}...` : `🔓 Send message to ${selectedChannel.name}... (receiver has no keys)`)
+        ? `Send message to ${selectedChannel.name}...` 
         : `Send message to # ${selectedChannel.name}...`)
-    : 'Select a channel or member...';
+    : 'Select a conversation...';
 
   return (
     <AppLayout title="Collaboration Chat Room">
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: '260px 1fr 260px', 
-        gap: 20, 
+        gridTemplateColumns: '280px 1fr', 
+        gap: 0, 
         height: 'calc(100vh - 140px)',
         background: 'var(--bg-card)',
         borderRadius: 12,
@@ -305,72 +312,46 @@ const ChatPage = () => {
           background: 'var(--bg-secondary)',
           overflowY: 'auto'
         }}>
-          {/* Channels list */}
-          <div>
-            <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 12, paddingLeft: 4 }}>
-              📢 Channels
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {userServer && (
-                <button
-                  onClick={() => setSelectedChannel({ type: 'server', id: userServer.id, name: 'Global Chat' })}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    background: selectedChannel?.type === 'server' ? 'var(--accent)' : 'transparent',
-                    color: selectedChannel?.type === 'server' ? '#ffffff' : 'var(--text-primary)',
-                    border: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    transition: 'background 0.2s'
-                  }}
-                >
-                  🌐 # Global Chat
-                </button>
-              )}
-
-              {userCompany && (
-                <button
-                  onClick={() => setSelectedChannel({ type: 'company', id: userCompany.id, name: 'Private Channel' })}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    background: selectedChannel?.type === 'company' ? 'var(--accent)' : 'transparent',
-                    color: selectedChannel?.type === 'company' ? '#ffffff' : 'var(--text-primary)',
-                    border: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    transition: 'background 0.2s'
-                  }}
-                >
-                  🏢 # Private Channel
-                </button>
-              )}
+          {/* Company Channel (if company assigned) */}
+          {userCompany && (
+            <div>
+              <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
+                📢 Team Channel
+              </h4>
+              <button
+                onClick={() => setSelectedChannel({ type: 'company', id: userCompany.id, name: userCompany.name || 'Team Channel' })}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  background: selectedChannel?.type === 'company' ? 'var(--accent)' : 'transparent',
+                  color: selectedChannel?.type === 'company' ? '#ffffff' : 'var(--text-primary)',
+                  border: 'none',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  transition: 'background 0.2s'
+                }}
+              >
+                🏢 # {userCompany.name || 'Company Channel'}
+              </button>
             </div>
-          </div>
+          )}
 
           {/* Direct Messages list */}
           <div>
-            <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 12, paddingLeft: 4 }}>
-              💬 Direct Messages
+            <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
+              💬 Direct Messages ({members.length})
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {loadingMembers ? (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: 4 }}>Loading...</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: 4 }}>Loading members...</div>
               ) : members.length === 0 ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: 4 }}>No workspace members found.</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: 4 }}>No organization members found.</div>
               ) : (
                 members.map(member => {
                   const isSelected = selectedChannel?.type === 'dm' && selectedChannel.id === member.id;
@@ -387,27 +368,41 @@ const ChatPage = () => {
                         background: isSelected ? 'var(--accent)' : 'transparent',
                         color: isSelected ? '#ffffff' : 'var(--text-primary)',
                         border: 'none',
-                        fontSize: '0.82rem',
-                        fontWeight: 700,
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        gap: 8,
+                        gap: 10,
                         transition: 'background 0.2s'
                       }}
                     >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ 
-                          width: 8, 
-                          height: 8, 
-                          borderRadius: '50%', 
-                          background: member.isOnline ? 'var(--success)' : 'var(--text-muted)',
-                          boxShadow: member.isOnline && !isSelected ? '0 0 6px var(--success)' : 'none',
-                          flexShrink: 0
-                        }} />
-                        {member.name}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(56, 189, 248, 0.12)',
+                            color: isSelected ? '#ffffff' : 'var(--accent)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.75rem', fontWeight: 800
+                          }}>
+                            {member.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{
+                            width: 8, height: 8, borderRadius: '50%',
+                            background: member.isOnline ? 'var(--success)' : 'var(--text-muted)',
+                            border: '2px solid var(--bg-secondary)',
+                            position: 'absolute', bottom: -1, right: -1
+                          }} />
+                        </div>
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 700, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {member.name}
+                          </div>
+                          <div style={{ fontSize: '0.68rem', opacity: isSelected ? 0.85 : 0.65, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {member.roleName || member.deptName || 'Member'}
+                          </div>
+                        </div>
+                      </div>
                     </button>
                   );
                 })
@@ -436,23 +431,26 @@ const ChatPage = () => {
                   # {selectedChannel ? selectedChannel.name : 'Loading Channel...'}
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  {selectedChannel?.type === 'server' ? `Shared Server workspace: ${userServer?.name || 'Default'}` : 
-                   selectedChannel?.type === 'company' ? 'Private isolated company channel' : 'Direct Message session'}
+                  {selectedChannel?.type === 'company' ? 'Private organization channel' : 'Direct Message session'}
                 </span>
               </div>
             </div>
 
-            {/* E2EE Badge */}
+            {/* Session Security Badge */}
             {selectedChannel?.type === 'dm' && (
-              isE2EEDM ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--success)', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.1)', padding: '4px 10px', borderRadius: 20, fontWeight: 700 }}>
-                  <RiLock2Line /> End-to-End Encrypted
-                </span>
-              ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#f59e0b', fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', padding: '4px 10px', borderRadius: 20, fontWeight: 700 }} title="Recipient must open Chat page to register their encryption keys.">
-                  <RiLock2Line /> Waiting for recipient keys...
-                </span>
-              )
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                color: isE2EEDM ? 'var(--success)' : 'var(--accent)',
+                fontSize: '0.75rem',
+                background: isE2EEDM ? 'rgba(34, 197, 94, 0.1)' : 'rgba(56, 189, 248, 0.1)',
+                padding: '4px 10px',
+                borderRadius: 20,
+                fontWeight: 700
+              }}>
+                <RiLock2Line /> {isE2EEDM ? 'End-to-End Encrypted' : 'Direct Message'}
+              </span>
             )}
           </div>
 
@@ -577,82 +575,6 @@ const ChatPage = () => {
               <RiSendPlane2Line /> Send
             </button>
           </form>
-        </div>
-
-        {/* Right Sidebar - Active Members and Click-to-DM triggers */}
-        <div style={{ 
-          borderLeft: '1px solid var(--border)', 
-          padding: '20px 14px', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 20, 
-          background: 'var(--bg-secondary)',
-          overflowY: 'auto'
-        }}>
-          <div>
-            <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 12, paddingLeft: 4 }}>
-              👥 Active Members ({members.length})
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {loadingMembers ? (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: 4 }}>Loading...</div>
-              ) : members.length === 0 ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: 4 }}>No members.</div>
-              ) : (
-                members.map(member => (
-                  <div 
-                    key={member.id} 
-                    onClick={() => selectDirectMessage(member)}
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 10, 
-                      padding: '8px 10px', 
-                      borderRadius: 8, 
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      cursor: 'pointer',
-                      transition: 'border 0.2s, background 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.border = '1px solid var(--accent)';
-                      e.currentTarget.style.background = 'rgba(56, 189, 248, 0.03)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.border = '1px solid var(--border)';
-                      e.currentTarget.style.background = 'var(--bg-card)';
-                    }}
-                    title={`Click to Direct Message ${member.name}`}
-                  >
-                    {/* Status dot */}
-                    <div style={{ 
-                      width: 8, 
-                      height: 8, 
-                      borderRadius: '50%', 
-                      background: member.isOnline ? 'var(--success)' : 'var(--text-muted)',
-                      boxShadow: member.isOnline ? '0 0 8px var(--success)' : 'none',
-                      flexShrink: 0
-                    }} />
-
-                    {/* Member Details */}
-                    <div style={{ overflow: 'hidden' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {member.name}
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <RiBuildingLine /> {member.companyName}
-                        </span>
-                        <span style={{ fontSize: '0.62rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 2, fontWeight: 600 }}>
-                          <RiFolderUserLine /> {member.roleName}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
         </div>
 
       </div>

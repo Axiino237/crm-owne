@@ -143,14 +143,14 @@ const PerformancePage = () => {
       <div className="card" style={{ padding: '16px 20px', marginBottom: 24, background: 'var(--bg-card)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
           
-          {/* Department Filter (Admins only) */}
+          {/* Department Filter (Admins or multi-department heads) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <RiGroupLine style={{ color: 'var(--text-muted)' }} />
             <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Department:</span>
             <select
               value={selectedDept}
               onChange={e => setSelectedDept(e.target.value)}
-              disabled={!isAdmin}
+              disabled={!isAdmin && departments.length <= 1}
               style={{
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border)',
@@ -158,15 +158,17 @@ const PerformancePage = () => {
                 padding: '8px 12px',
                 color: 'var(--text-primary)',
                 fontSize: '0.875rem',
-                cursor: isAdmin ? 'pointer' : 'default',
-                opacity: isAdmin ? 1 : 0.75
+                cursor: (isAdmin || departments.length > 1) ? 'pointer' : 'default',
+                opacity: (isAdmin || departments.length > 1) ? 1 : 0.75
               }}
             >
-              {!isAdmin && <option value={selectedDept}>{activeDeptLabel}</option>}
-              {isAdmin && departments.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-              {isAdmin && departments.length === 0 && <option value="">No departments</option>}
+              {departments.length > 0 ? (
+                departments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))
+              ) : (
+                <option value={selectedDept || ''}>{activeDeptLabel || 'No departments'}</option>
+              )}
             </select>
           </div>
 

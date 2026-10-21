@@ -1,18 +1,44 @@
 const express = require('express');
 const router = express.Router();
-const { Lead, User, Organization } = require('../models');
+const { Lead, User, Organization, Permission } = require('../models');
 const { protect } = require('../middleware/auth');
-const { checkPermission } = require('../middleware/permission');
 const { Op } = require('sequelize');
 
 router.use(protect);
 
-// @desc   Get all closed (converted) sales/leads
+// @desc   Get closed (converted) sales/leads with granular (All vs Own) scoping
 // @route  GET /api/closed-sales
-router.get('/', checkPermission('closed_sales', 'closed-sales-list', 'canView'), async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { search = '', page = 1, limit = 10 } = req.query;
-    
+
+    const userRole = req.user.role?.level;
+    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
+
+    // Check permissions for closed_sales (All vs Own)
+    let hasAllAccess = isSuper;
+    let hasOwnAccess = isSuper;
+
+    if (!isSuper && req.user.roleId) {
+      const perms = await Permission.findAll({
+        where: {
+          roleId: req.user.roleId,
+          module: 'closed_sales',
+          screen: { [Op.in]: ['closed-sales-all', 'closed-sales-list'] }
+        }
+      });
+      hasAllAccess = perms.some(p => p.screen === 'closed-sales-all' && p.canView);
+      hasOwnAccess = perms.some(p => p.screen === 'closed-sales-list' && p.canView);
+    }
+
+    // If user has neither permission, deny access
+    if (!hasAllAccess && !hasOwnAccess) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: You don't have permission to view closed sales."
+      });
+    }
+
     // Base filter: Only status 'converted'
     const where = {
       status: 'converted'
@@ -29,37 +55,16 @@ router.get('/', checkPermission('closed_sales', 'closed-sales-list', 'canView'),
       ];
     }
 
-    // Role-based scoping
-    const userRole = req.user.role?.level;
-    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
-    const isOrgAdmin = userRole === 'org_admin';
-    const isCompanyAdmin = userRole === 'company_admin';
-    const isDeptManager = userRole === 'dept_manager';
-    const isRegular = userRole === 'user';
-
-    if (!isSuper) {
-      if (isOrgAdmin && req.user.organizationId) {
+    // ── Apply Scoping based on Permission ──
+    // 1. If hasAllAccess: Show everyone's closed sales (within org if not superadmin)
+    // 2. If ONLY hasOwnAccess (and NOT hasAllAccess): STRICTLY show only user's own closed sales
+    if (hasAllAccess) {
+      if (!isSuper && req.user.organizationId) {
         where.organizationId = req.user.organizationId;
-      } else if (isCompanyAdmin && req.user.companyId) {
-        // Enforce company scoping
-        // Note: Lead doesn't have companyId directly, but we scope it by matching users in that company, or we can check org if needed.
-        // Let's find all user IDs in the same company:
-        const companyUserIds = (await User.findAll({
-          where: { companyId: req.user.companyId },
-          attributes: ['id']
-        })).map(u => u.id);
-        where.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else if (isDeptManager && req.user.departmentId) {
-        // Enforce department scoping
-        const deptUserIds = (await User.findAll({
-          where: { departmentId: req.user.departmentId },
-          attributes: ['id']
-        })).map(u => u.id);
-        where.assignedTo = { [Op.or]: [{ [Op.in]: deptUserIds }, null] };
-      } else if (isRegular) {
-        // Enforce self scoping
-        where.assignedTo = req.user.id;
       }
+    } else {
+      // User only has Own Closed Sales permission -> strictly scope to assignedTo = req.user.id
+      where.assignedTo = req.user.id;
     }
 
     const { count, rows } = await Lead.findAndCountAll({
@@ -75,6 +80,8 @@ router.get('/', checkPermission('closed_sales', 'closed-sales-list', 'canView'),
 
     res.json({
       success: true,
+      canViewAll: hasAllAccess,
+      scopeType: hasAllAccess ? 'all' : 'own',
       total: count,
       page: Number(page),
       limit: Number(limit),

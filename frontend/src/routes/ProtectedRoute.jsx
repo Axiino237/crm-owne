@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
  * @param {string} action - e.g. 'canView'
  */
 const ProtectedRoute = ({ children, module, screen, action = 'canView', superAdminOnly = false }) => {
-  const { user, loading, hasPermission } = useAuth();
+  const { user, loading, hasPermission, getFirstAuthorizedPath } = useAuth();
 
   if (loading) {
     return (
@@ -23,11 +23,17 @@ const ProtectedRoute = ({ children, module, screen, action = 'canView', superAdm
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (superAdminOnly && !user.isSuperAdmin) {
-    return <Navigate to="/dashboard" replace />;
+  if (superAdminOnly && !user.isSuperAdmin && user.role?.level !== 'super_admin') {
+    const fallback = getFirstAuthorizedPath();
+    return <Navigate to={fallback} replace />;
   }
 
   if (module && screen && !hasPermission(module, screen, action)) {
+    // Route to user's authorized screen instead of showing an unauthorized error
+    const target = getFirstAuthorizedPath();
+    if (target && target !== window.location.pathname) {
+      return <Navigate to={target} replace />;
+    }
     return <Navigate to="/unauthorized" replace />;
   }
 

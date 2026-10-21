@@ -3,7 +3,7 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { Lead, User, Organization } = require('../models');
+const { Lead, User, Organization, Permission } = require('../models');
 const { protect } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/permission');
 
@@ -263,18 +263,25 @@ router.put('/:id', async (req, res, next) => {
       return next();
     }
 
-    const { Permission } = require('../models');
-    
-    // Check if user has either leads/leads-list/canEdit OR closed_sales/closed-sales-list/canEdit
+    // Check if user has edit permission for leads, closed sales list/all, or financial fields
     const hasLeadsEdit = await Permission.findOne({
       where: { roleId: req.user.roleId, module: 'leads', screen: 'leads-list', canEdit: true }
     });
     
     const hasClosedSalesEdit = await Permission.findOne({
-      where: { roleId: req.user.roleId, module: 'closed_sales', screen: 'closed-sales-list', canEdit: true }
+      where: { roleId: req.user.roleId, module: 'closed_sales', screen: { [Op.in]: ['closed-sales-list', 'closed-sales-all'] }, canEdit: true }
+    });
+
+    const hasFinancialEdit = await Permission.findOne({
+      where: {
+        roleId: req.user.roleId,
+        module: 'closed_sales',
+        screen: { [Op.in]: ['closed-sales-value', 'closed-sales-paid', 'closed-sales-vendor-payout'] },
+        canEdit: true
+      }
     });
     
-    if (hasLeadsEdit || hasClosedSalesEdit) {
+    if (hasLeadsEdit || hasClosedSalesEdit || hasFinancialEdit) {
       return next();
     }
     
@@ -283,6 +290,7 @@ router.put('/:id', async (req, res, next) => {
       message: "Access denied: You don't have permission to edit leads/closed-sales"
     });
   } catch (error) {
+    console.error('❌ Lead update permission check error:', error);
     return res.status(500).json({ success: false, message: 'Permission check failed', error: error.message });
   }
 }, async (req, res) => {
@@ -385,6 +393,7 @@ router.put('/:id', async (req, res, next) => {
 
     res.json({ success: true, message: 'Lead updated successfully', lead: updated });
   } catch (error) {
+    console.error('❌ Lead update execution error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 });

@@ -1,7 +1,24 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
+
+// Smart redirect to user's first authorized route
+const HomeRedirect = () => {
+  const { user, loading, getFirstAuthorizedPath } = useAuth();
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: '#0a0f1e', color: '#818cf8'
+      }}>
+        <div className="spinner" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={getFirstAuthorizedPath()} replace />;
+};
 
 // Pages
 import LoginPage from './pages/Login';
@@ -12,6 +29,7 @@ import PermissionsPage from './pages/uam/PermissionsPage';
 import OrganizationsPage from './pages/orgs/OrganizationsPage';
 import CompaniesPage from './pages/orgs/CompaniesPage';
 import DepartmentsPage from './pages/orgs/DepartmentsPage';
+import HierarchyPage from './pages/orgs/HierarchyPage';
 import OrgOverviewPage from './pages/orgs/OrgOverviewPage';
 import TeamMonitorPage from './pages/orgs/TeamMonitorPage';
 import LeadsPage from './pages/leads/LeadsPage';
@@ -28,6 +46,7 @@ import LeavesPage from './pages/LeavesPage';
 import ChatPage from './pages/chat/ChatPage';
 import ChatSettingsPage from './pages/chat/ChatSettingsPage';
 import ProfilePage from './pages/ProfilePage';
+import StaffSummaryPage from './pages/hr/StaffSummaryPage';
 
 const App = () => {
   return (
@@ -56,7 +75,7 @@ const App = () => {
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* Root redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<HomeRedirect />} />
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={
@@ -120,6 +139,13 @@ const App = () => {
             </ProtectedRoute>
           } />
 
+          {/* Hierarchy Studio */}
+          <Route path="/hierarchy" element={
+            <ProtectedRoute module="departments" screen="departments-list" action="canView">
+              <HierarchyPage />
+            </ProtectedRoute>
+          } />
+
           {/* Team Monitor */}
           <Route path="/team-monitor" element={
             <ProtectedRoute module="departments" screen="departments-list" action="canView">
@@ -157,7 +183,7 @@ const App = () => {
 
           {/* Closed Sales */}
           <Route path="/closed-sales" element={
-            <ProtectedRoute module="closed_sales" screen="closed-sales-list" action="canView">
+            <ProtectedRoute module="closed_sales" screen={['closed-sales-list', 'closed-sales-all']} action="canView">
               <ClosedSalesPage />
             </ProtectedRoute>
           } />
@@ -194,6 +220,13 @@ const App = () => {
           <Route path="/leaves" element={
             <ProtectedRoute module="attendance" screen="attendance-list" action="canView">
               <LeavesPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Staff & Payroll Summary */}
+          <Route path="/staff-summary" element={
+            <ProtectedRoute module="uam" screen={['staff-summary', 'users-list']} action="canView">
+              <StaffSummaryPage />
             </ProtectedRoute>
           } />
 

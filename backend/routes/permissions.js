@@ -28,7 +28,7 @@ const MODULE_SCREENS = {
     'change-designs-widget',
     'total-designs-widget'
   ],
-  uam: ['users-list', 'user-create', 'user-edit', 'audit-logs-list'],
+  uam: ['users-list', 'user-create', 'user-edit', 'audit-logs-list', 'staff-summary'],
   roles: ['roles-list', 'role-create', 'role-edit'],
   permissions: ['permissions-list', 'permission-edit'],
   organizations: ['organizations-list', 'organization-create', 'organization-edit'],
@@ -39,6 +39,7 @@ const MODULE_SCREENS = {
   performance: ['performance-view'],
   closed_sales: [
     'closed-sales-list',
+    'closed-sales-all',
     'closed-sales-value',
     'closed-sales-paid',
     'closed-sales-balance',

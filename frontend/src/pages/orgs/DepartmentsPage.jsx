@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   RiAddLine, RiPencilLine, RiDeleteBinLine, RiSearchLine,
   RiTeamLine, RiCloseLine, RiShieldUserLine, RiUserLine,
-  RiBuildingLine, RiArrowRightSLine
+  RiBuildingLine, RiArrowRightSLine, RiNodeTree
 } from 'react-icons/ri';
 import toast from 'react-hot-toast';
 import AppLayout from '../../components/AppLayout';
@@ -335,6 +335,22 @@ const DeptModal = ({ dept, onClose, onSaved }) => {
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                 ({u.role?.name || 'User'})
                               </span>
+                              {u.headedDepartments && u.headedDepartments.filter(hd => hd.id !== dept?.id).length > 0 && (
+                                <span
+                                  style={{
+                                    fontSize: '0.66rem',
+                                    fontWeight: 700,
+                                    color: '#d97706',
+                                    background: 'rgba(245, 158, 11, 0.15)',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    borderRadius: 4,
+                                    padding: '1px 5px'
+                                  }}
+                                  title={`Also Heads: ${u.headedDepartments.filter(hd => hd.id !== dept?.id).map(hd => hd.name).join(', ')}`}
+                                >
+                                  👑 Multi-Head (+{u.headedDepartments.filter(hd => hd.id !== dept?.id).length})
+                                </span>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => handleRemoveUserFromLayer(idx, u.id)}
@@ -378,11 +394,14 @@ const DeptModal = ({ dept, onClose, onSaved }) => {
                                 ? 'All company users added'
                                 : `+ Add user to ${layer.name || `Layer ${idx + 1}`}...`}
                         </option>
-                        {availableUsers.map(u => (
-                          <option key={u.id} value={u.id}>
-                            👤 {u.name} · {u.role?.name || 'No Role'} ({u.email})
-                          </option>
-                        ))}
+                        {availableUsers.map(u => {
+                          const otherHeads = u.headedDepartments?.map(d => d.name).join(', ');
+                          return (
+                            <option key={u.id} value={u.id}>
+                              👤 {u.name} · {u.role?.name || 'No Role'} ({u.email}){otherHeads ? ` [👑 Head of: ${otherHeads}]` : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -468,6 +487,9 @@ const DepartmentsPage = () => {
           <p className="page-subtitle">Manage departments, dynamic authority layers, and monitor team performance</p>
         </div>
         <div className="flex gap-2">
+          <Link to="/hierarchy" className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: 'rgba(99,102,241,0.4)', color: '#818cf8' }}>
+            <RiNodeTree /> Hierarchy Studio
+          </Link>
           <Link to="/team-monitor" className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <RiTeamLine /> Team Monitor
           </Link>

@@ -49,6 +49,9 @@ router.post('/login', async (req, res) => {
       organization: user.organization,
       company: user.company,
       department: user.department,
+      paidLeaves: user.paidLeaves ?? 12,
+      casualLeaves: user.casualLeaves ?? 10,
+      sickLeaves: user.sickLeaves ?? 8,
       lastLogin: user.lastLogin
     };
 
@@ -74,14 +77,16 @@ router.post('/forgot-password', async (req, res) => {
     await user.update({ resetOTP: otp, resetOTPExpiry: otpExpiry, resetOTPVerified: false });
 
     try {
+      const isSecure = Number(process.env.EMAIL_PORT) === 465 || process.env.EMAIL_SECURE === 'true';
       const transporter = nodemailer.createTransport({
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
-        secure: false,
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
+        port: Number(process.env.EMAIL_PORT) || 465,
+        secure: isSecure,
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        tls: { rejectUnauthorized: false }
       });
       await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
+        from: process.env.EMAIL_FROM || `"CRM System" <${process.env.EMAIL_USER}>`,
         to: user.email,
         subject: 'CRM — Password Reset OTP',
         html: `<div style="font-family:Inter,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#0f172a;color:#e2e8f0;border-radius:12px;"><h2 style="color:#818cf8;">🔐 Password Reset OTP</h2><p>Hello <strong>${user.name}</strong>,</p><div style="background:#1e293b;padding:20px;border-radius:8px;text-align:center;margin:20px 0;"><h1 style="color:#818cf8;font-size:48px;letter-spacing:8px;margin:0;">${otp}</h1></div><p>Valid for <strong>10 minutes</strong>.</p></div>`

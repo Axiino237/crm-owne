@@ -18,7 +18,7 @@ const axiosBaseQuery = () => async ({ url, method, data, params }) => {
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: axiosBaseQuery(),
-  tagTypes: ['Attendance', 'Leaves', 'Holidays', 'ChatMessages', 'ChatServers', 'ChatMembers'],
+  tagTypes: ['Attendance', 'Leaves', 'Holidays', 'Regularization', 'Payroll', 'ChatMessages', 'ChatServers', 'ChatMembers'],
   keepUnusedDataFor: 86400, // Keep cache for 24 hours to prevent refetch on page navigation
   endpoints: (builder) => ({
     // Attendance summary
@@ -123,6 +123,50 @@ export const apiSlice = createApi({
       invalidatesTags: ['Holidays', 'Attendance']
     }),
 
+    // --- Attendance Regularization (Correction) Endpoints ---
+    getMyRegularizations: builder.query({
+      query: () => ({
+        url: '/attendance/regularize/my-requests',
+        method: 'GET'
+      }),
+      providesTags: ['Regularization']
+    }),
+
+    getTeamRegularizations: builder.query({
+      query: () => ({
+        url: '/attendance/regularize/team-requests',
+        method: 'GET'
+      }),
+      providesTags: ['Regularization']
+    }),
+
+    applyRegularization: builder.mutation({
+      query: (data) => ({
+        url: '/attendance/regularize',
+        method: 'POST',
+        data
+      }),
+      invalidatesTags: ['Regularization']
+    }),
+
+    updateRegularizationStatus: builder.mutation({
+      query: ({ id, status, managerNotes }) => ({
+        url: `/attendance/regularize/${id}/status`,
+        method: 'PUT',
+        data: { status, managerNotes }
+      }),
+      invalidatesTags: ['Regularization', 'Attendance']
+    }),
+
+    // --- Payroll Summary Endpoint ---
+    getPayrollSummary: builder.query({
+      query: (params) => ({
+        url: `/attendance/payroll-summary?month=${params?.month || ''}&organizationId=${params?.organizationId || ''}`,
+        method: 'GET'
+      }),
+      providesTags: ['Payroll', 'Attendance', 'Leaves']
+    }),
+
     // --- Chat API Endpoints ---
     getChatServers: builder.query({
       query: () => ({
@@ -197,6 +241,15 @@ export const {
   useGetAllHolidaysQuery,
   useAddHolidayMutation,
   useDeleteHolidayMutation,
+
+  // Attendance Regularization hooks
+  useGetMyRegularizationsQuery,
+  useGetTeamRegularizationsQuery,
+  useApplyRegularizationMutation,
+  useUpdateRegularizationStatusMutation,
+
+  // Payroll summary hooks
+  useGetPayrollSummaryQuery,
   
   // Chat hooks
   useGetChatServersQuery,

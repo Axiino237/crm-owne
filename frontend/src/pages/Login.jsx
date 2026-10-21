@@ -11,7 +11,7 @@ import './Login.css';
    ============================================================ */
 
 const LoginPage = () => {
-  const { login } = useAuth();
+  const { login, getFirstAuthorizedPath } = useAuth();
   const navigate = useNavigate();
   const [view, setView] = useState('login'); // 'login' | 'forgot' | 'otp' | 'reset' | 'done'
 
@@ -37,8 +37,9 @@ const LoginPage = () => {
     setLoginLoading(true);
     setLoginError('');
     try {
-      await login(loginForm.email, loginForm.password);
-      navigate('/dashboard');
+      const loginData = await login(loginForm.email, loginForm.password);
+      const targetRoute = getFirstAuthorizedPath(loginData.user, loginData.permissions);
+      navigate(targetRoute, { replace: true });
     } catch (err) {
       setLoginError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {

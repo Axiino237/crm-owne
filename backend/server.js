@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://178.238.236.200', 'http://crm.178-238-236-200.sslip.io'],
+    origin: true,
     credentials: true
   }
 });
@@ -78,7 +78,7 @@ app.set('activeUsers', activeUsers);
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://178.238.236.200', 'http://crm.178-238-236-200.sslip.io'],
+  origin: true,
   credentials: true
 }));
 app.use(express.json());
@@ -101,6 +101,7 @@ app.use('/api/designs', require('./routes/designs'));
 app.use('/api/audit-logs', require('./routes/auditLogs'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/staff-summary', require('./routes/staffSummary'));
 app.use('/uploads', require('express').static(require('path').join(__dirname, 'uploads')));
 
 // Health check
@@ -183,6 +184,7 @@ const startServer = async () => {
         // ✅ Core modules
         await ensurePerm('performance', 'performance-view');
         await ensurePerm('closed_sales', 'closed-sales-list');
+        await ensurePerm('closed_sales', 'closed-sales-all');
         await ensurePerm('closed_sales', 'closed-sales-value');
         await ensurePerm('closed_sales', 'closed-sales-paid');
         await ensurePerm('closed_sales', 'closed-sales-balance');

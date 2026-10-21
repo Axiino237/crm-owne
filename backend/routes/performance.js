@@ -3,6 +3,7 @@ const router = express.Router();
 const { Lead, User, Department, Role, DesignOrder } = require('../models');
 const { protect } = require('../middleware/auth');
 const { checkPermission } = require('../middleware/permission');
+const { getDeptHeadScope } = require('../utils/departmentScope');
 const { Op } = require('sequelize');
 
 router.use(protect);
@@ -14,30 +15,39 @@ router.get('/', checkPermission('performance', 'performance-view', 'canView'), a
     const userRole = req.user.role?.level;
     const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
 
-    // Check if user is a department head via headId
-    const managedDept = await Department.findOne({ where: { headId: req.user.id } });
-    const isDeptHead = !!managedDept;
-
-    // dept_manager role OR headId = team-level access
+    // Check department head scope (supports multi-department heads)
+    const deptScope = await getDeptHeadScope(req.user);
+    const isDeptHead = deptScope.isDeptHead;
     const isManager = userRole === 'dept_manager';
     const hasTeamAccess = isManager || isDeptHead;
 
-    let targetDeptId = req.query.departmentId || null;
-
-    // ── Scope targetDeptId based on role ──
+    // Determine available departments for this user
+    let availableDepts = [];
     if (isAdmin) {
-      // Admins see what they select or default to first dept
-      const adminDepts = await Department.findAll({
+      availableDepts = await Department.findAll({
         where: req.user.isSuperAdmin ? {} : { organizationId: req.user.organizationId },
         attributes: ['id', 'name']
       });
-      if (!targetDeptId && adminDepts.length > 0) targetDeptId = adminDepts[0].id;
-    } else if (hasTeamAccess) {
-      // Head → their headed dept; manager → their assigned dept
-      targetDeptId = managedDept?.id || req.user.departmentId;
-    } else {
-      // Regular user → self-only (targetDeptId irrelevant, userWhere uses id)
-      targetDeptId = null;
+    } else if (isDeptHead && deptScope.managedDeptIds.length > 0) {
+      availableDepts = await Department.findAll({
+        where: { id: { [Op.in]: deptScope.managedDeptIds } },
+        attributes: ['id', 'name']
+      });
+    } else if (isManager && req.user.departmentId) {
+      availableDepts = await Department.findAll({
+        where: { id: req.user.departmentId },
+        attributes: ['id', 'name']
+      });
+    }
+
+    let targetDeptId = req.query.departmentId || null;
+    if (targetDeptId && !isAdmin) {
+      const allowed = availableDepts.some(d => d.id === targetDeptId);
+      if (!allowed) targetDeptId = null;
+    }
+
+    if (!targetDeptId && availableDepts.length > 0) {
+      targetDeptId = availableDepts[0].id;
     }
 
     // 2. Build userWhere: admins/team-heads see dept members, regular users see only self
@@ -208,7 +218,7 @@ router.get('/', checkPermission('performance', 'performance-view', 'canView'), a
         name: user.name,
         email: user.email,
         role: user.role?.name || 'User',
-        isHead: managedDept ? user.id === req.user.id && isDeptHead : false,
+        isHead: Boolean(isDeptHead && user.id === req.user.id),
         stats: {
           totalAssigned,
           contactedCount,
@@ -266,24 +276,16 @@ router.get('/', checkPermission('performance', 'performance-view', 'canView'), a
       return (b.stats.convertedCount - a.stats.convertedCount);
     });
 
-    // For admins, re-fetch full dept list for the dropdown
-    const allDepts = isAdmin
-      ? await Department.findAll({
-          where: req.user.isSuperAdmin ? {} : { organizationId: req.user.organizationId },
-          attributes: ['id', 'name']
-        })
-      : [];
-
     res.json({
       success: true,
       isDeptHead,
       hasTeamAccess,
       isDesignDept,
-      headDeptName: managedDept?.name || null,
+      headDeptName: availableDepts.length > 0 ? (availableDepts.find(d => d.id === targetDeptId)?.name || availableDepts[0].name) : null,
       selectedDepartmentId: targetDeptId,
       filterPeriod: year ? 'custom' : 'today',
       filterDate: activeDateLabel,
-      departments: allDepts,
+      departments: availableDepts,
       members,
       activities
     });

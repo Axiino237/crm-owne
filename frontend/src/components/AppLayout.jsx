@@ -7,13 +7,14 @@ import {
   RiGroupLine, RiLogoutBoxLine, RiSettings4Line, RiStarLine,
   RiOrganizationChart, RiTargetLine, RiFilePaper2Line, RiBarChart2Line,
   RiCheckboxCircleLine, RiDraftLine, RiPaletteLine, RiFileList2Line,
-  RiCheckDoubleLine, RiCalendarLine, RiChat3Line, RiBellLine
+  RiCheckDoubleLine, RiCalendarLine, RiChat3Line, RiBellLine,
+  RiMenuLine, RiCloseLine, RiNodeTree, RiUserStarLine
 } from 'react-icons/ri';
 import { useAuth } from '../context/AuthContext';
 import './Layout.css';
 
 // Sidebar
-const Sidebar = () => {
+const Sidebar = ({ mobileOpen, onClose }) => {
   const { user, logout, hasPermission } = useAuth();
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'SA';
   const navItems = [
@@ -31,6 +32,7 @@ const Sidebar = () => {
         { to: '/organizations', icon: <RiBuildingLine />, label: 'Organizations', show: user?.isSuperAdmin && hasPermission('organizations', 'organizations-list', 'canView') },
         { to: '/companies', icon: <RiBuilding2Line />, label: 'Companies', show: hasPermission('companies', 'companies-list', 'canView') },
         { to: '/departments', icon: <RiGroupLine />, label: 'Departments', show: hasPermission('departments', 'departments-list', 'canView') },
+        { to: '/hierarchy', icon: <RiNodeTree />, label: 'Hierarchy Studio', show: hasPermission('departments', 'departments-list', 'canView') },
         { to: '/team-monitor', icon: <RiTeamLine />, label: 'Team Monitor', show: hasPermission('departments', 'departments-list', 'canView') },
         { to: '/org-overview', icon: <RiOrganizationChart />, label: 'Org Overview', show: hasPermission('dashboard', 'org-overview', 'canView') }
       ]
@@ -40,7 +42,7 @@ const Sidebar = () => {
         { to: '/leads', icon: <RiTargetLine />, label: 'Leads', show: hasPermission('leads', 'leads-list', 'canView') },
         { to: '/quotation', icon: <RiFilePaper2Line />, label: 'Quotation', show: hasPermission('quotations', 'quotations-list', 'canView') },
         { to: '/performance', icon: <RiBarChart2Line />, label: 'Performance', show: hasPermission('performance', 'performance-view', 'canView') },
-        { to: '/closed-sales', icon: <RiCheckboxCircleLine />, label: 'Closed Sales', show: hasPermission('closed_sales', 'closed-sales-list', 'canView') }
+        { to: '/closed-sales', icon: <RiCheckboxCircleLine />, label: 'Closed Sales', show: hasPermission('closed_sales', ['closed-sales-list', 'closed-sales-all'], 'canView') }
       ]
     },
     {
@@ -53,7 +55,8 @@ const Sidebar = () => {
     {
       section: 'HR Management', items: [
         { to: '/attendance', icon: <RiCalendarLine />, label: 'Attendance Portal', show: hasPermission('attendance', 'attendance-list', 'canView') },
-        { to: '/leaves', icon: <RiFileList2Line />, label: 'Leave Portal', show: hasPermission('attendance', 'attendance-list', 'canView') }
+        { to: '/leaves', icon: <RiFileList2Line />, label: 'Leave Portal', show: hasPermission('attendance', 'attendance-list', 'canView') },
+        { to: '/staff-summary', icon: <RiUserStarLine />, label: 'Staff & Salary Summary', show: hasPermission('uam', ['staff-summary', 'users-list'], 'canView') }
       ]
     },
     {
@@ -64,18 +67,44 @@ const Sidebar = () => {
     }
   ];
   return (
-    <aside className="sidebar">
-      <div className="sidebar-logo"><div className="logo-icon">&#x26A1;</div><div><div className="logo-text">CRM Pro</div><div className="logo-sub">Access Management</div></div></div>
+    <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+      <div className="sidebar-logo">
+        <div className="logo-icon">&#x26A1;</div>
+        <div>
+          <div className="logo-text">CRM Pro</div>
+          <div className="logo-sub">Access Management</div>
+        </div>
+        {mobileOpen && (
+          <button className="mobile-close-btn" onClick={onClose} aria-label="Close menu">
+            <RiCloseLine />
+          </button>
+        )}
+      </div>
       <nav className="sidebar-nav">
         {navItems.map(section => {
           const visibleItems = section.items.filter(item => item.always || item.show !== false);
           if (visibleItems.length === 0) return null;
-          return (<div key={section.section}><div className="nav-section-label">{section.section}</div>{visibleItems.map(item => (<NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}><span className="nav-icon">{item.icon}</span>{item.label}</NavLink>))}</div>);
+          return (
+            <div key={section.section}>
+              <div className="nav-section-label">{section.section}</div>
+              {visibleItems.map(item => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={onClose}
+                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          );
         })}
       </nav>
       <div className="sidebar-footer">
         <div className="user-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: 10, flexGrow: 1, textDecoration: 'none', color: 'inherit', minWidth: 0 }}>
+          <Link to="/profile" onClick={onClose} style={{ display: 'flex', alignItems: 'center', gap: 10, flexGrow: 1, textDecoration: 'none', color: 'inherit', minWidth: 0 }}>
             <div className="avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {user?.avatar ? <img src={user.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initials}
             </div>
@@ -124,7 +153,8 @@ const NotificationBell = ({ user }) => {
   useEffect(() => {
     const token = localStorage.getItem('crm_token');
     if (!token || !user) return;
-    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', { auth: { token } });
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const socket = io(socketUrl, { auth: { token }, transports: ['websocket', 'polling'] });
     socket.on('new_message', (data) => {
       const notif = { id: `msg-${Date.now()}`, type: 'message', icon: '💬', title: `New message from ${data.senderName || 'Someone'}`, body: data.isEncrypted ? 'Encrypted message' : (data.preview || 'Sent you a message'), channel: data.channelName || 'Chat', time: new Date(), read: false, link: '/chat' };
       setNotifications(prev => [notif, ...prev].slice(0, 50));
@@ -211,12 +241,17 @@ const NotificationBell = ({ user }) => {
 
 
 // Header
-const Header = ({ title }) => {
+const Header = ({ title, onMenuToggle }) => {
   const { user } = useAuth();
   return (
     <header className="header">
-      <div className="header-title">{title}</div>
-      <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        <button className="mobile-menu-btn" onClick={onMenuToggle} aria-label="Toggle navigation">
+          <RiMenuLine />
+        </button>
+        <div className="header-title">{title}</div>
+      </div>
+      <div className="header-right">
         {user?.isSuperAdmin && (<span className="super-admin-chip"><RiStarLine /> Super Admin</span>)}
         <NotificationBell user={user} />
         <Link to="/profile" className="avatar avatar-sm" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
@@ -228,15 +263,22 @@ const Header = ({ title }) => {
 };
 
 // AppLayout
-const AppLayout = ({ children, title = 'Dashboard' }) => (
-  <div className="app-layout">
-    <Sidebar />
-    <div className="main-content">
-      <Header title={title} />
-      <main className="page-wrapper">{children}</main>
+const AppLayout = ({ children, title = 'Dashboard' }) => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  return (
+    <div className="app-layout">
+      {mobileNavOpen && (
+        <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />
+      )}
+      <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <div className="main-content">
+        <Header title={title} onMenuToggle={() => setMobileNavOpen(p => !p)} />
+        <main className="page-wrapper">{children}</main>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export { Sidebar, Header };
 export default AppLayout;

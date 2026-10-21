@@ -25,14 +25,26 @@ const ACTIONS = [
 ];
 
 const SCREEN_LABELS = {
-  'closed-sales-list': 'Closed Sales Access',
+  'closed-sales-list': 'Closed Sales Access (Own Only)',
+  'closed-sales-all': 'Closed Sales Access (All / Team)',
   'closed-sales-value': 'Deal Value (Column & Input)',
   'closed-sales-paid': 'Paid Amount (Column & Input)',
   'closed-sales-balance': 'Outstanding Balance (Column & View)',
   'closed-sales-vendor-payout': 'Vendor Payout (Column & Input)',
   'total-profit-card': 'Total Sales Card',
   'monthly-profit-card': 'Average Monthly Sales Card',
-  'profit-trend-chart': 'Monthly Sales Trend Chart'
+  'profit-trend-chart': 'Monthly Sales Trend Chart',
+  'staff-summary': 'Staff Overview & Payroll (Leaves & Salary)'
+};
+
+const SCREEN_DESCRIPTIONS = {
+  'closed-sales-list': 'User can ONLY see and manage their own closed sales',
+  'closed-sales-all': 'User can see and manage ALL closed sales across the team / organization',
+  'closed-sales-value': 'Visibility and editing of total deal value',
+  'closed-sales-paid': 'Visibility and editing of received payments',
+  'closed-sales-balance': 'Visibility of outstanding pending balance',
+  'closed-sales-vendor-payout': 'Visibility and editing of vendor payout details',
+  'staff-summary': 'View organization employees summary, leaves taken, quota, and salary details'
 };
 
 const PermissionsPage = () => {
@@ -442,9 +454,16 @@ const PermissionsPage = () => {
                                 {isAllRowOn ? <RiCheckboxLine /> : <RiCheckboxBlankLine />}
                               </button>
                             )}
-                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                              {SCREEN_LABELS[screen] || screen.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                {SCREEN_LABELS[screen] || screen.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                              </span>
+                              {SCREEN_DESCRIPTIONS[screen] && (
+                                <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
+                                  {SCREEN_DESCRIPTIONS[screen]}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Action Toggles */}

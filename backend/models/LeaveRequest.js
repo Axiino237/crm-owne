@@ -21,7 +21,7 @@ const LeaveRequest = sequelize.define('LeaveRequest', {
     allowNull: false
   },
   leaveType: {
-    type: DataTypes.ENUM('casual', 'sick', 'earned', 'other'),
+    type: DataTypes.ENUM('casual', 'sick', 'paid', 'earned', 'other'),
     defaultValue: 'casual'
   },
   leaveDuration: {
@@ -35,6 +35,10 @@ const LeaveRequest = sequelize.define('LeaveRequest', {
   reason: {
     type: DataTypes.TEXT,
     allowNull: false
+  },
+  isLossOfPay: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),

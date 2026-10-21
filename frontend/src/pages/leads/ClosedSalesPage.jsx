@@ -44,9 +44,11 @@ const ClosedSalesPage = () => {
   const canViewVendorPay = isSuper || hasPermission('closed_sales', 'closed-sales-vendor-payout', 'canView');
   const canEditVendorPay = isSuper || hasPermission('closed_sales', 'closed-sales-vendor-payout', 'canEdit');
 
-  const canEditList = isSuper || hasPermission('closed_sales', 'closed-sales-list', 'canEdit');
+  const canEditList = isSuper || hasPermission('closed_sales', ['closed-sales-list', 'closed-sales-all'], 'canEdit');
   // Can open edit modal if user has list edit permission OR permission to edit any of the fields
   const canEdit = canEditList || canEditValue || canEditPaid || canEditVendorPay;
+
+  const [scopeInfo, setScopeInfo] = useState({ canViewAll: true, scopeType: 'all' });
 
   const fetchClosedSales = useCallback(async () => {
     setLoading(true);
@@ -55,12 +57,16 @@ const ClosedSalesPage = () => {
       if (res.data.success) {
         setLeads(res.data.leads || []);
         setTotal(res.data.total || 0);
+        setScopeInfo({
+          canViewAll: res.data.canViewAll ?? true,
+          scopeType: res.data.scopeType || (isSuper ? 'all' : 'own')
+        });
       }
     } catch (err) {
       toast.error('Failed to load closed sales data');
     }
     setLoading(false);
-  }, [search, page]);
+  }, [search, page, isSuper]);
 
   useEffect(() => {
     fetchClosedSales();
@@ -117,13 +123,49 @@ const ClosedSalesPage = () => {
 
   return (
     <AppLayout>
-      <div className="page-header" style={{ marginBottom: 24 }}>
+      <div className="page-header" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <RiCheckboxCircleLine style={{ color: 'var(--success)' }} /> Closed Sales
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 4 }}>
-            Monitor and record won deal payments, outstanding balances, and vendor payouts.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}>
+              <RiCheckboxCircleLine style={{ color: 'var(--success)' }} /> Closed Sales
+            </h1>
+
+            {scopeInfo.scopeType === 'all' ? (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 12px',
+                borderRadius: 20,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                background: 'rgba(59, 130, 246, 0.12)',
+                color: '#60a5fa',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }}>
+                <span>👥</span> All Closed Sales (Team / Org Scope)
+              </span>
+            ) : (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 12px',
+                borderRadius: 20,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                background: 'rgba(16, 185, 129, 0.12)',
+                color: '#34d399',
+                border: '1px solid rgba(16, 185, 129, 0.3)'
+              }}>
+                <span>👤</span> My Closed Sales (Assigned Only)
+              </span>
+            )}
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 6 }}>
+            {scopeInfo.scopeType === 'all'
+              ? 'Monitoring all closed and won sales across your team & organization.'
+              : 'Viewing only closed sales specifically assigned to your account.'}
           </p>
         </div>
       </div>

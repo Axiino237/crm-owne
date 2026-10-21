@@ -81,13 +81,15 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('crm_user', JSON.stringify(userData));
     setUser(userData);
     // Fetch permissions after login
+    let loadedPerms = [];
     try {
       const permRes = await api.get('/uam/my-permissions');
-      setPermissions(permRes.data.permissions || []);
+      loadedPerms = permRes.data.permissions || [];
+      setPermissions(loadedPerms);
     } catch {
       setPermissions([]);
     }
-    return res.data;
+    return { ...res.data, permissions: loadedPerms };
   };
 
   const logout = () => {
@@ -104,7 +106,7 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * Check if user has permission for module/screen/action
-   * Super admin bypasses only core administration modules to prevent lockout
+   * Respects configured permissions; safeguards permissions screen for super admin to prevent lockout
    */
   const hasPermission = useCallback((module, screen, action = 'canView') => {
     if (!user) return false;
@@ -113,17 +115,79 @@ export const AuthProvider = ({ children }) => {
     const isPermManager = module === 'permissions' && ['permissions-list', 'permission-edit'].includes(screen);
     if (user.isSuperAdmin && isPermManager) return true;
 
+    // Support array of screens (OR condition: true if any screen permitted)
+    if (Array.isArray(screen)) {
+      return screen.some(s => hasPermission(module, s, action));
+    }
+
     const perm = permissions.find(p => p.module === module && p.screen === screen);
     if (perm) {
       return !!perm[action];
     }
 
-    // Default to true for Super Admin (if no database record exists), and false for others
+    // Default to true for Super Admin if no permission record exists yet, false for others
     return user.isSuperAdmin ? true : false;
   }, [user, permissions]);
 
+  /**
+   * Find the first screen/route the user is authorized to access
+   * Used for smart routing on login, root redirect, and permission fallback
+   */
+  const getFirstAuthorizedPath = useCallback((customUser = user, customPerms = permissions) => {
+    const targetUser = customUser || user;
+    if (!targetUser) return '/login';
+
+    const checkPerm = (module, screen, action = 'canView') => {
+      // Safety guard for permissions management
+      if (targetUser.isSuperAdmin && module === 'permissions') return true;
+
+      if (Array.isArray(screen)) {
+        return screen.some(s => checkPerm(module, s, action));
+      }
+      const permList = customPerms || permissions;
+      const p = permList.find(x => x.module === module && x.screen === screen);
+      if (p) return !!p[action];
+      return targetUser.isSuperAdmin ? true : false;
+    };
+
+    const routes = [
+      { path: '/dashboard', module: 'dashboard', screen: 'dashboard-home' },
+      { path: '/leads', module: 'leads', screen: 'leads-list' },
+      { path: '/quotation', module: 'quotations', screen: 'quotations-list' },
+      { path: '/closed-sales', module: 'closed_sales', screen: ['closed-sales-list', 'closed-sales-all'] },
+      { path: '/performance', module: 'performance', screen: 'performance-view' },
+      { path: '/design', module: 'design', screen: 'design-list' },
+      { path: '/my-projects', module: 'design', screen: 'my-projects-list' },
+      { path: '/completed-models', module: 'design', screen: 'completed-models-list' },
+      { path: '/attendance', module: 'attendance', screen: 'attendance-list' },
+      { path: '/leaves', module: 'attendance', screen: 'attendance-list' },
+      { path: '/staff-summary', module: 'uam', screen: ['staff-summary', 'users-list'] },
+      { path: '/chat', module: 'chat', screen: 'chat-room' },
+      { path: '/uam/users', module: 'uam', screen: 'users-list' },
+      { path: '/uam/roles', module: 'roles', screen: 'roles-list' },
+      { path: '/uam/permissions', module: 'permissions', screen: 'permissions-list' },
+      { path: '/companies', module: 'companies', screen: 'companies-list' },
+      { path: '/departments', module: 'departments', screen: 'departments-list' },
+      { path: '/hierarchy', module: 'departments', screen: 'departments-list' },
+      { path: '/team-monitor', module: 'departments', screen: 'departments-list' },
+      { path: '/org-overview', module: 'dashboard', screen: 'org-overview' },
+      { path: '/profile', always: true }
+    ];
+
+    for (const r of routes) {
+      if (r.always) return r.path;
+      if (checkPerm(r.module, r.screen, 'canView')) {
+        return r.path;
+      }
+    }
+    return '/profile';
+  }, [user, permissions]);
+
   return (
-    <AuthContext.Provider value={{ user, permissions, loading, login, logout, hasPermission, fetchPermissions, updateUser, refreshAuth }}>
+    <AuthContext.Provider value={{
+      user, permissions, loading, login, logout,
+      hasPermission, getFirstAuthorizedPath, fetchPermissions, updateUser, refreshAuth
+    }}>
       {children}
     </AuthContext.Provider>
   );
