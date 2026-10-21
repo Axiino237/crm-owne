@@ -115,6 +115,9 @@ const Sidebar = ({ mobileOpen, onClose }) => {
           </Link>
           <button className="logout-btn" onClick={logout} title="Logout" style={{ flexShrink: 0 }}><RiLogoutBoxLine /></button>
         </div>
+        <div style={{ textAlign: 'center', paddingTop: 8, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+          Developed by <a href="https://axiino.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>axiino.com</a>
+        </div>
       </div>
     </aside>
   );
@@ -275,6 +278,9 @@ const AppLayout = ({ children, title = 'Dashboard' }) => {
       <div className="main-content">
         <Header title={title} onMenuToggle={() => setMobileNavOpen(p => !p)} />
         <main className="page-wrapper">{children}</main>
+        <footer style={{ padding: '16px 24px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          Developed by <a href="https://axiino.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>axiino.com</a>
+        </footer>
       </div>
     </div>
   );

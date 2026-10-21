@@ -30,12 +30,22 @@ export const apiSlice = createApi({
       providesTags: ['Attendance', 'Holidays']
     }),
     
-    // Team today attendance
+    // Team attendance with date range and month filtering
     getTeamToday: builder.query({
-      query: () => ({
-        url: '/attendance/team-today',
-        method: 'GET'
-      }),
+      query: (params) => {
+        const queryParams = new URLSearchParams();
+        if (params?.startDate) queryParams.append('startDate', params.startDate);
+        if (params?.endDate) queryParams.append('endDate', params.endDate);
+        if (params?.date) queryParams.append('date', params.date);
+        if (params?.month) queryParams.append('month', params.month);
+        if (params?.year) queryParams.append('year', params.year);
+        if (params?.departmentId && params.departmentId !== 'All') queryParams.append('departmentId', params.departmentId);
+        const qs = queryParams.toString();
+        return {
+          url: `/attendance/team-today${qs ? `?${qs}` : ''}`,
+          method: 'GET'
+        };
+      },
       providesTags: ['Attendance']
     }),
 

@@ -4,7 +4,7 @@ import {
   RiLoginBoxLine, RiLogoutBoxLine, 
   RiTimeLine, RiDeleteBin7Line,
   RiEditBoxLine, RiCheckDoubleLine, RiCloseCircleLine, RiMoneyDollarCircleLine,
-  RiFileList2Line, RiUserStarLine
+  RiFileList2Line, RiUserStarLine, RiRefreshLine
 } from 'react-icons/ri';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -40,9 +40,59 @@ const AttendancePage = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
   // Filter States
+  const todayDateStr = new Date().toLocaleDateString('en-CA');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
+
+  // Date Period & Monthly Filter States
+  const [periodPreset, setPeriodPreset] = useState('today'); // 'today' | 'this_month' | 'last_month' | 'month_picker' | 'custom'
+  const [startDate, setStartDate] = useState(todayDateStr);
+  const [endDate, setEndDate] = useState(todayDateStr);
+  const [filterMonth, setFilterMonth] = useState(String(new Date().getMonth() + 1));
+  const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
+
+  // Handlers for period selection
+  const handlePeriodPresetChange = (preset) => {
+    setPeriodPreset(preset);
+    const now = new Date();
+    const currYear = now.getFullYear();
+    const currMonth = now.getMonth() + 1;
+
+    if (preset === 'today') {
+      const t = now.toLocaleDateString('en-CA');
+      setStartDate(t);
+      setEndDate(t);
+    } else if (preset === 'this_month') {
+      const mStr = String(currMonth).padStart(2, '0');
+      const lastDay = new Date(currYear, currMonth, 0).getDate();
+      setStartDate(`${currYear}-${mStr}-01`);
+      setEndDate(`${currYear}-${mStr}-${String(lastDay).padStart(2, '0')}`);
+      setFilterMonth(String(currMonth));
+      setFilterYear(String(currYear));
+    } else if (preset === 'last_month') {
+      const lastMonthDate = new Date(currYear, currMonth - 2, 1);
+      const lmYear = lastMonthDate.getFullYear();
+      const lmMonth = lastMonthDate.getMonth() + 1;
+      const mStr = String(lmMonth).padStart(2, '0');
+      const lastDay = new Date(lmYear, lmMonth, 0).getDate();
+      setStartDate(`${lmYear}-${mStr}-01`);
+      setEndDate(`${lmYear}-${mStr}-${String(lastDay).padStart(2, '0')}`);
+      setFilterMonth(String(lmMonth));
+      setFilterYear(String(lmYear));
+    }
+  };
+
+  const handleMonthYearChange = (m, y) => {
+    const selM = parseInt(m, 10);
+    const selY = parseInt(y, 10);
+    const mStr = String(selM).padStart(2, '0');
+    const lastDay = new Date(selY, selM, 0).getDate();
+    setFilterMonth(String(selM));
+    setFilterYear(String(selY));
+    setStartDate(`${selY}-${mStr}-01`);
+    setEndDate(`${selY}-${mStr}-${String(lastDay).padStart(2, '0')}`);
+  };
 
   // RTK Query hooks
   const { data: summaryData, isLoading: loadingSummary } = useGetMySummaryQuery({ year: currentYear, month: currentMonth });
@@ -56,7 +106,10 @@ const AttendancePage = () => {
   const hasAllDeptsPerm = hasPermission('attendance', 'attendance-all-departments', 'canView');
   const canAccessTeam = isAdmin || hasTeamAccess || hasTeamPerm;
 
-  const { data: teamData, isLoading: loadingTeam, refetch: refetchTeamData } = useGetTeamTodayQuery(undefined, {
+  const { data: teamData, isLoading: loadingTeam, refetch: refetchTeamData } = useGetTeamTodayQuery({
+    startDate,
+    endDate
+  }, {
     skip: !canAccessTeam
   });
   const teamAttendance = teamData?.teamAttendance || [];
@@ -91,30 +144,66 @@ const AttendancePage = () => {
     return matchesSearch && matchesDept && matchesStatus;
   });
 
-  // Client-side CSV export function
-  const handleExportCSV = () => {
-    const headers = ['Member Name', 'Department', 'Role', 'Check-in Time', 'Check-out Time', 'Work Duration', 'Status'];
-    const rows = filteredTeamAttendance.map(member => [
-      member.name,
-      member.department || 'Unassigned',
-      member.role || 'User',
-      member.log?.checkIn ? new Date(member.log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
-      member.log?.checkOut ? new Date(member.log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-',
-      member.log ? calculateDuration(member.log.checkIn, member.log.checkOut) : '-',
-      member.log ? member.log.status.toUpperCase() : 'ABSENT'
-    ]);
+  const isMultiDay = startDate !== endDate;
 
-    const csvString = [headers.join(','), ...rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(','))].join('\n');
+  // Client-side CSV export function supporting single date and date range / month
+  const handleExportCSV = () => {
+    const headers = isMultiDay
+      ? ['Date', 'Member Name', 'Department', 'Role', 'Check-in Time', 'Check-out Time', 'Work Duration', 'Status', 'Notes']
+      : ['Member Name', 'Department', 'Role', 'Check-in Time', 'Check-out Time', 'Work Duration', 'Status'];
+
+    const rows = filteredTeamAttendance.map(member => {
+      const checkInStr = member.log?.checkIn ? new Date(member.log.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+      const checkOutStr = member.log?.checkOut ? new Date(member.log.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+      const durationStr = member.log?.checkIn ? calculateDuration(member.log.checkIn, member.log.checkOut) : '-';
+      const statusStr = member.log ? member.log.status.toUpperCase() : 'ABSENT';
+      const notesStr = member.log?.notes || '-';
+
+      if (isMultiDay) {
+        return [
+          member.date || startDate,
+          member.name,
+          member.department || 'Unassigned',
+          member.role || 'User',
+          checkInStr,
+          checkOutStr,
+          durationStr,
+          statusStr,
+          notesStr
+        ];
+      } else {
+        return [
+          member.name,
+          member.department || 'Unassigned',
+          member.role || 'User',
+          checkInStr,
+          checkOutStr,
+          durationStr,
+          statusStr
+        ];
+      }
+    });
+
+    const csvString = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    const dateStr = new Date().toLocaleDateString('en-CA');
-    link.setAttribute("download", `attendance_report_${dateStr}.csv`);
+    const filename = isMultiDay
+      ? `team_attendance_${startDate}_to_${endDate}.csv`
+      : `team_attendance_${startDate}.csv`;
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('Attendance report exported successfully!');
+    toast.success(`Exported ${filteredTeamAttendance.length} records (${isMultiDay ? `${startDate} to ${endDate}` : startDate})`);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedDept(canSwitchAllDepts ? 'All' : (user?.department?.name || 'Your Department'));
+    setSelectedStatus('All');
+    handlePeriodPresetChange('today');
   };
 
   const { data: holidaysData } = useGetAllHolidaysQuery(undefined, {
@@ -652,99 +741,238 @@ const AttendancePage = () => {
         {/* Team Attendance Logs */}
         {activeTab === 'team-attendance' && canAccessTeam && (
           <div className="card" style={{ padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>Today's Presence Dashboard</h3>
-              <button className="btn btn-outline btn-sm" onClick={refetchTeamData}>Refresh Logs</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span>{isMultiDay ? '🗓️ Team Presence Logs' : '📅 Today\'s Presence Dashboard'}</span>
+                  <span className="badge" style={{ fontSize: '0.75rem', padding: '3px 10px', background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', fontWeight: 700 }}>
+                    {isMultiDay ? `${startDate} to ${endDate}` : startDate}
+                  </span>
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  {isMultiDay
+                    ? `Showing team check-ins, leaves, and attendance logs across ${startDate} to ${endDate}`
+                    : 'Real-time check-in, check-out, and active duty status for today'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button 
+                  className="btn btn-outline btn-sm" 
+                  onClick={refetchTeamData}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: '0.8rem' }}
+                >
+                  <RiRefreshLine className={loadingTeam ? 'spinner' : ''} /> Refresh Logs
+                </button>
+              </div>
             </div>
 
             {/* Filter Bar */}
             <div style={{
               display: 'flex',
-              flexWrap: 'wrap',
-              gap: 16,
+              flexDirection: 'column',
+              gap: 14,
               marginBottom: 20,
-              padding: '16px',
+              padding: '16px 18px',
               background: 'var(--bg-secondary)',
-              borderRadius: 8,
-              border: '1px solid var(--border)',
-              alignItems: 'center'
+              borderRadius: 10,
+              border: '1px solid var(--border)'
             }}>
-              <div style={{ flex: '1 1 200px' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Search Member / Role</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="Search by name or role..." 
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                />
-              </div>
-              
-              <div style={{ flex: '1 1 150px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>
-                  <span>Department</span>
-                  {!canSwitchAllDepts && (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>🔒 (Your Dept)</span>
-                  )}
-                </label>
-                <select 
-                  className="form-control" 
-                  value={selectedDept}
-                  onChange={e => setSelectedDept(e.target.value)}
-                  disabled={!canSwitchAllDepts}
-                  title={!canSwitchAllDepts ? 'Department locked to your assigned department' : 'Switch department'}
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 12px',
-                    cursor: canSwitchAllDepts ? 'pointer' : 'default',
-                    opacity: canSwitchAllDepts ? 1 : 0.85
-                  }}
-                >
-                  {departmentsList.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
+              {/* Filter Controls Row */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 14,
+                alignItems: 'center'
+              }}>
+                {/* Search Member / Role */}
+                <div style={{ flex: '1 1 200px', minWidth: 170 }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Search Member / Role</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="Search by name or role..." 
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{ fontSize: '0.8rem', padding: '7px 12px' }}
+                  />
+                </div>
+                
+                {/* Department Filter */}
+                <div style={{ flex: '1 1 160px', minWidth: 150 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>
+                    <span>Department</span>
+                    {!canSwitchAllDepts && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>🔒 (Your Dept)</span>
+                    )}
+                  </label>
+                  <select 
+                    className="form-control" 
+                    value={selectedDept}
+                    onChange={e => setSelectedDept(e.target.value)}
+                    disabled={!canSwitchAllDepts}
+                    title={!canSwitchAllDepts ? 'Department locked to your assigned department' : 'Switch department'}
+                    style={{
+                      fontSize: '0.8rem',
+                      padding: '7px 12px',
+                      cursor: canSwitchAllDepts ? 'pointer' : 'default',
+                      opacity: canSwitchAllDepts ? 1 : 0.85
+                    }}
+                  >
+                    {departmentsList.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Presence Status */}
+                <div style={{ flex: '1 1 130px', minWidth: 120 }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Presence Status</label>
+                  <select 
+                    className="form-control" 
+                    value={selectedStatus}
+                    onChange={e => setSelectedStatus(e.target.value)}
+                    style={{ fontSize: '0.8rem', padding: '7px 12px' }}
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="present">Present</option>
+                    <option value="late">Late Arrival</option>
+                    <option value="half_day">Half Day</option>
+                    <option value="on_leave">On Leave</option>
+                    <option value="absent">Absent</option>
+                  </select>
+                </div>
+
+                {/* Period Mode Selector */}
+                <div style={{ flex: '1 1 170px', minWidth: 160 }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Date / Range Filter</label>
+                  <select
+                    className="form-control"
+                    value={periodPreset}
+                    onChange={e => handlePeriodPresetChange(e.target.value)}
+                    style={{ fontSize: '0.8rem', padding: '7px 12px', fontWeight: 600 }}
+                  >
+                    <option value="today">📅 Today ({todayDateStr})</option>
+                    <option value="this_month">🗓️ This Month ({new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })})</option>
+                    <option value="last_month">🗓️ Last Month</option>
+                    <option value="month_picker">📆 Specific Month...</option>
+                    <option value="custom">🔍 Custom Date Range...</option>
+                  </select>
+                </div>
+
+                {/* Specific Month / Year selector if month_picker is active */}
+                {periodPreset === 'month_picker' && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flex: '1 1 200px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Month</label>
+                      <select
+                        className="form-control"
+                        value={filterMonth}
+                        onChange={e => handleMonthYearChange(e.target.value, filterYear)}
+                        style={{ fontSize: '0.8rem', padding: '7px 10px' }}
+                      >
+                        {[
+                          { m: '1', l: 'January' }, { m: '2', l: 'February' }, { m: '3', l: 'March' },
+                          { m: '4', l: 'April' }, { m: '5', l: 'May' }, { m: '6', l: 'June' },
+                          { m: '7', l: 'July' }, { m: '8', l: 'August' }, { m: '9', l: 'September' },
+                          { m: '10', l: 'October' }, { m: '11', l: 'November' }, { m: '12', l: 'December' }
+                        ].map(({ m, l }) => (
+                          <option key={m} value={m}>{l}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ width: 85 }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Year</label>
+                      <select
+                        className="form-control"
+                        value={filterYear}
+                        onChange={e => handleMonthYearChange(filterMonth, e.target.value)}
+                        style={{ fontSize: '0.8rem', padding: '7px 10px' }}
+                      >
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Date Range if custom is active */}
+                {periodPreset === 'custom' && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flex: '1 1 230px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>From Date</label>
+                      <input 
+                        type="date"
+                        className="form-control"
+                        value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
+                        style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>To Date</label>
+                      <input 
+                        type="date"
+                        className="form-control"
+                        value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
+                        style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-end', marginLeft: 'auto' }}>
+                  <button 
+                    type="button"
+                    className="btn btn-outline btn-sm" 
+                    onClick={handleResetFilters}
+                    style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+                  >
+                    Reset
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-primary btn-sm" 
+                    onClick={handleExportCSV}
+                    disabled={filteredTeamAttendance.length === 0}
+                    style={{
+                      padding: '8px 18px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      boxShadow: '0 4px 14px rgba(99,102,241,0.25)'
+                    }}
+                  >
+                    📥 Export CSV ({filteredTeamAttendance.length})
+                  </button>
+                </div>
               </div>
 
-              <div style={{ flex: '1 1 150px' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>Presence Status</label>
-                <select 
-                  className="form-control" 
-                  value={selectedStatus}
-                  onChange={e => setSelectedStatus(e.target.value)}
-                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="present">Present</option>
-                  <option value="late">Late Arrival</option>
-                  <option value="half_day">Half Day</option>
-                  <option value="absent">Absent</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-end', marginLeft: 'auto' }}>
-                <button 
-                  type="button"
-                  className="btn btn-outline btn-sm" 
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedDept('All');
-                    setSelectedStatus('All');
-                  }}
-                  style={{ padding: '8px 16px', fontSize: '0.8rem' }}
-                >
-                  Reset
-                </button>
-                <button 
-                  type="button"
-                  className="btn btn-primary btn-sm" 
-                  onClick={handleExportCSV}
-                  disabled={filteredTeamAttendance.length === 0}
-                  style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  📥 Export CSV ({filteredTeamAttendance.length})
-                </button>
+              {/* Summary Metrics Chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, marginRight: 4 }}>
+                  Filtered Metrics ({isMultiDay ? `${startDate} to ${endDate}` : startDate}):
+                </span>
+                <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.12)', color: 'var(--accent)', fontSize: '0.72rem', padding: '3px 8px' }}>
+                  Total: {filteredTeamAttendance.length}
+                </span>
+                <span className="badge" style={{ background: 'rgba(34, 197, 94, 0.12)', color: 'var(--success)', fontSize: '0.72rem', padding: '3px 8px' }}>
+                  Present: {filteredTeamAttendance.filter(m => m.log?.status === 'present').length}
+                </span>
+                <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', fontSize: '0.72rem', padding: '3px 8px' }}>
+                  Late: {filteredTeamAttendance.filter(m => m.log?.status === 'late').length}
+                </span>
+                <span className="badge" style={{ background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', fontSize: '0.72rem', padding: '3px 8px' }}>
+                  Half Day: {filteredTeamAttendance.filter(m => m.log?.status === 'half_day').length}
+                </span>
+                <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.12)', color: 'var(--danger)', fontSize: '0.72rem', padding: '3px 8px' }}>
+                  Absent / Leave: {filteredTeamAttendance.filter(m => !m.log || m.log?.status === 'absent' || m.log?.status === 'on_leave').length}
+                </span>
               </div>
             </div>
 
@@ -759,6 +987,7 @@ const AttendancePage = () => {
                 <table className="table">
                   <thead>
                     <tr>
+                      {isMultiDay && <th style={{ minWidth: 105 }}>Date</th>}
                       <th>Member Name</th>
                       <th>Department</th>
                       <th>Role</th>
@@ -771,6 +1000,11 @@ const AttendancePage = () => {
                   <tbody>
                     {filteredTeamAttendance.map(member => (
                       <tr key={member.id}>
+                        {isMultiDay && (
+                          <td style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                            📅 {member.date || member.log?.date || startDate}
+                          </td>
+                        )}
                         <td style={{ fontWeight: 700 }}>{member.name}</td>
                         <td>{member.department}</td>
                         <td>{member.role}</td>
@@ -781,8 +1015,8 @@ const AttendancePage = () => {
                         </td>
                         <td>
                           {member.log ? (
-                            <span className={`badge ${member.log.status === 'present' ? 'badge-success' : member.log.status === 'late' ? 'badge-warning' : member.log.status === 'half_day' ? 'badge-info' : 'badge-primary'}`} style={{ textTransform: 'uppercase' }}>
-                              {member.log.status}
+                            <span className={`badge ${member.log.status === 'present' ? 'badge-success' : member.log.status === 'late' ? 'badge-warning' : member.log.status === 'half_day' ? 'badge-info' : member.log.status === 'on_leave' ? 'badge-primary' : 'badge-danger'}`} style={{ textTransform: 'uppercase' }}>
+                              {member.log.status === 'on_leave' ? 'ON LEAVE' : member.log.status}
                             </span>
                           ) : (
                             <span className="badge badge-danger">ABSENT</span>
@@ -794,6 +1028,11 @@ const AttendancePage = () => {
                 </table>
               </div>
             )}
+
+            {/* Developed by axiino.com credit line */}
+            <div style={{ textAlign: 'center', marginTop: 18, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              Developed by <a href="https://axiino.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>axiino.com</a>
+            </div>
           </div>
         )}
 

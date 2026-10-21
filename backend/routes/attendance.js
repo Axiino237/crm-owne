@@ -244,38 +244,157 @@ router.get('/team-today', async (req, res) => {
     });
 
     const todayStr = getLocalDateString();
-    const attendanceLogs = await Attendance.findAll({
+    const { startDate, endDate, date, month, year } = req.query;
+
+    let effectiveStartDate = todayStr;
+    let effectiveEndDate = todayStr;
+
+    if (startDate && endDate) {
+      effectiveStartDate = startDate;
+      effectiveEndDate = endDate;
+    } else if (date) {
+      effectiveStartDate = date;
+      effectiveEndDate = date;
+    } else if (month) {
+      const parsedYear = parseInt(year, 10) || new Date().getFullYear();
+      const m = String(month).padStart(2, '0');
+      const lastDay = new Date(parsedYear, parseInt(month, 10), 0).getDate();
+      effectiveStartDate = `${parsedYear}-${m}-01`;
+      effectiveEndDate = `${parsedYear}-${m}-${String(lastDay).padStart(2, '0')}`;
+    }
+
+    const isRange = effectiveStartDate !== effectiveEndDate;
+
+
+    const userIds = deptUsers.map(u => u.id);
+
+    const attendanceLogs = userIds.length > 0 ? await Attendance.findAll({
       where: {
-        userId: { [Op.in]: deptUsers.map(u => u.id) },
-        date: todayStr
+        userId: { [Op.in]: userIds },
+        date: { [Op.between]: [effectiveStartDate, effectiveEndDate] }
+      },
+      order: [['date', 'DESC'], ['checkIn', 'ASC']],
+      raw: true
+    }) : [];
+
+    const approvedLeaves = userIds.length > 0 ? await LeaveRequest.findAll({
+      where: {
+        userId: { [Op.in]: userIds },
+        status: 'approved',
+        [Op.or]: [
+          { startDate: { [Op.between]: [effectiveStartDate, effectiveEndDate] } },
+          { endDate: { [Op.between]: [effectiveStartDate, effectiveEndDate] } }
+        ]
       },
       raw: true
-    });
+    }) : [];
 
-    // Map logs to user objects
-    const teamAttendance = deptUsers.map(user => {
-      const log = attendanceLogs.find(l => l.userId === user.id);
-      return {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        department: user.department?.name || 'Unassigned',
-        role: user.role?.name || 'User',
-        log: log ? {
-          id: log.id,
-          status: log.status,
-          checkIn: log.checkIn,
-          checkOut: log.checkOut,
-          notes: log.notes
-        } : null
-      };
-    });
+    let teamAttendance = [];
+
+    if (!isRange) {
+      // Single Day mapping: show all scoped users
+      teamAttendance = deptUsers.map(user => {
+        const log = attendanceLogs.find(l => l.userId === user.id);
+        const leave = approvedLeaves.find(l => l.userId === user.id && effectiveStartDate >= l.startDate && effectiveStartDate <= l.endDate);
+        return {
+          id: user.id,
+          date: effectiveStartDate,
+          name: user.name,
+          email: user.email,
+          department: user.department?.name || 'Unassigned',
+          role: user.role?.name || 'User',
+          log: log ? {
+            id: log.id,
+            date: log.date,
+            status: log.status,
+            checkIn: log.checkIn,
+            checkOut: log.checkOut,
+            notes: log.notes
+          } : (leave ? {
+            id: `leave_${leave.id}`,
+            date: effectiveStartDate,
+            status: 'on_leave',
+            checkIn: null,
+            checkOut: null,
+            notes: leave.leaveType ? `Approved ${leave.leaveType} leave` : 'On Leave'
+          } : null)
+        };
+      });
+    } else {
+      // Date Range / Month: show all attendance logs in the range
+      const deptUserMap = new Map();
+      deptUsers.forEach(u => deptUserMap.set(u.id, u));
+
+      attendanceLogs.forEach(log => {
+        const user = deptUserMap.get(log.userId);
+        if (user) {
+          teamAttendance.push({
+            id: `${user.id}_${log.date}_${log.id}`,
+            userId: user.id,
+            date: log.date,
+            name: user.name,
+            email: user.email,
+            department: user.department?.name || 'Unassigned',
+            role: user.role?.name || 'User',
+            log: {
+              id: log.id,
+              date: log.date,
+              status: log.status,
+              checkIn: log.checkIn,
+              checkOut: log.checkOut,
+              notes: log.notes
+            }
+          });
+        }
+      });
+
+      // Add approved leaves
+      approvedLeaves.forEach(leave => {
+        const user = deptUserMap.get(leave.userId);
+        if (user) {
+          const s = new Date(leave.startDate) < new Date(effectiveStartDate) ? new Date(effectiveStartDate) : new Date(leave.startDate);
+          const e = new Date(leave.endDate) > new Date(effectiveEndDate) ? new Date(effectiveEndDate) : new Date(leave.endDate);
+          for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+            const dateStr = d.toISOString().split('T')[0];
+            const alreadyHasLog = teamAttendance.some(t => t.userId === user.id && t.date === dateStr);
+            if (!alreadyHasLog) {
+              teamAttendance.push({
+                id: `leave_${leave.id}_${dateStr}`,
+                userId: user.id,
+                date: dateStr,
+                name: user.name,
+                email: user.email,
+                department: user.department?.name || 'Unassigned',
+                role: user.role?.name || 'User',
+                log: {
+                  id: `leave_${leave.id}_${dateStr}`,
+                  date: dateStr,
+                  status: 'on_leave',
+                  checkIn: null,
+                  checkOut: null,
+                  notes: leave.leaveType ? `Approved ${leave.leaveType} leave` : 'On Leave'
+                }
+              });
+            }
+          }
+        }
+      });
+
+      // Sort by date DESC, then name ASC
+      teamAttendance.sort((a, b) => {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        return a.name.localeCompare(b.name);
+      });
+    }
 
     const userDept = req.user.departmentId ? await Department.findByPk(req.user.departmentId) : null;
 
     res.json({
       success: true,
-      date: todayStr,
+      date: effectiveStartDate,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      isRange,
       canSwitchAllDepts: Boolean(canSwitchAllDepts),
       canViewTeam: Boolean(canViewTeam),
       userDeptName: userDept?.name || '',
