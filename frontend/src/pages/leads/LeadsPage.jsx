@@ -679,6 +679,8 @@ const LeadsPage = () => {
       await api.put(`/leads/${leadId}`, payload);
       if (newStatus === 'new') {
         toast.success('Lead status reverted to New (Call count removed)');
+      } else if (newStatus === 'requirement_received') {
+        toast.success('Requirement Received — Lead automatically moved to Design List! 🎨');
       } else {
         toast.success(`Status updated to ${getStatusConfig(newStatus)?.label || newStatus} (Calls Made logged)`);
       }

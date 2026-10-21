@@ -9,7 +9,7 @@ async function migrate() {
     console.log('Database connected.');
 
     // 1. Enum update
-    const screens = ['staff-summary', 'dashboard-all'];
+    const screens = ['staff-summary', 'dashboard-all', 'performance-team', 'performance-all-departments', 'net-profit-card'];
     for (const scr of screens) {
       try {
         await sequelize.query(`ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS '${scr}'`);
@@ -111,6 +111,60 @@ async function migrate() {
           canDelete: false
         });
         console.log(`Created dashboard-all permission for role ${role.name} (${role.code}): canView=${shouldHaveDashAll}`);
+      }
+
+      // performance-team permission
+      const existingPerfTeam = await Permission.findOne({
+        where: { roleId: role.id, module: 'performance', screen: 'performance-team' }
+      });
+      const shouldHavePerfTeam = isSuper || isAdmin;
+      if (!existingPerfTeam) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'performance',
+          screen: 'performance-team',
+          canView: shouldHavePerfTeam,
+          canCreate: false,
+          canEdit: false,
+          canDelete: false
+        });
+        console.log(`Created performance-team permission for role ${role.name}: canView=${shouldHavePerfTeam}`);
+      }
+
+      // performance-all-departments permission
+      const existingPerfDepts = await Permission.findOne({
+        where: { roleId: role.id, module: 'performance', screen: 'performance-all-departments' }
+      });
+      const shouldHavePerfDepts = isSuper || isAdmin;
+      if (!existingPerfDepts) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'performance',
+          screen: 'performance-all-departments',
+          canView: shouldHavePerfDepts,
+          canCreate: false,
+          canEdit: false,
+          canDelete: false
+        });
+        console.log(`Created performance-all-departments permission for role ${role.name}: canView=${shouldHavePerfDepts}`);
+      }
+
+      // net-profit-card permission
+      const existingNetProfit = await Permission.findOne({
+        where: { roleId: role.id, module: 'dashboard', screen: 'net-profit-card' }
+      });
+      const shouldHaveNetProfit = isSuper || isAdmin;
+      if (!existingNetProfit) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'dashboard',
+          screen: 'net-profit-card',
+          canView: shouldHaveNetProfit,
+          canCreate: false,
+          canEdit: false,
+          canDelete: false
+        });
+        console.log(`Created net-profit-card permission for role ${role.name}: canView=${shouldHaveNetProfit}`);
       }
     }
 

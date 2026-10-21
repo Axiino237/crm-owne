@@ -19,7 +19,7 @@ const Permission = sequelize.define('Permission', {
     type: DataTypes.ENUM(
       'dashboard-home', 'dashboard-all',
       'leads-widget', 'calls-widget', 'interested-leads-widget', 'projects-widget', 'pending-projects-widget', 'completed-projects-widget',
-      'total-profit-card', 'monthly-profit-card', 'deductions-card',
+      'total-profit-card', 'monthly-profit-card', 'deductions-card', 'net-profit-card',
       'profit-trend-chart', 'recent-leads-list', 'recent-projects-list',
       'org-overview', 'system-overview',
       'pending-designs-widget', 'completed-designs-widget', 'change-designs-widget', 'total-designs-widget',
@@ -31,7 +31,7 @@ const Permission = sequelize.define('Permission', {
       'departments-list', 'department-create', 'department-edit',
       'leads-list', 'lead-create', 'lead-edit', 'lead-delete',
       'quotations-list', 'quotation-create', 'quotation-export',
-      'performance-view',
+      'performance-view', 'performance-team', 'performance-all-departments',
       'closed-sales-list',
       'closed-sales-all',
       'closed-sales-value', 'closed-sales-paid', 'closed-sales-balance', 'closed-sales-vendor-payout',

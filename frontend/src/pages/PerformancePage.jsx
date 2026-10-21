@@ -36,8 +36,13 @@ const PerformancePage = () => {
   const [loading, setLoading] = useState(true);
   const [isDeptHead, setIsDeptHead] = useState(false);
   const [hasTeamAccess, setHasTeamAccess] = useState(false);
+  const [canViewTeam, setCanViewTeam] = useState(false);
+  const [canSwitchAllDepts, setCanSwitchAllDepts] = useState(false);
   const [headDeptName, setHeadDeptName] = useState('');
   const [isDesignDept, setIsDesignDept] = useState(false);
+
+  // Scope: 'team' vs 'own'
+  const [perfScope, setPerfScope] = useState('team');
 
   // Filter states
   const [selectedDept, setSelectedDept] = useState('');
@@ -56,6 +61,7 @@ const PerformancePage = () => {
     try {
       const params = new URLSearchParams();
       if (selectedDept) params.set('departmentId', selectedDept);
+      if (perfScope) params.set('scope', perfScope);
       if (year) params.set('year', year);
       if (month) params.set('month', month);
       if (day) params.set('day', day);
@@ -66,6 +72,8 @@ const PerformancePage = () => {
         setActivities(res.data.activities || []);
         setIsDeptHead(res.data.isDeptHead || false);
         setHasTeamAccess(res.data.hasTeamAccess || false);
+        setCanViewTeam(res.data.canViewTeam || false);
+        setCanSwitchAllDepts(res.data.canSwitchAllDepts || false);
         setHeadDeptName(res.data.headDeptName || '');
         setIsDesignDept(res.data.isDesignDept || false);
         if (res.data.departments) {
@@ -74,12 +82,15 @@ const PerformancePage = () => {
         if (res.data.selectedDepartmentId && !selectedDept) {
           setSelectedDept(res.data.selectedDepartmentId);
         }
+        if (res.data.scopeType && res.data.scopeType !== perfScope) {
+          setPerfScope(res.data.scopeType);
+        }
       }
     } catch (err) {
       toast.error('Failed to load performance metrics');
     }
     setLoading(false);
-  }, [selectedDept, year, month, day]);
+  }, [selectedDept, perfScope, year, month, day]);
 
   useEffect(() => {
     fetchPerformance();
@@ -100,24 +111,50 @@ const PerformancePage = () => {
   const designCompletionRate = totalAssigned > 0 ? ((totalConverted / totalAssigned) * 100).toFixed(1) : '0';
 
   // Get current active department label
-  const activeDeptLabel = departments.find(d => d.id === selectedDept)?.name || 'Department';
+  const activeDeptLabel = departments.find(d => String(d.id) === String(selectedDept))?.name || 'Department';
 
   return (
     <AppLayout>
-      <div className="page-header" style={{ marginBottom: 24 }}>
+      <div className="page-header" style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <RiBarChart2Line style={{ color: 'var(--accent)' }} /> Team Performance
-          </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0 }}>
-              {isAdmin 
-                ? `Monitor call counts, conversions, and leads across all departments.` 
-                : hasTeamAccess
-                  ? `Reviewing metrics for members of ${headDeptName || activeDeptLabel || 'your department'}.`
-                  : `Your personal performance metrics.`
-              }
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}>
+              <RiBarChart2Line style={{ color: 'var(--accent)' }} /> 
+              {perfScope === 'team' ? 'Team Performance' : 'My Performance'}
+            </h1>
+            {/* Scope Badge */}
+            {perfScope === 'team' ? (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 12px',
+                borderRadius: 20,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                background: 'rgba(59, 130, 246, 0.12)',
+                color: '#60a5fa',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }}>
+                <span>👥</span> Team Scope ({headDeptName || activeDeptLabel})
+              </span>
+            ) : (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 12px',
+                borderRadius: 20,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                background: 'rgba(16, 185, 129, 0.12)',
+                color: '#34d399',
+                border: '1px solid rgba(16, 185, 129, 0.3)'
+              }}>
+                <span>👤</span> My Performance Only
+              </span>
+            )}
+
             {/* Dept Head Badge */}
             {isDeptHead && (
               <span style={{
@@ -136,21 +173,81 @@ const PerformancePage = () => {
               </span>
             )}
           </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 6, marginBottom: 0 }}>
+            {perfScope === 'team'
+              ? `Reviewing metrics and conversions across ${headDeptName || activeDeptLabel || 'the department'}.`
+              : `Reviewing only your personal call counts, conversions, and metrics.`
+            }
+          </p>
         </div>
+
+        {/* Scope Toggle if user has team view permission */}
+        {canViewTeam && (
+          <div style={{
+            display: 'inline-flex',
+            background: 'rgba(5, 8, 16, 0.6)',
+            padding: 4,
+            borderRadius: 8,
+            border: '1px solid var(--border)'
+          }}>
+            <button
+              type="button"
+              onClick={() => setPerfScope('team')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: perfScope === 'team' ? 'var(--accent)' : 'transparent',
+                color: perfScope === 'team' ? '#ffffff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: 6,
+                fontWeight: 600,
+                fontSize: '0.8125rem',
+                cursor: 'pointer',
+                transition: 'var(--transition)'
+              }}
+            >
+              <span>👥</span> Team Performance
+            </button>
+            <button
+              type="button"
+              onClick={() => setPerfScope('own')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: perfScope === 'own' ? 'var(--accent)' : 'transparent',
+                color: perfScope === 'own' ? '#ffffff' : 'var(--text-secondary)',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: 6,
+                fontWeight: 600,
+                fontSize: '0.8125rem',
+                cursor: 'pointer',
+                transition: 'var(--transition)'
+              }}
+            >
+              <span>👤</span> My Performance Only
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter panel */}
       <div className="card" style={{ padding: '16px 20px', marginBottom: 24, background: 'var(--bg-card)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
           
-          {/* Department Filter (Admins or multi-department heads) */}
+          {/* Department Filter (Only accessible if canSwitchAllDepts, else locked to own dept) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <RiGroupLine style={{ color: 'var(--text-muted)' }} />
             <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Department:</span>
             <select
               value={selectedDept}
               onChange={e => setSelectedDept(e.target.value)}
-              disabled={!isAdmin && departments.length <= 1}
+              disabled={!canSwitchAllDepts && departments.length <= 1}
+              title={!canSwitchAllDepts ? 'Department locked to your assigned department' : 'Switch department'}
               style={{
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border)',
@@ -158,8 +255,8 @@ const PerformancePage = () => {
                 padding: '8px 12px',
                 color: 'var(--text-primary)',
                 fontSize: '0.875rem',
-                cursor: (isAdmin || departments.length > 1) ? 'pointer' : 'default',
-                opacity: (isAdmin || departments.length > 1) ? 1 : 0.75
+                cursor: canSwitchAllDepts ? 'pointer' : 'default',
+                opacity: canSwitchAllDepts ? 1 : 0.8
               }}
             >
               {departments.length > 0 ? (
@@ -170,6 +267,11 @@ const PerformancePage = () => {
                 <option value={selectedDept || ''}>{activeDeptLabel || 'No departments'}</option>
               )}
             </select>
+            {!canSwitchAllDepts && (
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                🔒 (Your Dept)
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
@@ -268,8 +370,8 @@ const PerformancePage = () => {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept 
-                    ? (hasTeamAccess || isAdmin ? 'Total Designs' : 'My Designs')
-                    : (hasTeamAccess || isAdmin ? 'Team Calls' : 'My Calls')
+                    ? (perfScope === 'team' ? 'Total Designs' : 'My Designs')
+                    : (perfScope === 'team' ? 'Team Calls' : 'My Calls')
                   }
                 </div>
                 <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap' }}>
@@ -286,8 +388,8 @@ const PerformancePage = () => {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept 
-                    ? (hasTeamAccess || isAdmin ? 'Team Completed' : 'My Completed')
-                    : (hasTeamAccess || isAdmin ? 'Team Converted' : 'My Converted')
+                    ? (perfScope === 'team' ? 'Team Completed' : 'My Completed')
+                    : (perfScope === 'team' ? 'Team Converted' : 'My Converted')
                   }
                 </div>
                 <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap' }}>
@@ -319,8 +421,8 @@ const PerformancePage = () => {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {isDesignDept 
-                    ? (hasTeamAccess || isAdmin ? 'Team Assigned' : 'My Assigned')
-                    : (hasTeamAccess || isAdmin ? 'Team Leads' : 'My Leads')
+                    ? (perfScope === 'team' ? 'Team Assigned' : 'My Assigned')
+                    : (perfScope === 'team' ? 'Team Leads' : 'My Leads')
                   }
                 </div>
                 <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap' }}>
@@ -336,7 +438,7 @@ const PerformancePage = () => {
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {isDesignDept ? 'Completed Budget' : 'Total Closed'}
+                  {isDesignDept ? 'Completed Budget' : (perfScope === 'team' ? 'Total Closed' : 'My Closed')}
                 </div>
                 <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {formatCurrency(totalClosedVal)}
@@ -351,7 +453,7 @@ const PerformancePage = () => {
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {isDesignDept ? 'Generated Rev.' : 'Net Profit'}
+                  {isDesignDept ? 'Generated Rev.' : (perfScope === 'team' ? 'Team Net Profit' : 'My Net Profit')}
                 </div>
                 <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {formatCurrency(totalNetProfit)}
@@ -363,16 +465,19 @@ const PerformancePage = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
             
-            {/* Leaderboard Table — only for admins and team-access users */}
-            {(hasTeamAccess || isAdmin) && (
+            {/* Leaderboard Table — visible for team scope or when user has members to view */}
+            {(perfScope === 'team' || canViewTeam || members.length > 0) && (
             <div className="card" style={{ padding: 0, overflow: 'hidden', width: '100%' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <RiUserLine style={{ color: 'var(--accent)' }} />
-                  {isDeptHead ? `👑 ${headDeptName} — Team Leaderboard` : 'Team Leaderboard'}
+                  {perfScope === 'team' 
+                    ? (isDeptHead ? `👑 ${headDeptName} — Team Leaderboard` : `${headDeptName || activeDeptLabel} Team Leaderboard`)
+                    : 'My Performance Details'
+                  }
                 </h3>
                 <span style={{ fontSize: '0.75rem', background: 'var(--accent-glow)', color: 'var(--accent)', padding: '4px 8px', borderRadius: 6, fontWeight: 700 }}>
-                  {members.length} member{members.length !== 1 && 's'}
+                  {members.length} {perfScope === 'team' ? `member${members.length !== 1 ? 's' : ''}` : 'record'}
                 </span>
               </div>
 
@@ -463,55 +568,6 @@ const PerformancePage = () => {
             </div>
             )}
 
-            {/* Personal stats card for regular users (non-head, non-admin) */}
-            {!hasTeamAccess && !isAdmin && members.length > 0 && (
-              <div className="card" style={{ padding: 24, width: '100%' }}>
-                <h3 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <RiUserLine style={{ color: 'var(--accent)' }} /> My Performance
-                </h3>
-                {members.map(me => (
-                  <div key={me.id}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 16px', background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                      <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--accent-glow)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
-                        {me.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{me.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{me.role}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                      {isDesignDept ? (
-                        [
-                          { label: 'Designs Assigned', val: me.stats?.totalAssigned, color: '#f59e0b' },
-                          { label: 'Completed Designs', val: me.stats?.convertedCount, color: '#10b981' },
-                          { label: 'Completed Budget', val: formatCurrency(me.stats?.totalClosedVal), color: '#06b6d4' },
-                          { label: 'Generated Revenue', val: formatCurrency(me.stats?.netProfit), color: '#ec4899' },
-                        ].map(({ label, val, color }) => (
-                          <div key={label} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--border)' }}>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color }}>{val}</div>
-                          </div>
-                        ))
-                      ) : (
-                        [
-                          { label: 'Leads Assigned', val: me.stats?.totalAssigned, color: '#f59e0b' },
-                          { label: 'Calls Made', val: me.stats?.contactedCount, color: '#818cf8' },
-                          { label: 'Converted Leads', val: me.stats?.convertedCount, color: '#10b981' },
-                          { label: 'Closed Amount', val: formatCurrency(me.stats?.totalClosedVal), color: '#06b6d4' },
-                          { label: 'Net Profit', val: formatCurrency(me.stats?.netProfit), color: '#ec4899' },
-                        ].map(({ label, val, color }) => (
-                          <div key={label} style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '14px 16px', border: '1px solid var(--border)' }}>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color }}>{val}</div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
 
           </div>
         </>

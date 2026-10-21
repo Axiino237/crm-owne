@@ -12,57 +12,92 @@ router.use(protect);
 // @route  GET /api/performance
 router.get('/', checkPermission('performance', 'performance-view', 'canView'), async (req, res) => {
   try {
+    const { Permission } = require('../models');
     const userRole = req.user.role?.level;
-    const isAdmin = ['super_admin', 'org_admin', 'company_admin'].includes(userRole) || req.user.isSuperAdmin;
+    const isSuper = req.user.isSuperAdmin || userRole === 'super_admin';
+    const isOrgAdmin = userRole === 'org_admin';
+    const isCompanyAdmin = userRole === 'company_admin';
+    const isAdmin = isSuper || isOrgAdmin || isCompanyAdmin;
 
     // Check department head scope (supports multi-department heads)
     const deptScope = await getDeptHeadScope(req.user);
     const isDeptHead = deptScope.isDeptHead;
     const isManager = userRole === 'dept_manager';
-    const hasTeamAccess = isManager || isDeptHead;
+
+    // 1. Team access check: admins, managers, dept heads, or roles with 'performance-team' permission
+    let canViewTeam = isAdmin || isDeptHead || isManager;
+    if (!canViewTeam && req.user.roleId) {
+      const permTeam = await Permission.findOne({
+        where: { roleId: req.user.roleId, module: 'performance', screen: 'performance-team', canView: true }
+      });
+      if (permTeam) canViewTeam = true;
+    }
+
+    // 2. All departments switch check: admins or roles with 'performance-all-departments' permission
+    let canSwitchAllDepts = isAdmin;
+    if (!canSwitchAllDepts && req.user.roleId) {
+      const permDepts = await Permission.findOne({
+        where: { roleId: req.user.roleId, module: 'performance', screen: 'performance-all-departments', canView: true }
+      });
+      if (permDepts) canSwitchAllDepts = true;
+    }
 
     // Determine available departments for this user
     let availableDepts = [];
-    if (isAdmin) {
+    if (canSwitchAllDepts) {
       availableDepts = await Department.findAll({
-        where: req.user.isSuperAdmin ? {} : { organizationId: req.user.organizationId },
-        attributes: ['id', 'name']
+        where: isSuper ? {} : { organizationId: req.user.organizationId },
+        attributes: ['id', 'name'],
+        order: [['name', 'ASC']]
       });
     } else if (isDeptHead && deptScope.managedDeptIds.length > 0) {
       availableDepts = await Department.findAll({
         where: { id: { [Op.in]: deptScope.managedDeptIds } },
-        attributes: ['id', 'name']
+        attributes: ['id', 'name'],
+        order: [['name', 'ASC']]
       });
-    } else if (isManager && req.user.departmentId) {
+    } else if (req.user.departmentId) {
       availableDepts = await Department.findAll({
         where: { id: req.user.departmentId },
         attributes: ['id', 'name']
       });
     }
 
+    // Target department: default to user's own department!
     let targetDeptId = req.query.departmentId || null;
-    if (targetDeptId && !isAdmin) {
-      const allowed = availableDepts.some(d => d.id === targetDeptId);
-      if (!allowed) targetDeptId = null;
+    if (targetDeptId) {
+      if (!canSwitchAllDepts) {
+        const isAllowed = availableDepts.some(d => String(d.id) === String(targetDeptId));
+        if (!isAllowed) {
+          targetDeptId = req.user.departmentId || (availableDepts[0]?.id || null);
+        }
+      }
+    } else {
+      // Default to user's own department
+      if (req.user.departmentId && (canSwitchAllDepts || availableDepts.some(d => String(d.id) === String(req.user.departmentId)))) {
+        targetDeptId = req.user.departmentId;
+      } else if (availableDepts.length > 0) {
+        targetDeptId = availableDepts[0].id;
+      }
     }
 
-    if (!targetDeptId && availableDepts.length > 0) {
-      targetDeptId = availableDepts[0].id;
-    }
+    // 3. Scope handling: 'team' vs 'own'
+    const requestedScope = req.query.scope; // 'team' or 'own'
+    const effectiveScope = (requestedScope === 'own') ? 'own' : (canViewTeam ? 'team' : 'own');
 
-    // 2. Build userWhere: admins/team-heads see dept members, regular users see only self
     let userWhere = {};
-    if (isAdmin || hasTeamAccess) {
+    if (effectiveScope === 'own') {
+      userWhere.id = req.user.id;
+    } else {
+      // Team scope (if permitted)
       if (targetDeptId) {
         userWhere.departmentId = targetDeptId;
-      } else if (!isAdmin) {
-        // Fallback safety: If department head has no department assigned, scope only to themselves
+      } else {
         userWhere.id = req.user.id;
       }
-      if (!req.user.isSuperAdmin && req.user.organizationId) userWhere.organizationId = req.user.organizationId;
-    } else {
-      // Regular user — only their own row
-      userWhere.id = req.user.id;
+      if (!isSuper && req.user.organizationId) {
+        userWhere.organizationId = req.user.organizationId;
+      }
     }
 
     const deptUsers = await User.findAll({
@@ -279,10 +314,14 @@ router.get('/', checkPermission('performance', 'performance-view', 'canView'), a
 
     res.json({
       success: true,
+      canViewTeam,
+      canSwitchAllDepts,
+      scopeType: effectiveScope,
+      userDepartmentId: req.user.departmentId,
       isDeptHead,
-      hasTeamAccess,
+      hasTeamAccess: canViewTeam,
       isDesignDept,
-      headDeptName: availableDepts.length > 0 ? (availableDepts.find(d => d.id === targetDeptId)?.name || availableDepts[0].name) : null,
+      headDeptName: availableDepts.length > 0 ? (availableDepts.find(d => String(d.id) === String(targetDeptId))?.name || availableDepts[0].name) : null,
       selectedDepartmentId: targetDeptId,
       filterPeriod: year ? 'custom' : 'today',
       filterDate: activeDateLabel,

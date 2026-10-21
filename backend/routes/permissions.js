@@ -19,6 +19,7 @@ const MODULE_SCREENS = {
     'total-profit-card',
     'monthly-profit-card',
     'deductions-card',
+    'net-profit-card',
     'profit-trend-chart',
     'recent-leads-list',
     'recent-projects-list',
@@ -37,7 +38,7 @@ const MODULE_SCREENS = {
   departments: ['departments-list', 'department-create', 'department-edit'],
   leads: ['leads-list', 'lead-create', 'lead-edit', 'lead-delete'],
   quotations: ['quotations-list', 'quotation-create', 'quotation-export'],
-  performance: ['performance-view'],
+  performance: ['performance-view', 'performance-team', 'performance-all-departments'],
   closed_sales: [
     'closed-sales-list',
     'closed-sales-all',

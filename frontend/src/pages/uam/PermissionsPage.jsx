@@ -33,9 +33,12 @@ const SCREEN_LABELS = {
   'closed-sales-vendor-payout': 'Vendor Payout (Column & Input)',
   'total-profit-card': 'Total Sales Card',
   'monthly-profit-card': 'Average Monthly Sales Card',
+  'net-profit-card': 'Net Profit Card',
   'profit-trend-chart': 'Monthly Sales Trend Chart',
   'dashboard-all': 'Dashboard All Counts (Team / Org Scope)',
-  'staff-summary': 'Staff Overview & Payroll (Leaves & Salary)'
+  'staff-summary': 'Staff Overview & Payroll (Leaves & Salary)',
+  'performance-team': 'Team Performance View (Show Department Team)',
+  'performance-all-departments': 'Switch All Departments (Department Dropdown)'
 };
 
 const SCREEN_DESCRIPTIONS = {
@@ -46,7 +49,10 @@ const SCREEN_DESCRIPTIONS = {
   'closed-sales-balance': 'Visibility of outstanding pending balance',
   'closed-sales-vendor-payout': 'Visibility and editing of vendor payout details',
   'dashboard-all': 'User can view counts and metrics across ALL staff in the organization on the dashboard',
-  'staff-summary': 'View organization employees summary, leaves taken, quota, and salary details'
+  'net-profit-card': 'Display Team / Personal Net Profit card on the dashboard',
+  'staff-summary': 'View organization employees summary, leaves taken, quota, and salary details',
+  'performance-team': 'User can view entire department team metrics instead of only personal performance',
+  'performance-all-departments': 'User can access and switch between all departments in the Performance dropdown'
 };
 
 const PermissionsPage = () => {

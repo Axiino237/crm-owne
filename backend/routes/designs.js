@@ -191,6 +191,31 @@ router.get('/my', checkPermission('design', 'my-projects-list', 'canView'), asyn
 // @route  GET /api/designs
 router.get('/', checkPermission('design', 'design-list', 'canView'), async (req, res) => {
   try {
+    const isSuper = req.user.isSuperAdmin || req.user.role?.level === 'super_admin';
+
+    // Auto-sync any leads with status 'requirement_received' that don't have a DesignOrder yet
+    const pendingReqLeads = await Lead.findAll({
+      where: {
+        status: 'requirement_received',
+        ...(!isSuper && req.user.organizationId ? { organizationId: req.user.organizationId } : {})
+      }
+    });
+
+    for (const l of pendingReqLeads) {
+      const exists = await DesignOrder.findOne({ where: { leadId: l.id } });
+      if (!exists) {
+        await DesignOrder.create({
+          leadId: l.id,
+          companyName: l.companyName || l.name || 'Unnamed Company',
+          exhibitionName: l.expoName || l.expoType || '',
+          organizationId: l.organizationId || req.user.organizationId || null,
+          submittedBy: l.assignedTo || req.user.id,
+          status: 'pending'
+        }).catch(() => {});
+        await l.update({ designStatus: 'pending' }).catch(() => {});
+      }
+    }
+
     const where = await buildScopeWhere(req.user);
     const orders = await DesignOrder.findAll({
       where,

@@ -15,7 +15,9 @@ import {
   RiLineChartLine,
   RiPaletteLine,
   RiPhoneLine,
-  RiUserHeartLine
+  RiUserHeartLine,
+  RiWallet3Line,
+  RiFundsLine
 } from 'react-icons/ri';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
@@ -54,6 +56,7 @@ const Dashboard = () => {
     hasPermission('dashboard', 'total-profit-card', 'canView') ||
     hasPermission('dashboard', 'monthly-profit-card', 'canView') ||
     hasPermission('dashboard', 'deductions-card', 'canView') ||
+    hasPermission('dashboard', 'net-profit-card', 'canView') ||
     hasPermission('dashboard', 'profit-trend-chart', 'canView') ||
     hasPermission('dashboard', 'recent-leads-list', 'canView') ||
     hasPermission('dashboard', 'recent-projects-list', 'canView') ||
@@ -525,13 +528,16 @@ const Dashboard = () => {
           {/* Financial Cards Grid */}
           {(hasPermission('dashboard', 'total-profit-card', 'canView') ||
             hasPermission('dashboard', 'monthly-profit-card', 'canView') ||
-            hasPermission('dashboard', 'deductions-card', 'canView')) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            hasPermission('dashboard', 'deductions-card', 'canView') ||
+            hasPermission('dashboard', 'net-profit-card', 'canView')) && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
               {hasPermission('dashboard', 'total-profit-card', 'canView') && (
                 <div className="card" style={{ borderLeft: '4px solid var(--success)', background: 'var(--bg-glass)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total Sales (Deal Value)</span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        {dashboardScope === 'all' ? 'Team Total Sales' : 'My Total Sales'}
+                      </span>
                       <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 8, color: 'var(--success)' }}>
                         {loadingBusiness ? <div className="spinner spinner-sm" /> : formatCurrency(businessStats?.stats?.totalSales ?? businessStats?.stats?.totalRevenue)}
                       </h2>
@@ -573,7 +579,9 @@ const Dashboard = () => {
                 <div className="card" style={{ borderLeft: '4px solid var(--danger)', background: 'var(--bg-glass)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Deductions & Expenses</span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        {dashboardScope === 'all' ? 'Team Deductions' : 'My Deductions'}
+                      </span>
                       <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 8, color: 'var(--danger)' }}>
                         {loadingBusiness ? <div className="spinner spinner-sm" /> : formatCurrency(businessStats?.stats?.totalDeductions)}
                       </h2>
@@ -586,6 +594,32 @@ const Dashboard = () => {
                     <span style={{ color: 'var(--text-secondary)' }}>Expense ratio:</span>
                     <span style={{ fontWeight: 600, color: 'var(--danger)' }}>
                       {loadingBusiness ? '...' : `${Math.round(((businessStats?.stats?.totalDeductions || 0) / (businessStats?.stats?.totalRevenue || 1)) * 100)}%`}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {(hasPermission('dashboard', 'net-profit-card', 'canView') || hasPermission('dashboard', 'total-profit-card', 'canView')) && (
+                <div className="card" style={{ borderLeft: '4px solid #10b981', background: 'var(--bg-glass)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        {dashboardScope === 'all' ? 'Team Net Profit' : 'My Net Profit'}
+                      </span>
+                      <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 8, color: (businessStats?.stats?.totalProfit ?? 0) >= 0 ? '#10b981' : 'var(--danger)' }}>
+                        {loadingBusiness ? <div className="spinner spinner-sm" /> : formatCurrency(businessStats?.stats?.totalProfit)}
+                      </h2>
+                    </div>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: 12, borderRadius: '50%', fontSize: '1.5rem', display: 'flex' }}>
+                      <RiWallet3Line />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontSize: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      {dashboardScope === 'all' ? 'Team Profit Margin:' : 'My Profit Margin:'}
+                    </span>
+                    <span style={{ fontWeight: 600, color: (businessStats?.stats?.totalProfit ?? 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {loadingBusiness ? '...' : `${Math.round(((businessStats?.stats?.totalProfit || 0) / (businessStats?.stats?.totalRevenue || 1)) * 100)}%`}
                     </span>
                   </div>
                 </div>

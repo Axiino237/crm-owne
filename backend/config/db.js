@@ -45,6 +45,9 @@ const connectDB = async () => {
     try {
       await sequelize.query("ALTER TYPE enum_crm_permissions_module ADD VALUE IF NOT EXISTS 'performance'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'performance-view'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'performance-team'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'performance-all-departments'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'net-profit-card'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'audit-logs-list'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'system-overview'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_module ADD VALUE IF NOT EXISTS 'closed_sales'");

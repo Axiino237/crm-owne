@@ -298,6 +298,19 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
       include: [{ model: User, as: 'assignee', attributes: ['id', 'name', 'email'] }]
     });
 
+    if (leadStatus === 'requirement_received') {
+      const { DesignOrder } = require('../models');
+      await DesignOrder.create({
+        leadId: lead.id,
+        companyName: lead.companyName || lead.name || 'Unnamed Company',
+        exhibitionName: lead.expoName || lead.expoType || '',
+        organizationId: lead.organizationId || req.user.organizationId || null,
+        submittedBy: req.user.id || lead.assignedTo || null,
+        status: 'pending'
+      }).catch(err => console.error('Auto DesignOrder creation error on POST:', err));
+      await lead.update({ designStatus: 'pending' });
+    }
+
     const { logAction } = require('../utils/auditLogger');
     await logAction(req, 'CREATE', 'leads', lead.id, lead.companyName || lead.name, `Created lead "${lead.companyName || lead.name}"`);
 
@@ -432,6 +445,22 @@ router.put('/:id', async (req, res, next) => {
     }
 
     await lead.update(updates);
+
+    if (updates.status === 'requirement_received' || (lead.status === 'requirement_received' && updates.designStatus !== 'completed')) {
+      const { DesignOrder } = require('../models');
+      const existingOrder = await DesignOrder.findOne({ where: { leadId: lead.id } });
+      if (!existingOrder) {
+        await DesignOrder.create({
+          leadId: lead.id,
+          companyName: updates.companyName || lead.companyName || lead.name || 'Unnamed Company',
+          exhibitionName: updates.expoName || lead.expoName || updates.expoType || lead.expoType || '',
+          organizationId: lead.organizationId || req.user.organizationId || null,
+          submittedBy: req.user.id || lead.assignedTo || null,
+          status: 'pending'
+        }).catch(err => console.error('Auto DesignOrder creation error on PUT:', err));
+        await lead.update({ designStatus: 'pending' });
+      }
+    }
 
     const updated = await Lead.findByPk(lead.id, {
       include: [{ model: User, as: 'assignee', attributes: ['id', 'name', 'email'] }]
