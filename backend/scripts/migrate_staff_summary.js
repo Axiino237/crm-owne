@@ -1,0 +1,87 @@
+require('dotenv').config();
+const { sequelize } = require('../config/db');
+const { Role, Permission } = require('../models');
+
+async function migrate() {
+  try {
+    console.log('Connecting to database...');
+    await sequelize.authenticate();
+    console.log('Database connected.');
+
+    // 1. Enum update
+    const screen = 'staff-summary';
+    try {
+      await sequelize.query(`ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS '${screen}'`);
+      console.log(`Added enum value '${screen}' to enum_crm_permissions_screen`);
+    } catch (err) {
+      console.log(`Enum note (enum_crm_permissions_screen): ${err.message}`);
+    }
+
+    try {
+      await sequelize.query(`ALTER TYPE enum_permissions_screen ADD VALUE IF NOT EXISTS '${screen}'`);
+      console.log(`Added enum value '${screen}' to enum_permissions_screen`);
+    } catch (err) {
+      console.log(`Enum note (enum_permissions_screen): ${err.message}`);
+    }
+
+    // 2. User columns
+    try {
+      await sequelize.query(`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS "baseSalary" NUMERIC(12, 2) DEFAULT 0`);
+      await sequelize.query(`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS "monthlyLeaveQuota" INTEGER DEFAULT 1`);
+      console.log('crm_users columns verified.');
+    } catch (err) {
+      console.log(`crm_users column note: ${err.message}`);
+    }
+
+    try {
+      await sequelize.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "baseSalary" NUMERIC(12, 2) DEFAULT 0`);
+      await sequelize.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "monthlyLeaveQuota" INTEGER DEFAULT 1`);
+      console.log('users columns verified.');
+    } catch (err) {
+      console.log(`users column note: ${err.message}`);
+    }
+
+    // 3. Grant default permission to roles
+    const roles = await Role.findAll();
+    console.log(`Found ${roles.length} roles.`);
+
+    for (const role of roles) {
+      const isSuper = role.code === 'SUPER_ADMIN';
+      const isAdmin = role.code === 'ADMIN';
+      const isHR = role.code === 'HR';
+      const shouldHaveView = isSuper || isAdmin || isHR;
+
+      const existing = await Permission.findOne({
+        where: { roleId: role.id, module: 'uam', screen }
+      });
+
+      if (!existing) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'uam',
+          screen,
+          canView: shouldHaveView,
+          canCreate: shouldHaveView,
+          canEdit: shouldHaveView,
+          canDelete: false
+        });
+        console.log(`Created staff-summary permission for role ${role.name} (${role.code}): canView=${shouldHaveView}`);
+      } else {
+        if (shouldHaveView && !existing.canView) {
+          existing.canView = true;
+          existing.canEdit = true;
+          await existing.save();
+          console.log(`Updated staff-summary permission for role ${role.name}`);
+        }
+      }
+    }
+
+    console.log('Migration completed successfully!');
+  } catch (err) {
+    console.error('Migration failed:', err);
+  } finally {
+    process.exit(0);
+  }
+}
+
+migrate();
