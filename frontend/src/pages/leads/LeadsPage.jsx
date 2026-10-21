@@ -5,7 +5,8 @@ import {
   RiRefreshLine, RiCloseLine, RiSaveLine, RiPhoneLine,
   RiMailLine, RiMoneyDollarBoxLine, RiFilterLine,
   RiUpload2Line, RiDownloadLine, RiCheckboxLine, RiCheckboxBlankLine,
-  RiDeleteBin5Line, RiFileExcelLine, RiCheckboxMultipleLine, RiEyeLine, RiDraftLine
+  RiDeleteBin5Line, RiFileExcelLine, RiCheckboxMultipleLine, RiEyeLine, RiDraftLine,
+  RiCalendarLine, RiBuilding2Line
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -607,7 +608,10 @@ const LeadsPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-  const [expoFilter, setExpoFilter] = useState('');
+  const [expoNameFilter, setExpoNameFilter] = useState('');
+  const [expoNamesList, setExpoNamesList] = useState([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const limit = 10;
 
@@ -639,14 +643,19 @@ const LeadsPage = () => {
     try {
       const params = new URLSearchParams({ page, limit, search });
       if (statusFilter) params.set('status', statusFilter);
-      if (expoFilter) params.set('expo', expoFilter);
+      if (expoNameFilter) params.set('expoName', expoNameFilter);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
       const res = await api.get(`/leads?${params}`);
       setLeads(res.data.leads || []);
       setTotal(res.data.total || 0);
       setStatusCounts(res.data.statusCounts || {});
+      if (res.data.expoNames) {
+        setExpoNamesList(res.data.expoNames);
+      }
     } catch { toast.error('Failed to load leads'); }
     setLoading(false);
-  }, [page, search, statusFilter, expoFilter]);
+  }, [page, search, statusFilter, expoNameFilter, startDate, endDate]);
 
   const fetchUsers = useCallback(async () => {
     try { const res = await api.get('/uam/users?limit=100'); setUsers(res.data.users || []); } catch {}
@@ -795,20 +804,171 @@ const LeadsPage = () => {
 
       {/* Search + Filter bar */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
-        <div className="search-bar" style={{ flex: 1, minWidth: 240 }}>
+        {/* Search */}
+        <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
           <RiSearchLine className="search-icon" />
-          <input className="search-input" type="text" placeholder="Search leads by name, company, email..."
+          <input className="search-input" type="text" placeholder="Search name, company, email..."
             value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
         </div>
+
+        {/* Expo Name Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+          <RiBuilding2Line style={{ color: expoNameFilter ? 'var(--accent)' : 'var(--text-muted)', fontSize: '1.1rem' }} />
+          <input
+            type="text"
+            list="expo-names-datalist"
+            placeholder="Expo Name..."
+            value={expoNameFilter}
+            onChange={e => { setExpoNameFilter(e.target.value); setPage(1); }}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: expoNameFilter ? '1px solid var(--accent)' : '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '9px 28px 9px 12px',
+              color: 'var(--text-primary)',
+              fontSize: '0.875rem',
+              width: 155
+            }}
+          />
+          <datalist id="expo-names-datalist">
+            {expoNamesList.map(name => <option key={name} value={name}>{name}</option>)}
+          </datalist>
+          {expoNameFilter && (
+            <button
+              type="button"
+              onClick={() => { setExpoNameFilter(''); setPage(1); }}
+              title="Clear Expo Name filter"
+              style={{
+                position: 'absolute',
+                right: 8,
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <RiCloseLine />
+            </button>
+          )}
+        </div>
+
+        {/* Status Filter Dropdown */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <RiFilterLine style={{ color: 'var(--text-muted)' }} />
-          <select value={expoFilter} onChange={e => { setExpoFilter(e.target.value); setPage(1); }}
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary)', fontSize: '0.875rem' }}>
-            <option value="">All Expos</option>
-            {Object.entries(EXPO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          <RiFilterLine style={{ color: statusFilter ? 'var(--accent)' : 'var(--text-muted)', fontSize: '1.1rem' }} />
+          <select
+            value={statusFilter}
+            onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+            style={{
+              background: 'var(--bg-secondary)',
+              border: statusFilter ? '1px solid var(--accent)' : '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '9px 12px',
+              color: 'var(--text-primary)',
+              fontSize: '0.875rem',
+              minWidth: 145,
+              cursor: 'pointer'
+            }}
+          >
+            <option value="">All Statuses</option>
+            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v.label} {statusCounts[k] ? `(${statusCounts[k]})` : ''}
+              </option>
+            ))}
           </select>
         </div>
-        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+
+        {/* Date Filter Range */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'var(--bg-secondary)',
+          border: (startDate || endDate) ? '1px solid var(--accent)' : '1px solid var(--border)',
+          borderRadius: 8,
+          padding: '4px 8px'
+        }}>
+          <RiCalendarLine style={{ color: (startDate || endDate) ? 'var(--accent)' : 'var(--text-muted)', fontSize: '1.1rem' }} />
+          <input
+            type="date"
+            title="From Date"
+            value={startDate}
+            onChange={e => { setStartDate(e.target.value); setPage(1); }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-primary)',
+              fontSize: '0.8125rem',
+              outline: 'none'
+            }}
+          />
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>to</span>
+          <input
+            type="date"
+            title="To Date"
+            value={endDate}
+            onChange={e => { setEndDate(e.target.value); setPage(1); }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-primary)',
+              fontSize: '0.8125rem',
+              outline: 'none'
+            }}
+          />
+          {(startDate || endDate) && (
+            <button
+              type="button"
+              onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+              title="Clear Date filter"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: 0
+              }}
+            >
+              <RiCloseLine />
+            </button>
+          )}
+        </div>
+
+        {/* Active Filters Reset Button */}
+        {(search || statusFilter || expoNameFilter || startDate || endDate) && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('');
+              setStatusFilter('');
+              setExpoNameFilter('');
+              setStartDate('');
+              setEndDate('');
+              setPage(1);
+            }}
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#ef4444',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <RiRefreshLine /> Reset
+          </button>
+        )}
+
+        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', marginLeft: 'auto' }}>
           {total} lead{total !== 1 && 's'} found
         </div>
       </div>
@@ -825,9 +985,9 @@ const LeadsPage = () => {
             <div style={{ fontSize: '3rem', marginBottom: 12 }}>🎯</div>
             <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>No leads found</div>
             <div style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-              {search || statusFilter || expoFilter ? 'Try changing your filters' : 'Start by adding your first lead'}
+              {search || statusFilter || expoNameFilter || startDate || endDate ? 'Try changing your filters' : 'Start by adding your first lead'}
             </div>
-            {canCreate && !search && !statusFilter && !expoFilter && (
+            {canCreate && !search && !statusFilter && !expoNameFilter && !startDate && !endDate && (
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                 <button className="btn btn-outline" onClick={() => setShowUpload(true)}><RiUpload2Line /> Bulk Upload</button>
                 <button className="btn btn-primary" onClick={openAdd}><RiUserAddLine /> Add Lead</button>

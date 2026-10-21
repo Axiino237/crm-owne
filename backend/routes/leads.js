@@ -82,7 +82,7 @@ const VALID_EXPOS = ['website', 'referral', 'social_media', 'cold_call', 'email'
 // @route  GET /api/leads
 router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, res) => {
   try {
-    const { search = '', status, expo, page = 1, limit = 10 } = req.query;
+    const { search = '', status, expo, expoName, startDate, endDate, date, page = 1, limit = 10 } = req.query;
 
     // Base search + expo + org scope (shared between table and badge counts)
     const baseWhere = {};
@@ -102,6 +102,23 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
       ];
     }
     if (expo) baseWhere.expo = expo;
+    if (expoName) {
+      baseWhere.expoName = { [Op.iLike]: `%${expoName.trim()}%` };
+    }
+
+    // Date range filtering on createdAt
+    const effStartDate = startDate || (date ? date : null);
+    const effEndDate = endDate || (date ? date : null);
+    if (effStartDate || effEndDate) {
+      const dateCond = {};
+      if (effStartDate) {
+        dateCond[Op.gte] = new Date(`${effStartDate}T00:00:00.000Z`);
+      }
+      if (effEndDate) {
+        dateCond[Op.lte] = new Date(`${effEndDate}T23:59:59.999Z`);
+      }
+      baseWhere.createdAt = dateCond;
+    }
 
     // Scope by org / role hierarchy
     const { getDeptHeadScope } = require('../utils/departmentScope');
@@ -160,7 +177,26 @@ router.get('/', checkPermission('leads', 'leads-list', 'canView'), async (req, r
     const statusCounts = {};
     statusCountRows.forEach(r => { statusCounts[r.status] = parseInt(r.count, 10); });
 
-    res.json({ success: true, total: count, page: Number(page), limit: Number(limit), leads: rows, statusCounts });
+    // Distinct expo names for dropdown / auto-complete
+    const distinctExpos = await Lead.findAll({
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col('expoName')), 'expoName']],
+      where: {
+        ...(req.user.organizationId && !isSuper ? { organizationId: req.user.organizationId } : {}),
+        expoName: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] }
+      },
+      raw: true
+    }).catch(() => []);
+    const expoNames = distinctExpos.map(e => e.expoName).filter(Boolean).sort();
+
+    res.json({
+      success: true,
+      total: count,
+      page: Number(page),
+      limit: Number(limit),
+      leads: rows,
+      statusCounts,
+      expoNames
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
