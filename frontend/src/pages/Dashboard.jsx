@@ -495,6 +495,7 @@ const Dashboard = () => {
                     label="Total Design" 
                     value={loadingBusiness ? null : businessStats?.stats?.totalDesigns} 
                     color="primary" 
+                    onClick={() => navigate('/my-projects')}
                   />
                 )}
                 {hasPermission('dashboard', 'pending-designs-widget', 'canView') && (
@@ -503,6 +504,7 @@ const Dashboard = () => {
                     label="Pending Design" 
                     value={loadingBusiness ? null : businessStats?.stats?.pendingDesigns} 
                     color="warning" 
+                    onClick={() => navigate('/my-projects')}
                   />
                 )}
                 {hasPermission('dashboard', 'completed-designs-widget', 'canView') && (
@@ -511,6 +513,7 @@ const Dashboard = () => {
                     label="Total Completed Design" 
                     value={loadingBusiness ? null : businessStats?.stats?.completedDesigns} 
                     color="success" 
+                    onClick={() => navigate('/completed-models')}
                   />
                 )}
                 {hasPermission('dashboard', 'change-designs-widget', 'canView') && (

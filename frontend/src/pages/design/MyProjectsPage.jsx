@@ -414,7 +414,7 @@ const MyProjectsPage = () => {
   const completedCount  = orders.filter(o => o.status === 'completed').length;
 
   return (
-    <AppLayout>
+    <AppLayout title="My Projects">
       {/* Header */}
       <div className="page-header" style={{ marginBottom: 24 }}>
         <div>
@@ -429,20 +429,30 @@ const MyProjectsPage = () => {
       </div>
 
       {/* Stats summaries */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', color: 'var(--accent)' }}>
+            <RiPaletteLine />
+          </div>
+          <div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>{orders.length}</div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Total Assigned</div>
+          </div>
+        </div>
+
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', color: '#f59e0b' }}>
             <RiTimeLine />
           </div>
           <div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>{pendingCount}</div>
-            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Pending</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>{pendingCount + inProgressCount}</div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Pending to Finish</div>
           </div>
         </div>
 
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(129,140,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', color: '#818cf8' }}>
-            <RiPaletteLine />
+            <RiTimerLine />
           </div>
           <div>
             <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>{inProgressCount}</div>

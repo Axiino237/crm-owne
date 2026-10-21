@@ -69,8 +69,30 @@ router.get('/stats', async (req, res) => {
 
     if (effectiveScope === 'own') {
       countsWhere.assignedTo = req.user.id;
-      changeWhere.assignedTo = req.user.id;
-      designOrderWhere.submittedBy = req.user.id;
+
+      // Design orders: submitted by user OR assigned to user as designer
+      designOrderWhere[Op.or] = [
+        { submittedBy: req.user.id },
+        { assignedDesignerId: req.user.id }
+      ];
+
+      // Find all leads associated with designs assigned to this user (for design changes)
+      const myDesignOrders = await DesignOrder.findAll({
+        where: { assignedDesignerId: req.user.id },
+        attributes: ['leadId'],
+        raw: true
+      });
+      const myDesignLeadIds = myDesignOrders.map(d => d.leadId).filter(Boolean);
+
+      if (myDesignLeadIds.length > 0) {
+        changeWhere[Op.or] = [
+          { assignedTo: req.user.id },
+          { id: { [Op.in]: myDesignLeadIds } }
+        ];
+      } else {
+        changeWhere.assignedTo = req.user.id;
+      }
+
       financialWhere.assignedTo = req.user.id;
       if (req.user.organizationId && !isSuper) {
         countsWhere.organizationId = req.user.organizationId;
