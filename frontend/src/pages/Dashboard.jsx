@@ -78,6 +78,7 @@ const Dashboard = () => {
   const [loadingSystem, setLoadingSystem] = useState(true);
   const [loadingBusiness, setLoadingBusiness] = useState(true);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [dashboardScope, setDashboardScope] = useState('all');
 
   // Prepare smooth line chart points and curves
   const lineChartData = useMemo(() => {
@@ -168,16 +169,25 @@ const Dashboard = () => {
     setLoadingSystem(false);
   }, []);
 
-  const fetchBusinessStats = useCallback(async () => {
+  const fetchBusinessStats = useCallback(async (scopeOverride) => {
     setLoadingBusiness(true);
     try {
-      const res = await api.get('/dashboard/stats');
+      const targetScope = scopeOverride || 'all';
+      const res = await api.get(`/dashboard/stats?scope=${targetScope}`);
       setBusinessStats(res.data);
+      if (res.data?.scopeType) {
+        setDashboardScope(res.data.scopeType);
+      }
     } catch { /* ignore */ }
     finally {
       setLoadingBusiness(false);
     }
   }, []);
+
+  const handleScopeChange = (newScope) => {
+    setDashboardScope(newScope);
+    fetchBusinessStats(newScope);
+  };
 
   useEffect(() => {
     fetchSystemStats();
@@ -286,6 +296,116 @@ const Dashboard = () => {
       {/* BUSINESS TAB */}
       {activeTab === 'business' && canSeeBusinessTab && (
         <div>
+          {/* Scope Header / Toggle Bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            background: 'var(--surface-color, rgba(17, 24, 39, 0.7))',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '14px 20px',
+            marginBottom: 20
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Business Analytics Scope:
+                </span>
+                {dashboardScope === 'all' ? (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 12px',
+                    borderRadius: 20,
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: 'rgba(59, 130, 246, 0.12)',
+                    color: '#60a5fa',
+                    border: '1px solid rgba(59, 130, 246, 0.3)'
+                  }}>
+                    <span>👥</span> All Staff Counts (Team / Org Scope)
+                  </span>
+                ) : (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 12px',
+                    borderRadius: 20,
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    color: '#34d399',
+                    border: '1px solid rgba(16, 185, 129, 0.3)'
+                  }}>
+                    <span>👤</span> My Counts Only (Assigned to Me)
+                  </span>
+                )}
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginTop: 4, marginBottom: 0 }}>
+                {dashboardScope === 'all'
+                  ? 'Monitoring leads, calls, deals and project metrics across all staff in your organization.'
+                  : 'Viewing only metrics and leads specifically assigned to your account.'}
+              </p>
+            </div>
+
+            {/* Scope Toggle Buttons if user has canViewAll permission */}
+            {businessStats?.canViewAll && (
+              <div style={{
+                display: 'inline-flex',
+                background: 'rgba(5, 8, 16, 0.6)',
+                padding: 4,
+                borderRadius: 8,
+                border: '1px solid var(--border)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange('all')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: dashboardScope === 'all' ? 'var(--accent)' : 'transparent',
+                    color: dashboardScope === 'all' ? '#ffffff' : 'var(--text-secondary)',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
+                  }}
+                >
+                  <span>👥</span> All Staff Counts
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange('own')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: dashboardScope === 'own' ? 'var(--accent)' : 'transparent',
+                    color: dashboardScope === 'own' ? '#ffffff' : 'var(--text-secondary)',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    fontWeight: 600,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    transition: 'var(--transition)'
+                  }}
+                >
+                  <span>👤</span> My Counts Only
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Business Metrics Grid - 6 Core Cards */}
           {(hasPermission('dashboard', 'leads-widget', 'canView') ||
             hasPermission('dashboard', 'calls-widget', 'canView') ||

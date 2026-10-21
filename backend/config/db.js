@@ -92,6 +92,7 @@ const connectDB = async () => {
       await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'quote_sent'");
       await sequelize.query("ALTER TYPE enum_crm_leads_status ADD VALUE IF NOT EXISTS 'sales_closed'");
       await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'staff-summary'");
+      await sequelize.query("ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS 'dashboard-all'");
     } catch (err) {
       // Silently ignore if types do not exist yet (will be created by sync)
     }

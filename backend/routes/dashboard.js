@@ -47,83 +47,45 @@ async function seedDummyDataIfEmpty() {
 // Stats Endpoint
 router.get('/stats', async (req, res) => {
   try {
-    const { getDeptHeadScope } = require('../utils/departmentScope');
-    const scopeInfo = await getDeptHeadScope(req.user);
-    const { isSuper, isOrgAdmin, isCompanyAdmin, isDeptHead, teamUserIds } = scopeInfo;
-    const isRegular = scopeInfo.isRegular;
+    const { Permission } = require('../models');
+    const isSuper = req.user.isSuperAdmin || req.user.role?.level === 'super_admin';
+    const isOrgAdmin = req.user.role?.level === 'org_admin';
+    let hasDashboardAll = isSuper || isOrgAdmin;
+
+    if (!hasDashboardAll && req.user.roleId) {
+      const p = await Permission.findOne({
+        where: { roleId: req.user.roleId, module: 'dashboard', screen: 'dashboard-all', canView: true }
+      });
+      if (p) hasDashboardAll = true;
+    }
+
+    const requestedScope = req.query.scope; // 'all' or 'own'
+    const effectiveScope = (requestedScope === 'own') ? 'own' : (hasDashboardAll ? 'all' : 'own');
 
     const countsWhere = {};
-    if (!isSuper) {
-      if (isOrgAdmin && req.user.organizationId) {
-        countsWhere.organizationId = req.user.organizationId;
-      } else if (isCompanyAdmin && req.user.companyId) {
-        const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
-        countsWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else if (isDeptHead && teamUserIds.length > 0) {
-        // Department head sees all leads belonging to any member in their department(s)
-        countsWhere.assignedTo = { [Op.in]: teamUserIds };
-      } else {
-        // Regular users ("mathavangal") only count leads assigned directly to them
-        countsWhere.assignedTo = req.user.id;
-      }
-    }
-
-    let isDesignTeam = false;
-    if (req.user.role?.name && req.user.role.name.toLowerCase().includes('design')) isDesignTeam = true;
-    if (req.user.departmentId) {
-      const dept = await Department.findByPk(req.user.departmentId);
-      if (dept && (dept.name.toLowerCase().includes('design') || (dept.code && dept.code.toLowerCase().includes('design')))) isDesignTeam = true;
-    }
-
-    const designOrderWhere = {};
-    if (!isSuper) {
-      if (isOrgAdmin && req.user.organizationId) {
-        designOrderWhere.organizationId = req.user.organizationId;
-      } else if (isDesignTeam) {
-        designOrderWhere.assignedDesignerId = req.user.id;
-        if (req.user.organizationId) designOrderWhere.organizationId = req.user.organizationId;
-      } else if (isDeptHead && teamUserIds.length > 0) {
-        designOrderWhere.submittedBy = { [Op.in]: teamUserIds };
-        if (req.user.organizationId) designOrderWhere.organizationId = req.user.organizationId;
-      } else {
-        designOrderWhere.submittedBy = req.user.id;
-        if (req.user.organizationId) designOrderWhere.organizationId = req.user.organizationId;
-      }
-    }
-
-    // changeWhere: scopes Lead.count for change designs — uses Lead columns only (assignedTo, organizationId)
     const changeWhere = {};
-    if (!isSuper) {
-      if (isOrgAdmin && req.user.organizationId) {
-        changeWhere.organizationId = req.user.organizationId;
-      } else if (isDesignTeam) {
-        // Get lead IDs assigned to this designer via DesignOrder
-        const assignedLeadIds = (await DesignOrder.findAll({
-          where: { assignedDesignerId: req.user.id }, attributes: ['leadId']
-        })).map(o => o.leadId).filter(Boolean);
-        changeWhere.id = { [Op.in]: assignedLeadIds.length ? assignedLeadIds : [-1] };
-        if (req.user.organizationId) changeWhere.organizationId = req.user.organizationId;
-      } else if (isDeptHead && teamUserIds.length > 0) {
-        // dept_manager / dept head — scope by leads assigned to dept users
-        changeWhere.assignedTo = { [Op.in]: teamUserIds };
-        if (req.user.organizationId) changeWhere.organizationId = req.user.organizationId;
-      } else if (isCompanyAdmin && req.user.companyId) {
-        const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
-        changeWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else {
-        changeWhere.assignedTo = req.user.id;
-        if (req.user.organizationId) changeWhere.organizationId = req.user.organizationId;
-      }
-    }
+    const designOrderWhere = {};
     const financialWhere = { status: 'converted', [Op.and]: [sequelize.where(sequelize.col('value'), '=', sequelize.col('paidAmount'))] };
-    if (!isSuper) {
-      if (isOrgAdmin && req.user.organizationId) financialWhere.organizationId = req.user.organizationId;
-      else if (isCompanyAdmin && req.user.companyId) {
-        const companyUserIds = (await User.findAll({ where: { companyId: req.user.companyId }, attributes: ['id'] })).map(u => u.id);
-        financialWhere.assignedTo = { [Op.or]: [{ [Op.in]: companyUserIds }, null] };
-      } else if (isDeptHead && teamUserIds.length > 0) {
-        financialWhere.assignedTo = { [Op.or]: [{ [Op.in]: teamUserIds }, null] };
-      } else if (isRegular) financialWhere.assignedTo = req.user.id;
+
+    if (effectiveScope === 'own') {
+      countsWhere.assignedTo = req.user.id;
+      changeWhere.assignedTo = req.user.id;
+      designOrderWhere.submittedBy = req.user.id;
+      financialWhere.assignedTo = req.user.id;
+      if (req.user.organizationId && !isSuper) {
+        countsWhere.organizationId = req.user.organizationId;
+        changeWhere.organizationId = req.user.organizationId;
+        designOrderWhere.organizationId = req.user.organizationId;
+        financialWhere.organizationId = req.user.organizationId;
+      }
+    } else {
+      // 'all' scope
+      if (!isSuper && req.user.organizationId) {
+        countsWhere.organizationId = req.user.organizationId;
+        changeWhere.organizationId = req.user.organizationId;
+        designOrderWhere.organizationId = req.user.organizationId;
+        financialWhere.organizationId = req.user.organizationId;
+      }
     }
 
     // Converted leads represent projects in this CRM
@@ -158,10 +120,12 @@ router.get('/stats', async (req, res) => {
       ]
     };
 
-    // Interested leads: status is 'qualified'
+    // Interested leads: status is 'qualified' or modern interested statuses
     const interestedLeadsWhere = {
       ...countsWhere,
-      status: 'qualified'
+      status: {
+        [Op.in]: ['qualified', 'requirement_received', 'call_back', 'follow_ups', 'design_sent', 'quote_sent']
+      }
     };
 
     const [
@@ -240,8 +204,8 @@ router.get('/stats', async (req, res) => {
 
     res.json({
       success: true,
-      isDeptHead,
-      scopeType: isSuper ? 'all' : (isOrgAdmin ? 'organization' : (isCompanyAdmin ? 'company' : (isDeptHead ? 'department' : 'personal'))),
+      canViewAll: hasDashboardAll,
+      scopeType: effectiveScope,
       stats: {
         totalLeads,
         totalCalls,

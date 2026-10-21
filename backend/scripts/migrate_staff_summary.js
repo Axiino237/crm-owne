@@ -9,19 +9,20 @@ async function migrate() {
     console.log('Database connected.');
 
     // 1. Enum update
-    const screen = 'staff-summary';
-    try {
-      await sequelize.query(`ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS '${screen}'`);
-      console.log(`Added enum value '${screen}' to enum_crm_permissions_screen`);
-    } catch (err) {
-      console.log(`Enum note (enum_crm_permissions_screen): ${err.message}`);
-    }
-
-    try {
-      await sequelize.query(`ALTER TYPE enum_permissions_screen ADD VALUE IF NOT EXISTS '${screen}'`);
-      console.log(`Added enum value '${screen}' to enum_permissions_screen`);
-    } catch (err) {
-      console.log(`Enum note (enum_permissions_screen): ${err.message}`);
+    const screens = ['staff-summary', 'dashboard-all'];
+    for (const scr of screens) {
+      try {
+        await sequelize.query(`ALTER TYPE enum_crm_permissions_screen ADD VALUE IF NOT EXISTS '${scr}'`);
+        console.log(`Added enum value '${scr}' to enum_crm_permissions_screen`);
+      } catch (err) {
+        console.log(`Enum note (enum_crm_permissions_screen): ${err.message}`);
+      }
+      try {
+        await sequelize.query(`ALTER TYPE enum_permissions_screen ADD VALUE IF NOT EXISTS '${scr}'`);
+        console.log(`Added enum value '${scr}' to enum_permissions_screen`);
+      } catch (err) {
+        console.log(`Enum note (enum_permissions_screen): ${err.message}`);
+      }
     }
 
     // 1.5 Lead statuses
@@ -69,6 +70,7 @@ async function migrate() {
       const isHR = role.code === 'HR';
       const shouldHaveView = isSuper || isAdmin || isHR;
 
+      const screen = 'staff-summary';
       const existing = await Permission.findOne({
         where: { roleId: role.id, module: 'uam', screen }
       });
@@ -91,6 +93,24 @@ async function migrate() {
           await existing.save();
           console.log(`Updated staff-summary permission for role ${role.name}`);
         }
+      }
+
+      // dashboard-all permission
+      const existingDashAll = await Permission.findOne({
+        where: { roleId: role.id, module: 'dashboard', screen: 'dashboard-all' }
+      });
+      const shouldHaveDashAll = isSuper || isAdmin;
+      if (!existingDashAll) {
+        await Permission.create({
+          roleId: role.id,
+          module: 'dashboard',
+          screen: 'dashboard-all',
+          canView: shouldHaveDashAll,
+          canCreate: false,
+          canEdit: false,
+          canDelete: false
+        });
+        console.log(`Created dashboard-all permission for role ${role.name} (${role.code}): canView=${shouldHaveDashAll}`);
       }
     }
 

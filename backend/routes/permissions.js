@@ -9,6 +9,7 @@ router.use(protect);
 const MODULE_SCREENS = {
   dashboard: [
     'dashboard-home',
+    'dashboard-all',
     'leads-widget',
     'calls-widget',
     'interested-leads-widget',

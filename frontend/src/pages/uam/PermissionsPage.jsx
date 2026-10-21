@@ -34,6 +34,7 @@ const SCREEN_LABELS = {
   'total-profit-card': 'Total Sales Card',
   'monthly-profit-card': 'Average Monthly Sales Card',
   'profit-trend-chart': 'Monthly Sales Trend Chart',
+  'dashboard-all': 'Dashboard All Counts (Team / Org Scope)',
   'staff-summary': 'Staff Overview & Payroll (Leaves & Salary)'
 };
 
@@ -44,6 +45,7 @@ const SCREEN_DESCRIPTIONS = {
   'closed-sales-paid': 'Visibility and editing of received payments',
   'closed-sales-balance': 'Visibility of outstanding pending balance',
   'closed-sales-vendor-payout': 'Visibility and editing of vendor payout details',
+  'dashboard-all': 'User can view counts and metrics across ALL staff in the organization on the dashboard',
   'staff-summary': 'View organization employees summary, leaves taken, quota, and salary details'
 };
 
