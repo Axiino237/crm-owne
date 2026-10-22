@@ -46,7 +46,7 @@ const adminOnly = (req, res, next) => {
 };
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '365d' });
 };
 
 module.exports = { protect, superAdminOnly, adminOnly, generateToken };

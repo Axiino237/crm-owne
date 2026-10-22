@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RiEyeLine, RiEyeOffLine, RiLockLine, RiMailLine, RiArrowLeftLine, RiCheckLine, RiErrorWarningLine } from 'react-icons/ri';
 import { useAuth } from '../context/AuthContext';
@@ -6,12 +6,12 @@ import api from '../api/axios';
 import './Login.css';
 
 /* ============================================================
-   LOGIN PAGE — with Forgot Password multi-step flow
+   LOGIN PAGE — with Persistent Session and Forgot Password flow
    Steps: login → forgot (email) → otp → reset password → done
    ============================================================ */
 
 const LoginPage = () => {
-  const { login, getFirstAuthorizedPath } = useAuth();
+  const { user, loading: authLoading, login, getFirstAuthorizedPath } = useAuth();
   const navigate = useNavigate();
   const [view, setView] = useState('login'); // 'login' | 'forgot' | 'otp' | 'reset' | 'done'
 
@@ -20,6 +20,34 @@ const LoginPage = () => {
   const [showPass, setShowPass] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // If user already has an active session, skip asking for password and redirect immediately
+  useEffect(() => {
+    if (!authLoading && user) {
+      const targetRoute = getFirstAuthorizedPath(user);
+      navigate(targetRoute, { replace: true });
+    }
+  }, [user, authLoading, navigate, getFirstAuthorizedPath]);
+
+  // Load saved session credentials so user never has to re-type password
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('crm_saved_credentials');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.email) {
+          setLoginForm({
+            email: parsed.email || '',
+            password: parsed.password || ''
+          });
+          setRememberMe(true);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load saved credentials', e);
+    }
+  }, []);
 
   // Forgot Password state
   const [fpEmail, setFpEmail] = useState('');
@@ -38,10 +66,21 @@ const LoginPage = () => {
     setLoginError('');
     try {
       const loginData = await login(loginForm.email, loginForm.password);
+
+      // Save credentials persistently in session so user is never asked again
+      if (rememberMe) {
+        localStorage.setItem('crm_saved_credentials', JSON.stringify({
+          email: loginForm.email,
+          password: loginForm.password
+        }));
+      } else {
+        localStorage.removeItem('crm_saved_credentials');
+      }
+
       const targetRoute = getFirstAuthorizedPath(loginData.user, loginData.permissions);
       navigate(targetRoute, { replace: true });
     } catch (err) {
-      setLoginError(err.response?.data?.message || 'Login failed. Please try again.');
+      setLoginError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoginLoading(false);
     }
@@ -141,6 +180,17 @@ const LoginPage = () => {
   );
 
   /* ========== RENDER ========== */
+  if (authLoading) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: 'var(--bg-primary)', color: 'var(--accent)'
+      }}>
+        <div className="spinner" />
+      </div>
+    );
+  }
+
   return (
     <div className="login-page">
       <div className="login-container">
@@ -204,7 +254,16 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={e => setRememberMe(e.target.checked)}
+                    style={{ accentColor: 'var(--accent)', cursor: 'pointer', width: 15, height: 15 }}
+                  />
+                  <span>Save password & keep signed in</span>
+                </label>
                 <span className="forgot-link" onClick={() => setView('forgot')}>
                   Forgot Password?
                 </span>

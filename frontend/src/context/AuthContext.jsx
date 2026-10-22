@@ -95,6 +95,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_user');
+    localStorage.removeItem('crm_saved_credentials');
+    sessionStorage.clear();
     setUser(null);
     setPermissions([]);
   };
