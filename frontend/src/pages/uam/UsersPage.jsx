@@ -93,14 +93,14 @@ const UserModal = ({ user, onClose, onSaved }) => {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 580 }}>
-        <div className="modal-header">
+    <div className="modal-overlay" style={{ padding: '16px', overflowY: 'auto' }}>
+      <div className="modal" style={{ maxWidth: 620, maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="modal-header" style={{ flexShrink: 0 }}>
           <h3 className="modal-title">{user ? 'Edit User' : 'Create New User'}</h3>
           <button className="btn btn-icon" onClick={onClose}>✕</button>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div className="modal-body" style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '20px 24px' }}>
             {error && <div style={{ background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', color: 'var(--danger)', fontSize: '0.875rem', marginBottom: 16 }}>{error}</div>}
 
             <div className="grid-2">

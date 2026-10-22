@@ -260,7 +260,8 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
       designation, expoType, expoName, address, expoMode, lastContactedDate, nextFollowUp, alternatePhone,
       paidAmount, vendorPaidAmount, designStatus
     } = req.body;
-    if (!name && !companyName) return res.status(400).json({ success: false, message: 'Either Contact Person or Company Name is required' });
+    const effectiveCompany = (companyName || name || '').trim();
+    if (!effectiveCompany) return res.status(400).json({ success: false, message: 'Company Name is required' });
 
     let leadStatus = status || 'new';
     if (leadStatus === 'sales_closed') leadStatus = 'converted';
@@ -271,8 +272,8 @@ router.post('/', checkPermission('leads', 'leads-list', 'canCreate'), async (req
     }
 
     const lead = await Lead.create({
-      name,
-      companyName: companyName || null,
+      name: name ? name.trim() : null,
+      companyName: (companyName ? companyName.trim() : effectiveCompany) || null,
       email: email || null,
       phone: phone || null,
       status: leadStatus,

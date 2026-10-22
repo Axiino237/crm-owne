@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 30 * 1024 * 1024 }, // 30MB
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2GB
   fileFilter: (_req, file, cb) => {
     const allowedExts = /\.(jpe?g|png|gif|webp|pdf|xls|xlsx|csv|doc|docx|txt)$/i;
     if (allowedExts.test(path.extname(file.originalname))) cb(null, true);
@@ -44,7 +44,7 @@ const modelStorage = multer.diskStorage({
 });
 const uploadModel = multer({
   storage: modelStorage,
-  limits: { fileSize: 250 * 1024 * 1024 }, // 250MB per file
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2GB per file
   fileFilter: (_req, file, cb) => {
     const allowed = /\.(jpe?g|png|gif|webp|pdf|zip|rar|7z|cdr|mp4|glb|gltf|obj|fbx|stl|dwg)$/i;
     const okExt = allowed.test(path.extname(file.originalname).toLowerCase());

@@ -257,7 +257,7 @@ const LeadModal = ({ lead, users, onClose, onSaved }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() && !form.companyName.trim()) return toast.error('Either Contact Person or Company Name is required');
+    if (!form.companyName?.trim()) return toast.error('Company Name is required');
     setSaving(true);
     try {
       const payload = { 
@@ -297,10 +297,18 @@ const LeadModal = ({ lead, users, onClose, onSaved }) => {
         </div>
         <form onSubmit={handleSubmit} style={{ padding: '24px' }}>
           <div className="form-grid-2" style={{ gap: 16, marginBottom: 16 }}>
-            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Contact Person *</label>
-              <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Full name" required /></div>
-            <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Company Name</label>
-              <input style={inputStyle} value={form.companyName} onChange={e => set('companyName', e.target.value)} placeholder="Company name" /></div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>
+                Company Name <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input style={inputStyle} value={form.companyName} onChange={e => set('companyName', e.target.value)} placeholder="Company name" required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>
+                Contact Person <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
+              </label>
+              <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Full name (optional)" />
+            </div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Email</label>
               <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" /></div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Phone Number</label>
@@ -370,19 +378,13 @@ const ViewLeadModal = ({ lead, onClose }) => {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: '0.875rem' }}>
           <div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Contact Person</div>
-            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1rem' }}>{lead.name}</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Company Name</div>
+            <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1.05rem' }}>{lead.companyName || '—'}</div>
           </div>
-          {lead.designation && (
+          {lead.name && (
             <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Designation</div>
-              <div style={{ color: 'var(--text-primary)' }}>{lead.designation}</div>
-            </div>
-          )}
-          {lead.companyName && (
-            <div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Company Name</div>
-              <div style={{ color: 'var(--text-primary)' }}>{lead.companyName}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Contact Person</div>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{lead.name} {lead.designation ? `(${lead.designation})` : ''}</div>
             </div>
           )}
           <div className="form-grid-2" style={{ gap: 12 }}>
@@ -1008,7 +1010,8 @@ const LeadsPage = () => {
                       </button>
                     </th>
                   )}
-                  <th>Lead</th>
+                  <th>Company Name</th>
+                  <th>Contact Person</th>
                   <th>Contact</th>
                   <th>Expo</th>
                   <th>Follow Up</th>
@@ -1030,24 +1033,41 @@ const LeadsPage = () => {
                           </button>
                         </td>
                       )}
+                      {/* Separate Column 1: Company Name */}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: `${st.dot}20`, border: `1.5px solid ${st.dot}50`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 800, color: st.dot }}>
-                            {(lead.name || lead.companyName || '?').charAt(0).toUpperCase()}
+                          <div style={{
+                            width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                            background: `${st.dot}18`, border: `1.5px solid ${st.dot}40`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.85rem', fontWeight: 800, color: st.dot
+                          }}>
+                            {(lead.companyName || lead.name || '?').charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                              {lead.name || lead.companyName || 'Unnamed Lead'}
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                              {lead.companyName || '—'}
                             </div>
-                            {lead.name && lead.companyName && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                {lead.designation ? `${lead.designation} @ ` : ''}{lead.companyName}
+                            {lead.address && (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 190, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {lead.address}
                               </div>
                             )}
-                            {(!lead.name || !lead.companyName) && lead.designation && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{lead.designation}</div>
-                            )}
                           </div>
+                        </div>
+                      </td>
+
+                      {/* Separate Column 2: Contact Person */}
+                      <td>
+                        <div style={{ fontSize: '0.8125rem' }}>
+                          <div style={{ fontWeight: 600, color: lead.name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {lead.name || '—'}
+                          </div>
+                          {lead.designation && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                              {lead.designation}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td>

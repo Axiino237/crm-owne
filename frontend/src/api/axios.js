@@ -12,9 +12,13 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
 
   // ✅ If sending FormData, remove the hardcoded application/json Content-Type
-  // so axios can automatically set multipart/form-data with the correct boundary
+  // so axios can automatically set multipart/form-data with the correct boundary.
+  // Also remove 30s timeout for file uploads so large (up to 2GB) transfers complete smoothly.
   if (config.data instanceof FormData) {
     delete config.headers['Content-Type'];
+    if (!config.timeout || config.timeout === 30000) {
+      config.timeout = 0; // Unlimited timeout for file uploads
+    }
   }
 
   return config;

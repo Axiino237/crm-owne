@@ -1,10 +1,17 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { Op } = require('sequelize');
 const { User, Role, Organization, Company, Department } = require('../models');
 const { generateToken, protect } = require('../middleware/auth');
+
+const avatarUploadDir = path.join(__dirname, '../uploads/avatars');
+if (!fs.existsSync(avatarUploadDir)) {
+  fs.mkdirSync(avatarUploadDir, { recursive: true });
+}
 
 // @route   POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -189,7 +196,47 @@ router.put('/profile', protect, async (req, res) => {
 
     const updates = {};
     if (name) updates.name = name;
-    if (avatar !== undefined) updates.avatar = avatar;
+    
+    if (avatar !== undefined) {
+      if (avatar === null || avatar === '') {
+        updates.avatar = null;
+        if (user.avatar && user.avatar.startsWith('/uploads/avatars/')) {
+          try {
+            const oldFile = path.join(__dirname, '..', user.avatar);
+            if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+          } catch (e) {
+            console.warn('Could not remove old avatar:', e.message);
+          }
+        }
+      } else if (typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+        // Base64 image payload from client
+        const matches = avatar.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+        if (matches) {
+          let ext = matches[1].toLowerCase();
+          if (ext === 'jpeg') ext = 'jpg';
+          if (ext === 'svg+xml') ext = 'svg';
+          const buffer = Buffer.from(matches[2], 'base64');
+          const filename = `avatar-${user.id}-${Date.now()}.${ext}`;
+          const filePath = path.join(avatarUploadDir, filename);
+          fs.writeFileSync(filePath, buffer);
+          updates.avatar = `/uploads/avatars/${filename}`;
+
+          // Clean up previous avatar if locally stored
+          if (user.avatar && user.avatar.startsWith('/uploads/avatars/')) {
+            try {
+              const oldFile = path.join(__dirname, '..', user.avatar);
+              if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+            } catch (e) {
+              console.warn('Could not remove old avatar:', e.message);
+            }
+          }
+        } else {
+          updates.avatar = avatar;
+        }
+      } else {
+        updates.avatar = avatar;
+      }
+    }
 
     if (newPassword) {
       if (!currentPassword) {

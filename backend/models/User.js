@@ -23,7 +23,7 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   phone: DataTypes.STRING,
-  avatar: DataTypes.STRING,
+  avatar: DataTypes.TEXT,
   roleId: {
     type: DataTypes.UUID,
     allowNull: true

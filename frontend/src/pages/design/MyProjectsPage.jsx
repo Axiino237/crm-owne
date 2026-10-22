@@ -446,7 +446,7 @@ const CompleteModelModal = ({ order, onClose, onCompleted }) => {
                 {files.length > 0 ? 'Click or drop more files to add' : 'Drop design files here or click to browse'}
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 10 }}>
-                Max 250MB per file · Upload multiple files together
+                Max 2GB per file · Upload multiple files together
               </div>
 
               {/* Supported Format Chips */}

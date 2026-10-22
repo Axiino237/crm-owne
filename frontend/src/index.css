@@ -554,6 +554,7 @@ textarea.form-control {
   z-index: 1000;
   padding: 16px;
   animation: fadeIn 0.2s ease;
+  overflow-y: auto;
 }
 
 .modal {
@@ -562,19 +563,28 @@ textarea.form-control {
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 580px;
-  max-height: 90vh;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow: var(--shadow-lg), var(--shadow-glow);
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.modal > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -591,7 +601,24 @@ textarea.form-control {
 .modal-body { 
   padding: 24px; 
   overflow-y: auto;
-  flex-grow: 1;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+}
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .modal-footer {

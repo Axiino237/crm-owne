@@ -244,7 +244,7 @@ const UploadRequirementModal = ({ order, onClose, onUploaded }) => {
               {file ? file.name : 'Click to select requirement file'}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-              PDF, Excel, CSV, Word Doc, or Image (Max 30MB)
+              PDF, Excel, CSV, Word Doc, or Image (Max 2GB)
             </div>
             {file && (
               <div style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: 6, fontWeight: 700 }}>
