@@ -104,6 +104,8 @@ const ProfilePage = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 16,
             marginBottom: 20
           }}>
             <div>
@@ -136,7 +138,7 @@ const ProfilePage = () => {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '300px 1fr',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
             gap: 30
           }}>
             {/* Left Card - DP & Basic Meta */}
@@ -299,7 +301,7 @@ const ProfilePage = () => {
                   Account Information
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div className="form-grid-2" style={{ gap: 20 }}>
                   <div className="form-group">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-secondary)' }}>
                       <RiUserLine style={{ color: 'var(--accent)' }} /> Full Name
@@ -353,7 +355,7 @@ const ProfilePage = () => {
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                  <div className="form-grid-2" style={{ gap: 20 }}>
                     <div className="form-group">
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, marginBottom: 8, color: 'var(--text-secondary)' }}>
                         <RiLockPasswordLine style={{ color: 'var(--accent)' }} /> New Password

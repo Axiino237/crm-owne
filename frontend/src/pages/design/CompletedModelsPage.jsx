@@ -41,7 +41,7 @@ const ModelDetailDrawer = ({ order, onClose }) => {
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000 }} />
       {/* Drawer */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 540,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 'min(540px, 100vw)',
         background: 'var(--bg-card)', borderLeft: '1px solid var(--border)',
         zIndex: 1001, display: 'flex', flexDirection: 'column',
         boxShadow: '-24px 0 64px rgba(0,0,0,0.5)'
@@ -184,7 +184,7 @@ const ModelDetailDrawer = ({ order, onClose }) => {
           )}
 
           {/* Timestamps */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20, padding: 16, background: 'rgba(129,140,248,0.05)', borderRadius: 12, border: '1px solid var(--border)' }}>
+          <div className="form-grid-2" style={{ gap: 12, marginBottom: 20, padding: 16, background: 'rgba(129,140,248,0.05)', borderRadius: 12, border: '1px solid var(--border)' }}>
             <div>
               <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <RiCalendarLine /> Submitted
@@ -212,7 +212,7 @@ const ModelDetailDrawer = ({ order, onClose }) => {
           {/* Stall Details */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Stall Information</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+            <div className="form-grid-2" style={{ gap: '0 20px' }}>
               <Field label="Exhibition" value={order.exhibitionName} icon={<RiCalendarLine />} />
               <Field label="Stall No." value={order.stallNo} icon={<RiPaletteLine />} />
               <Field label="Hall No." value={order.hallNo} icon={<RiBuilding2Line />} />
@@ -227,7 +227,7 @@ const ModelDetailDrawer = ({ order, onClose }) => {
           {/* Furniture Details */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Stall Furniture & Fixtures</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+            <div className="form-grid-2" style={{ gap: '0 20px' }}>
               <Field label="Reception Counter" value={order.receptionCounter} />
               <Field label="Round Table + Bar Stool" value={order.roundTableBarStool} />
               <Field label="Closed Meeting Room" value={order.closedMeetingRoom} />
@@ -243,7 +243,7 @@ const ModelDetailDrawer = ({ order, onClose }) => {
           {order.lead && (
             <div style={{ padding: 16, background: 'rgba(129,140,248,0.06)', borderRadius: 12, border: '1px solid rgba(129,140,248,0.2)', marginBottom: 20 }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Client / Lead Info</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+              <div className="form-grid-2" style={{ gap: '0 20px' }}>
                 <Field label="Lead Name" value={order.lead.name || order.lead.companyName} icon={<RiUser3Line />} />
                 <Field label="Phone" value={order.lead.phone} icon={<RiPhoneLine />} />
                 <Field label="Email" value={order.lead.email} icon={<RiMailLine />} />
@@ -318,7 +318,7 @@ const CompletedModelsPage = () => {
       </div>
 
       {/* Summary Card */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16, marginBottom: 24 }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', color: '#10b981' }}>
             <RiCheckDoubleLine />
@@ -389,7 +389,7 @@ const CompletedModelsPage = () => {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 18 }}>
           {filtered.map(order => {
             const completedFiles = Array.isArray(order.completedFiles) && order.completedFiles.length > 0
               ? order.completedFiles
@@ -478,7 +478,7 @@ const CompletedModelsPage = () => {
                     )}
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 110px), 1fr))', gap: 8, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                     <div>
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Completed</div>
                       <div style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 700 }}>

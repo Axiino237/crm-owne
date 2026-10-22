@@ -488,7 +488,7 @@ const AttendancePage = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         
         {/* Top Widgets Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 20 }}>
           
           {/* Check-In/Out Card */}
           <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 200 }}>
@@ -737,8 +737,9 @@ const AttendancePage = () => {
               <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner" /></div>
             ) : (
               <div>
-                {/* Calendar Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, textAlign: 'center' }}>
+                {/* Calendar Grid with responsive horizontal scroll wrapper */}
+                <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, textAlign: 'center', minWidth: 460 }}>
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
                     <div key={d} style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', paddingBottom: 8 }}>{d}</div>
                   ))}
@@ -796,6 +797,7 @@ const AttendancePage = () => {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               </div>
             )}

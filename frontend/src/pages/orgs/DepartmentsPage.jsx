@@ -486,7 +486,7 @@ const DepartmentsPage = () => {
           <h1 className="page-title">Departments & Hierarchy</h1>
           <p className="page-subtitle">Manage departments, dynamic authority layers, and monitor team performance</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
           <Link to="/hierarchy" className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: 'rgba(99,102,241,0.4)', color: '#818cf8' }}>
             <RiNodeTree /> Hierarchy Studio
           </Link>
@@ -501,14 +501,14 @@ const DepartmentsPage = () => {
 
       <div className="card">
         <div className="card-header">
-          <div className="input-wrapper">
+          <div className="input-wrapper" style={{ width: '100%', maxWidth: 280 }}>
             <RiSearchLine className="input-icon" />
             <input
               className="form-control"
               placeholder="Search departments..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
-              style={{ width: 280 }}
+              style={{ width: '100%' }}
               id="dept-search"
             />
           </div>

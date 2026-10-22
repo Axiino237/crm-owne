@@ -69,7 +69,7 @@ const ViewDesignModal = ({ order, onClose, onUploadClick }) => {
 
         {/* Scrollable Content */}
         <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 28px' }}>
+          <div className="form-grid-2" style={{ gap: '0 28px' }}>
             <Field label="Company Name" value={order.companyName} />
             <Field label="Website" value={order.website} />
             <Field label="Exhibition Name" value={order.exhibitionName} />
@@ -401,7 +401,7 @@ const DesignPage = () => {
         </div>
 
         {/* Stat Summary */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16, marginBottom: 28 }}>
           {[
             { label: 'Pending', count: pendingCount, icon: <RiTimeLine />, color: '#f59e0b' },
             { label: 'In Progress', count: inProgressCount, icon: <RiPaletteLine />, color: '#818cf8' },

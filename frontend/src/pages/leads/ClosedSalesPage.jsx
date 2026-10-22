@@ -171,7 +171,7 @@ const ClosedSalesPage = () => {
       </div>
 
       {/* Aggregate Overview Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16, marginBottom: 24 }}>
         
         {canViewValue && (
           <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -407,7 +407,7 @@ const ClosedSalesPage = () => {
                 <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700 }}>{viewLead.companyName}</div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-grid-2" style={{ gap: 12 }}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Phone</div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{viewLead.phone || '—'}</div>
@@ -419,7 +419,7 @@ const ClosedSalesPage = () => {
               </div>
 
               {(canViewValue || canViewPaid) && (
-                <div style={{ display: 'grid', gridTemplateColumns: (canViewValue && canViewPaid) ? '1fr 1fr' : '1fr', gap: 12 }}>
+                <div className="form-grid-2" style={{ gap: 12 }}>
                   {canViewValue && (
                     <div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Deal Value</div>
@@ -436,7 +436,7 @@ const ClosedSalesPage = () => {
               )}
 
               {(canViewBalance || canViewVendorPay) && (
-                <div style={{ display: 'grid', gridTemplateColumns: (canViewBalance && canViewVendorPay) ? '1fr 1fr' : '1fr', gap: 12 }}>
+                <div className="form-grid-2" style={{ gap: 12 }}>
                   {canViewBalance && (
                     <div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding Balance</div>
@@ -452,7 +452,7 @@ const ClosedSalesPage = () => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-grid-2" style={{ gap: 12 }}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Design Status</div>
                   <div style={{

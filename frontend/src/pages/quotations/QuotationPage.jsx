@@ -373,7 +373,7 @@ const QuotationPage = () => {
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="form-grid-2" style={{ gap: 10 }}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={label}>Company Name</label>
                     <input style={inp} value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your Company Pvt Ltd" />
@@ -406,7 +406,7 @@ const QuotationPage = () => {
                 <div style={{ fontWeight: 800, fontSize: '0.9375rem', marginBottom: 16, color: 'var(--text-primary)' }}>
                   👤 Bill To (Client)
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="form-grid-2" style={{ gap: 10 }}>
                   <div>
                     <label style={label}>Contact Name</label>
                     <input style={inp} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="John Doe" />
@@ -493,9 +493,7 @@ const QuotationPage = () => {
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Show in Document</span>
                   </label>
                 </div>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '1fr 1fr', 
+                <div className="form-grid-2" style={{ 
                   gap: 10,
                   opacity: showBankDetails ? 1 : 0.4,
                   pointerEvents: showBankDetails ? 'auto' : 'none',
@@ -523,6 +521,7 @@ const QuotationPage = () => {
 
             {/* Splitter Resizer Handle */}
             <div 
+              id="split-pane-resizer"
               onMouseDown={startResize}
               style={{
                 width: 6,
@@ -557,7 +556,7 @@ const QuotationPage = () => {
                 <div style={{ fontWeight: 800, fontSize: '0.9375rem', marginBottom: 16, color: 'var(--text-primary)' }}>
                   📋 Document Details
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="form-grid-2" style={{ gap: 10 }}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={label}>Document Type</label>
                     <select style={inp} value={docType} onChange={e => handleDocTypeChange(e.target.value)}>
@@ -622,7 +621,7 @@ const QuotationPage = () => {
 
                 {/* Plan Picker Grid */}
                 {showPlanPicker && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                  <div className="form-grid-2" style={{ gap: 8, marginBottom: 14 }}>
                     {PRESET_PLANS.map(plan => (
                       <button
                         key={plan.id}
@@ -646,7 +645,7 @@ const QuotationPage = () => {
                 )}
 
                 {/* Line Items Table */}
-                <div style={{ overflowX: 'auto' }}>
+                <div className="table-wrapper" style={{ border: 'none', background: 'transparent' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                     <colgroup>
                       {/* Description */}

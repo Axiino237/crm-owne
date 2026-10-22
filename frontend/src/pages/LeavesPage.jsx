@@ -101,7 +101,7 @@ const LeavesPage = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         
         {/* Top Widgets Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 20 }}>
           
           {/* Top Leave Request Form */}
           <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -219,7 +219,7 @@ const LeavesPage = () => {
               </div>
 
               {/* 3 Core Quotas */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 100px), 1fr))', gap: 10, marginBottom: 14 }}>
                 <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '12px 10px', borderRadius: 10, border: '1px solid rgba(59, 130, 246, 0.25)', textAlign: 'center' }}>
                   <div style={{ fontSize: '0.72rem', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Paid Leave</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#93c5fd' }}>{balances.paid.remaining} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ {balances.paid.allocated}</span></div>
@@ -240,7 +240,7 @@ const LeavesPage = () => {
               </div>
 
               {/* Status quick counters */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 80px), 1fr))', gap: 8, marginBottom: 12 }}>
                 <div style={{ background: 'var(--bg-secondary)', padding: '8px', borderRadius: 6, textAlign: 'center', border: '1px solid var(--border)' }}>
                   <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--success)' }}>
                     {myLeaves.filter(l => l.status === 'approved').length}

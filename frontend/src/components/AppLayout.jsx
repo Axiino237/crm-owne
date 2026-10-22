@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import {
   RiDashboardLine, RiTeamLine, RiShieldUserLine,
@@ -200,7 +200,7 @@ const NotificationBell = ({ user }) => {
         {unreadCount > 0 && (<span style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: '#fff', fontSize: '0.58rem', fontWeight: 800, minWidth: 17, height: 17, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg-card)', padding: '0 3px' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>)}
       </button>
       {open && (
-        <div id="notification-panel" style={{ position: 'absolute', top: 'calc(100% + 12px)', right: 0, width: 370, maxHeight: 500, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: '0 24px 64px rgba(0,0,0,0.4)', zIndex: 9999, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div id="notification-panel" className="notification-panel-responsive">
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>Notifications {notifications.length > 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>({notifications.length})</span>}</span>
             {notifications.length > 0 && (<div style={{ display: 'flex', gap: 12 }}><button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}>Mark all read</button><button onClick={clearAll} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}>Clear all</button></div>)}
@@ -242,22 +242,21 @@ const NotificationBell = ({ user }) => {
   );
 };
 
-
 // Header
 const Header = ({ title, onMenuToggle }) => {
   const { user } = useAuth();
   return (
     <header className="header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: '1 1 auto' }}>
         <button className="mobile-menu-btn" onClick={onMenuToggle} aria-label="Toggle navigation">
           <RiMenuLine />
         </button>
-        <div className="header-title">{title}</div>
+        <div className="header-title" title={title}>{title}</div>
       </div>
       <div className="header-right">
         {user?.isSuperAdmin && (<span className="super-admin-chip"><RiStarLine /> Super Admin</span>)}
         <NotificationBell user={user} />
-        <Link to="/profile" className="avatar avatar-sm" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+        <Link to="/profile" className="avatar avatar-sm" style={{ cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }} title="My Profile">
           {user?.avatar ? <img src={user.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
         </Link>
       </div>
@@ -268,6 +267,12 @@ const Header = ({ title, onMenuToggle }) => {
 // AppLayout
 const AppLayout = ({ children, title = 'Dashboard' }) => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const location = useLocation();
+
+  // Close mobile drawer automatically upon navigating to any page
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="app-layout">

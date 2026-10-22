@@ -184,8 +184,8 @@ const AuditLogsPage = () => {
       </div>
 
       {/* Filters Section */}
-      <div className="card" style={{ padding: '16px', marginBottom: '24px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div className="search-bar" style={{ flex: 1, minWidth: '240px' }}>
+      <div className="card" style={{ padding: '16px', marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-bar" style={{ flex: '1 1 min(100%, 260px)', minWidth: 0, width: '100%' }}>
           <RiSearchLine className="search-icon" />
           <input 
             type="text" 
@@ -198,12 +198,12 @@ const AuditLogsPage = () => {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 auto' }}>
           <select
             value={selectedModule}
             onChange={(e) => setSelectedModule(e.target.value)}
             className="form-control"
-            style={{ width: '160px', padding: '8px 12px' }}
+            style={{ flex: '1 1 140px', minWidth: '130px', padding: '8px 12px' }}
             id="audit-module-select"
           >
             {MODULES_LIST.map(m => (
@@ -215,7 +215,7 @@ const AuditLogsPage = () => {
             value={selectedAction}
             onChange={(e) => setSelectedAction(e.target.value)}
             className="form-control"
-            style={{ width: '160px', padding: '8px 12px' }}
+            style={{ flex: '1 1 140px', minWidth: '130px', padding: '8px 12px' }}
             id="audit-action-select"
           >
             {ACTIONS_LIST.map(a => (
@@ -226,7 +226,7 @@ const AuditLogsPage = () => {
           <button 
             onClick={() => fetchLogs(1)}
             className="btn btn-primary"
-            style={{ padding: '8px 20px' }}
+            style={{ flex: '1 1 auto', padding: '8px 20px', whiteSpace: 'nowrap' }}
             id="apply-filter-btn"
           >
             Apply Filter

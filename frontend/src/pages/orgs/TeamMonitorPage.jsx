@@ -355,14 +355,14 @@ const TeamMonitorPage = () => {
       <div className="card" style={{ marginBottom: 20, padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           {/* Department Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Select Department:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 min(100%, 280px)', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.875rem', whiteSpace: 'nowrap' }}>Select Department:</span>
             <select
               className="form-control"
               value={selectedDeptId}
               onChange={e => handleDeptChange(e.target.value)}
               disabled={loadingDepts}
-              style={{ minWidth: 240, fontWeight: 600, fontSize: '0.9rem' }}
+              style={{ flex: 1, minWidth: 160, fontWeight: 600, fontSize: '0.9rem' }}
             >
               {departments.map(d => (
                 <option key={d.id} value={d.id}>
@@ -457,7 +457,7 @@ const TeamMonitorPage = () => {
       ) : (
         <>
           {/* Key Metric Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16, marginBottom: 24 }}>
             {/* Total Members */}
             <div className="stat-card accent">
               <div className="stat-icon" style={{ color: 'var(--accent)' }}><RiTeamLine /></div>
@@ -494,7 +494,7 @@ const TeamMonitorPage = () => {
             {/* Card Filters Bar */}
             <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', paddingBottom: 14 }}>
               {/* Search Member */}
-              <div className="input-wrapper" style={{ width: 240 }}>
+              <div className="input-wrapper" style={{ width: '100%', maxWidth: 280 }}>
                 <RiSearchLine className="input-icon" />
                 <input
                   className="form-control"

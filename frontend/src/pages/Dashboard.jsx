@@ -488,7 +488,7 @@ const Dashboard = () => {
               <h3 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: 8 }}>
                 🎨 Design Operations
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '20px' }}>
                 {hasPermission('dashboard', 'total-designs-widget', 'canView') && (
                   <StatCard 
                     icon={<RiPaletteLine />} 
@@ -533,7 +533,7 @@ const Dashboard = () => {
             hasPermission('dashboard', 'monthly-profit-card', 'canView') ||
             hasPermission('dashboard', 'deductions-card', 'canView') ||
             hasPermission('dashboard', 'net-profit-card', 'canView')) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '20px', marginBottom: '24px' }}>
               {hasPermission('dashboard', 'total-profit-card', 'canView') && (
                 <div className="card" style={{ borderLeft: '4px solid var(--success)', background: 'var(--bg-glass)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -824,7 +824,7 @@ const Dashboard = () => {
           {/* Recent Leads & Projects tables */}
           {(hasPermission('dashboard', 'recent-leads-list', 'canView') ||
             hasPermission('dashboard', 'recent-projects-list', 'canView')) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '20px' }}>
               {hasPermission('dashboard', 'recent-leads-list', 'canView') && (
                 <div className="card">
                   <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -1014,7 +1014,7 @@ const Dashboard = () => {
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 24 }}>
             {/* Quick Access Card */}
             <div className="card">
               <div className="card-header">

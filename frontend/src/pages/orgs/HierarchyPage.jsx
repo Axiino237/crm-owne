@@ -381,17 +381,18 @@ const HierarchyPage = () => {
         {/* ── Filter / Scope Switcher Card ── */}
         <div className="card" style={{ padding: '16px 20px', background: 'var(--bg-card)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', flex: '1 1 auto' }}>
               {/* Company Picker */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <RiBuilding2Line style={{ color: 'var(--accent)', fontSize: '1.1rem' }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Company:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 min(100%, 220px)' }}>
+                <RiBuilding2Line style={{ color: 'var(--accent)', fontSize: '1.1rem', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Company:</span>
                 <select
                   className="form-control"
                   value={selectedCompanyId}
                   onChange={e => setSelectedCompanyId(e.target.value)}
                   style={{
-                    minWidth: 210,
+                    flex: 1,
+                    minWidth: 150,
                     height: 42,
                     padding: '0 14px',
                     lineHeight: '42px',
@@ -409,16 +410,17 @@ const HierarchyPage = () => {
               </div>
 
               {/* Department Picker */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <RiBuildingLine style={{ color: '#10b981', fontSize: '1.1rem' }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Department:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 min(100%, 240px)' }}>
+                <RiBuildingLine style={{ color: '#10b981', fontSize: '1.1rem', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Department:</span>
                 <select
                   className="form-control"
                   value={selectedDeptId}
                   onChange={e => setSelectedDeptId(e.target.value)}
                   disabled={departments.length === 0}
                   style={{
-                    minWidth: 230,
+                    flex: 1,
+                    minWidth: 150,
                     height: 42,
                     padding: '0 14px',
                     lineHeight: '42px',
@@ -439,7 +441,7 @@ const HierarchyPage = () => {
               </div>
 
               {/* Quick Search */}
-              <div className="input-wrapper" style={{ minWidth: 240 }}>
+              <div className="input-wrapper" style={{ flex: '1 1 min(100%, 220px)', minWidth: 160 }}>
                 <RiSearchLine className="input-icon" />
                 <input
                   className="form-control"
@@ -510,25 +512,25 @@ const HierarchyPage = () => {
         </div>
 
         {/* ── Main View Selector Tabs ── */}
-        <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <button
             className={`btn ${activeTab === 'layers' ? 'btn-primary' : 'btn-outline'} btn-sm`}
             onClick={() => setActiveTab('layers')}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontWeight: 600 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             <RiOrganizationChart /> 1. Dynamic Layer Builder ({layers.length})
           </button>
           <button
             className={`btn ${activeTab === 'matrix' ? 'btn-primary' : 'btn-outline'} btn-sm`}
             onClick={() => setActiveTab('matrix')}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontWeight: 600 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             <RiShieldUserLine /> 2. Reporting Matrix (Manager-Reportee)
           </button>
           <button
             className={`btn ${activeTab === 'tree' ? 'btn-primary' : 'btn-outline'} btn-sm`}
             onClick={() => setActiveTab('tree')}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontWeight: 600 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             <RiNodeTree /> 3. Interactive Org Flow Tree
           </button>

@@ -278,7 +278,7 @@ const OrgOverviewPage = () => {
       </div>
 
       {/* Summary Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 16, marginBottom: 28 }}>
         <div className="card" style={{ textAlign: 'center', background: 'var(--bg-glass)' }}>
           <div style={{ fontSize: '2rem', color: 'var(--accent)', marginBottom: 4 }}><RiBuildingLine /></div>
           <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{organizations.length}</div>
@@ -348,7 +348,7 @@ const OrgOverviewPage = () => {
             <button
               onClick={() => toggleOrg(org.id)}
               style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 16,
+                width: '100%', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
                 padding: '20px 24px', background: 'transparent',
                 border: 'none', cursor: 'pointer', textAlign: 'left',
                 borderBottom: isOpen ? '1px solid rgba(129,140,248,0.1)' : 'none',

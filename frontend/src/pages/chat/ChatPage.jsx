@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { 
-  RiChat3Line, RiSendPlane2Line, RiUserLine, RiBuildingLine, RiFolderUserLine, RiUserSmileLine, RiShieldKeyholeLine, RiLock2Line, RiLockUnlockLine
+  RiChat3Line, RiSendPlane2Line, RiUserLine, RiBuildingLine, RiFolderUserLine, 
+  RiUserSmileLine, RiShieldKeyholeLine, RiLock2Line, RiLockUnlockLine, RiArrowLeftLine,
+  RiSearchLine, RiCheckDoubleLine, RiShieldCheckLine, RiCloseLine, RiRadioButtonLine
 } from 'react-icons/ri';
 import AppLayout from '../../components/AppLayout';
 import { useAuth } from '../../context/AuthContext';
@@ -45,9 +47,11 @@ const DecryptedMessage = ({ rawMessage, privateKeyJwk, isSender }) => {
   const isEncrypted = typeof rawMessage === 'string' && rawMessage.startsWith('{"encryptedPayload"');
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      {isEncrypted && <RiLock2Line style={{ color: 'var(--success)', display: 'inline', fontSize: '0.85rem' }} />}
-      {decryptedText}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      {isEncrypted && (
+        <RiLock2Line style={{ color: isSender ? 'rgba(255,255,255,0.9)' : 'var(--success)', fontSize: '0.82rem', flexShrink: 0 }} />
+      )}
+      <span>{decryptedText}</span>
     </span>
   );
 };
@@ -59,6 +63,10 @@ const ChatPage = () => {
   // E2EE Keys state
   const [privateKeyJwk, setPrivateKeyJwk] = useState(null);
   const [publicKeyJwk, setPublicKeyJwk] = useState(null);
+
+  // Search and filter states
+  const [memberSearch, setMemberSearch] = useState('');
+  const [onlineFilterOnly, setOnlineFilterOnly] = useState(false);
 
   // Track the currently active channel for notification filtering
   const activeChannelRef = useRef(null);
@@ -147,20 +155,17 @@ const ChatPage = () => {
             silent: false,
           });
 
-          // Click the notification to focus and navigate to the CRM
           notification.onclick = () => {
             window.focus();
             notification.close();
           };
 
-          // Auto-close after 5 seconds
           setTimeout(() => notification.close(), 5000);
         }
       }
     });
 
-    socket.on('status_change', (data) => {
-      // Instantly refresh members cache
+    socket.on('status_change', () => {
       dispatch(apiSlice.util.invalidateTags(['ChatMembers']));
     });
 
@@ -173,12 +178,9 @@ const ChatPage = () => {
     };
   }, [dispatch]);
   
-  // Selected Channel state: 
-  // can be:
-  // - { type: 'server', id: string, name: string } (Global Shared Workspace)
-  // - { type: 'company', id: string, name: string } (Private Company Channel)
-  // - { type: 'dm', id: string, name: string } (Direct Message with User ID)
+  // Selected Channel state
   const [selectedChannel, setSelectedChannel] = useState(null);
+  const [showMobileList, setShowMobileList] = useState(false);
 
   // Message input state
   const [messageText, setMessageText] = useState('');
@@ -195,21 +197,38 @@ const ChatPage = () => {
 
   // Fetch members in this workspace context
   const { data: membersData, isLoading: loadingMembers } = useGetChatMembersQuery(undefined, {
-    pollingInterval: 15000 // Refresh active members and online/offline status dots as a safety fallback
+    pollingInterval: 15000
   });
   const members = membersData?.members || [];
 
-  // Find user's server
-  const userServer = userCompany && userCompany.chatServerId 
-    ? servers.find(s => s.id === userCompany.chatServerId) 
-    : servers.length > 0 ? servers[0] : null; // Fallback to first server for admins
+  // Filter members based on search and online status
+  const filteredMembers = useMemo(() => {
+    return members.filter(m => {
+      const matchSearch = !memberSearch.trim() || 
+        m.name?.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        m.roleName?.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        m.deptName?.toLowerCase().includes(memberSearch.toLowerCase());
+      const matchOnline = !onlineFilterOnly || m.isOnline;
+      return matchSearch && matchOnline;
+    });
+  }, [members, memberSearch, onlineFilterOnly]);
+
+  const onlineCount = useMemo(() => members.filter(m => m.isOnline).length, [members]);
 
   // Set default channel on load (prioritizing direct message)
   useEffect(() => {
     if (!selectedChannel && members.length > 0) {
       setSelectedChannel({ type: 'dm', id: members[0].id, name: members[0].name });
+      activeChannelRef.current = members[0].id;
     }
   }, [members, selectedChannel]);
+
+  // Update activeChannelRef when selectedChannel changes
+  useEffect(() => {
+    if (selectedChannel) {
+      activeChannelRef.current = selectedChannel.id;
+    }
+  }, [selectedChannel]);
 
   // Active channel query parameters
   const queryParams = {
@@ -220,7 +239,7 @@ const ChatPage = () => {
 
   const skipQuery = !selectedChannel;
 
-  // Fetch messages with 15-second fallback polling interval
+  // Fetch messages
   const { data: messagesData, isLoading: loadingMessages } = useGetChatMessagesQuery(queryParams, {
     skip: skipQuery,
     pollingInterval: 15000
@@ -235,27 +254,26 @@ const ChatPage = () => {
   }, [messages]);
 
   const handleSend = async (e) => {
-    e.preventDefault();
-    if (!messageText.trim() || !selectedChannel) return;
+    e?.preventDefault();
+    if (!messageText.trim() || !selectedChannel || sending) return;
 
-    let msgToSend = messageText;
+    let msgToSend = messageText.trim();
 
     if (selectedChannel.type === 'dm') {
       const receiver = members.find(m => m.id === selectedChannel.id);
       if (receiver && receiver.publicKey && publicKeyJwk) {
         try {
           msgToSend = await encryptE2EEMessage(
-            messageText,
+            messageText.trim(),
             JSON.parse(receiver.publicKey),
             publicKeyJwk
           );
         } catch (error) {
           console.warn('E2EE encryption fallback to standard message transport:', error);
-          msgToSend = messageText;
+          msgToSend = messageText.trim();
         }
       } else {
-        // Send directly so messaging is never blocked if user is offline or hasn't generated keys!
-        msgToSend = messageText;
+        msgToSend = messageText.trim();
       }
     }
 
@@ -272,8 +290,16 @@ const ChatPage = () => {
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const selectDirectMessage = (member) => {
     setSelectedChannel({ type: 'dm', id: member.id, name: member.name });
+    setShowMobileList(false);
   };
 
   const activeDMRecipient = selectedChannel?.type === 'dm' ? members.find(m => m.id === selectedChannel.id) : null;
@@ -281,45 +307,151 @@ const ChatPage = () => {
 
   const placeholderText = selectedChannel 
     ? (selectedChannel.type === 'dm' 
-        ? `Send message to ${selectedChannel.name}...` 
-        : `Send message to # ${selectedChannel.name}...`)
-    : 'Select a conversation...';
+        ? `Write a message to ${selectedChannel.name}...` 
+        : `Write a message to # ${selectedChannel.name}...`)
+    : 'Select a conversation to start...';
 
   return (
-    <AppLayout title="Collaboration Chat Room">
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '280px 1fr', 
-        gap: 0, 
-        height: 'calc(100vh - 140px)',
-        background: 'var(--bg-card)',
-        borderRadius: 12,
-        border: '1px solid var(--border)',
-        overflow: 'hidden'
-      }}>
+    <AppLayout title="Collaboration Chat">
+      <div className={`chat-layout ${showMobileList ? 'show-sidebar' : 'show-chat'}`}>
         
-        {/* Left Sidebar - Channels & Direct Messages list */}
-        <div style={{ 
+        {/* Left Sidebar - Team Members & Channels */}
+        <div className="chat-sidebar" style={{ 
           borderRight: '1px solid var(--border)', 
-          padding: '20px 14px', 
+          padding: '16px 14px', 
           display: 'flex', 
           flexDirection: 'column', 
-          gap: 20, 
+          gap: 14, 
           background: 'var(--bg-secondary)',
           overflowY: 'auto'
         }}>
+          {/* Header & Status Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 8,
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2))',
+                color: 'var(--accent)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.95rem'
+              }}>
+                <RiChat3Line />
+              </div>
+              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                Messages
+              </span>
+            </div>
+            <span style={{
+              fontSize: '0.7rem',
+              color: 'var(--success)',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              padding: '2px 8px',
+              borderRadius: 12,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)' }} />
+              {onlineCount} Online
+            </span>
+          </div>
+
+          {/* Member Search Bar */}
+          <div style={{ position: 'relative' }}>
+            <RiSearchLine style={{ 
+              position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', 
+              color: 'var(--text-muted)', fontSize: '0.85rem' 
+            }} />
+            <input 
+              type="text" 
+              className="search-input"
+              placeholder="Search team members..."
+              value={memberSearch}
+              onChange={e => setMemberSearch(e.target.value)}
+              style={{
+                width: '100%',
+                paddingLeft: 30,
+                paddingRight: memberSearch ? 26 : 10,
+                paddingTop: 7,
+                paddingBottom: 7,
+                fontSize: '0.78rem',
+                borderRadius: 8,
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)'
+              }}
+            />
+            {memberSearch && (
+              <button 
+                type="button" 
+                onClick={() => setMemberSearch('')}
+                style={{
+                  position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                  background: 'transparent', border: 'none', color: 'var(--text-muted)',
+                  cursor: 'pointer', padding: 0, display: 'flex'
+                }}
+              >
+                <RiCloseLine size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Filter Pills */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setOnlineFilterOnly(false)}
+              style={{
+                flex: 1,
+                padding: '5px 8px',
+                borderRadius: 6,
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                border: '1px solid',
+                borderColor: !onlineFilterOnly ? 'var(--accent)' : 'var(--border)',
+                background: !onlineFilterOnly ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                color: !onlineFilterOnly ? 'var(--accent)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              All ({members.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setOnlineFilterOnly(true)}
+              style={{
+                flex: 1,
+                padding: '5px 8px',
+                borderRadius: 6,
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                border: '1px solid',
+                borderColor: onlineFilterOnly ? 'var(--success)' : 'var(--border)',
+                background: onlineFilterOnly ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                color: onlineFilterOnly ? 'var(--success)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Active ({onlineCount})
+            </button>
+          </div>
+
           {/* Direct Messages list */}
-          <div>
-            <h4 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
-              💬 Direct Messages ({members.length})
-            </h4>
+          <div style={{ flexGrow: 1, overflowY: 'auto' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {loadingMembers ? (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', paddingLeft: 4 }}>Loading members...</div>
-              ) : members.length === 0 ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: 4 }}>No organization members found.</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 6px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  <div className="spinner" style={{ width: 14, height: 14 }} /> Loading team...
+                </div>
+              ) : filteredMembers.length === 0 ? (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '16px 6px', textAlign: 'center' }}>
+                  No members found {memberSearch && `for "${memberSearch}"`}
+                </div>
               ) : (
-                members.map(member => {
+                filteredMembers.map(member => {
                   const isSelected = selectedChannel?.type === 'dm' && selectedChannel.id === member.id;
                   
                   return (
@@ -329,46 +461,68 @@ const ChatPage = () => {
                       style={{
                         width: '100%',
                         textAlign: 'left',
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: isSelected ? 'var(--accent)' : 'transparent',
-                        color: isSelected ? '#ffffff' : 'var(--text-primary)',
-                        border: 'none',
+                        padding: '9px 10px',
+                        borderRadius: 10,
+                        background: isSelected 
+                          ? 'linear-gradient(90deg, rgba(99, 102, 241, 0.18) 0%, rgba(99, 102, 241, 0.08) 100%)' 
+                          : 'transparent',
+                        color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        border: isSelected ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: 10,
-                        transition: 'background 0.2s'
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           <div style={{
-                            width: 28, height: 28, borderRadius: '50%',
-                            background: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(56, 189, 248, 0.12)',
+                            width: 32, height: 32, borderRadius: 10,
+                            background: isSelected 
+                              ? 'linear-gradient(135deg, #4f46e5, #6366f1)' 
+                              : 'rgba(255, 255, 255, 0.06)',
                             color: isSelected ? '#ffffff' : 'var(--accent)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '0.75rem', fontWeight: 800
+                            fontSize: '0.78rem', fontWeight: 800,
+                            boxShadow: isSelected ? '0 2px 8px rgba(79, 70, 229, 0.35)' : 'none'
                           }}>
                             {member.name.charAt(0).toUpperCase()}
                           </div>
                           <div style={{
-                            width: 8, height: 8, borderRadius: '50%',
+                            width: 9, height: 9, borderRadius: '50%',
                             background: member.isOnline ? 'var(--success)' : 'var(--text-muted)',
                             border: '2px solid var(--bg-secondary)',
-                            position: 'absolute', bottom: -1, right: -1
+                            boxShadow: member.isOnline ? '0 0 6px rgba(16, 185, 129, 0.6)' : 'none',
+                            position: 'absolute', bottom: -2, right: -2
                           }} />
                         </div>
                         <div style={{ overflow: 'hidden' }}>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 700, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          <div style={{ 
+                            fontSize: '0.82rem', 
+                            fontWeight: isSelected ? 800 : 600, 
+                            color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' 
+                          }}>
                             {member.name}
                           </div>
-                          <div style={{ fontSize: '0.68rem', opacity: isSelected ? 0.85 : 0.65, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          <div style={{ 
+                            fontSize: '0.68rem', 
+                            color: isSelected ? 'var(--accent)' : 'var(--text-muted)', 
+                            textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' 
+                          }}>
                             {member.roleName || member.deptName || 'Member'}
                           </div>
                         </div>
                       </div>
+
+                      {member.publicKey && (
+                        <RiShieldKeyholeLine 
+                          title="E2EE Security Key Active" 
+                          style={{ fontSize: '0.8rem', color: isSelected ? 'var(--accent)' : 'var(--text-muted)', opacity: 0.7, flexShrink: 0 }} 
+                        />
+                      )}
                     </button>
                   );
                 })
@@ -379,26 +533,76 @@ const ChatPage = () => {
         </div>
 
         {/* Center - Message Log Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="chat-main" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-card)' }}>
           {/* Header */}
           <div style={{ 
-            padding: '16px 24px', 
+            padding: '14px 20px', 
             borderBottom: '1px solid var(--border)', 
             background: 'var(--bg-secondary)', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'space-between',
-            gap: 10 
+            gap: 12 
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <RiChat3Line style={{ color: 'var(--accent)', fontSize: '1.25rem' }} />
-              <div>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  # {selectedChannel ? selectedChannel.name : 'Loading Channel...'}
-                </h3>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  {selectedChannel?.type === 'company' ? 'Private organization channel' : 'Direct Message session'}
-                </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm mobile-chat-back-btn"
+                onClick={() => setShowMobileList(true)}
+                style={{ padding: '4px 8px', fontSize: '0.8rem', alignItems: 'center', gap: 4 }}
+                title="Back to Conversations"
+              >
+                <RiArrowLeftLine /> Chats
+              </button>
+
+              {activeDMRecipient && (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                    color: '#ffffff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.85rem', fontWeight: 800,
+                    boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)'
+                  }}>
+                    {activeDMRecipient.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: activeDMRecipient.isOnline ? 'var(--success)' : 'var(--text-muted)',
+                    border: '2px solid var(--bg-secondary)',
+                    boxShadow: activeDMRecipient.isOnline ? '0 0 6px rgba(16, 185, 129, 0.6)' : 'none',
+                    position: 'absolute', bottom: -2, right: -2
+                  }} />
+                </div>
+              )}
+
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h3 style={{ 
+                    fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', 
+                    margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' 
+                  }}>
+                    {selectedChannel ? selectedChannel.name : 'Select a Conversation'}
+                  </h3>
+                  {activeDMRecipient?.roleName && (
+                    <span style={{ 
+                      fontSize: '0.65rem', 
+                      background: 'rgba(255,255,255,0.06)', 
+                      border: '1px solid var(--border)',
+                      padding: '1px 6px', 
+                      borderRadius: 4, 
+                      color: 'var(--text-muted)',
+                      fontWeight: 600
+                    }}>
+                      {activeDMRecipient.roleName}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: activeDMRecipient?.isOnline ? 'var(--success)' : 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: activeDMRecipient?.isOnline ? 'var(--success)' : 'var(--text-muted)' }} />
+                  {activeDMRecipient?.isOnline ? 'Active Now' : 'Offline'}
+                </div>
               </div>
             </div>
 
@@ -407,15 +611,18 @@ const ChatPage = () => {
               <span style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: 5,
                 color: isE2EEDM ? 'var(--success)' : 'var(--accent)',
-                fontSize: '0.75rem',
-                background: isE2EEDM ? 'rgba(34, 197, 94, 0.1)' : 'rgba(56, 189, 248, 0.1)',
+                fontSize: '0.72rem',
+                background: isE2EEDM ? 'rgba(34, 197, 94, 0.1)' : 'rgba(99, 102, 241, 0.1)',
+                border: isE2EEDM ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(99, 102, 241, 0.25)',
                 padding: '4px 10px',
                 borderRadius: 20,
-                fontWeight: 700
+                fontWeight: 700,
+                flexShrink: 0
               }}>
-                <RiLock2Line /> {isE2EEDM ? 'End-to-End Encrypted' : 'Direct Message'}
+                {isE2EEDM ? <RiShieldCheckLine /> : <RiLock2Line />}
+                <span>{isE2EEDM ? 'E2EE Encrypted' : 'Direct Chat'}</span>
               </span>
             )}
           </div>
@@ -423,94 +630,136 @@ const ChatPage = () => {
           {/* Messages Feed */}
           <div style={{ 
             flexGrow: 1, 
-            padding: 24, 
+            padding: '20px 24px', 
             overflowY: 'auto', 
             display: 'flex', 
             flexDirection: 'column', 
-            gap: 16 
+            gap: 14 
           }}>
             {loadingMessages ? (
-              <div style={{ display: 'flex', justifyContent: 'center', margin: 'auto' }}><div className="spinner" /></div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: 'auto', gap: 12 }}>
+                <div className="spinner" />
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Decrypting conversation logs...</span>
+              </div>
             ) : messages.length === 0 ? (
-              <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                <RiUserSmileLine style={{ fontSize: '3rem', color: 'var(--border)', marginBottom: 12 }} />
-                <div>This is the start of direct/workspace chat logs.</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Type and send a message below to start chatting!</div>
+              <div style={{ 
+                margin: 'auto', 
+                maxWidth: 380, 
+                textAlign: 'center', 
+                padding: '32px 24px',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: 16,
+                border: '1px dashed var(--border)'
+              }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 16,
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15))',
+                  color: 'var(--accent)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1.8rem', margin: '0 auto 14px'
+                }}>
+                  <RiUserSmileLine />
+                </div>
+                <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6 }}>
+                  Direct Workspace Channel
+                </h4>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  This is the start of your secure conversation with <strong style={{ color: 'var(--text-primary)' }}>{selectedChannel?.name}</strong>. Messages are delivered in real time.
+                </div>
               </div>
             ) : (
               messages.map(msg => {
                 const isMe = msg.senderId === user?.id;
                 const initials = msg.sender?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+                const timeString = new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 
                 return (
                   <div key={msg.id} style={{ 
                     display: 'flex', 
-                    gap: 12, 
+                    gap: 10, 
                     alignSelf: isMe ? 'flex-end' : 'flex-start',
-                    maxWidth: '75%',
+                    maxWidth: '80%',
                     flexDirection: isMe ? 'row-reverse' : 'row'
                   }}>
                     {/* Avatar */}
-                    <div style={{ 
-                       width: 36, 
-                       height: 36, 
-                       borderRadius: '50%', 
-                       background: isMe ? 'var(--accent)' : 'var(--bg-secondary)', 
-                       color: isMe ? '#ffffff' : 'var(--text-primary)',
-                       display: 'flex',
-                       alignItems: 'center',
-                       justifyContent: 'center',
-                       fontSize: '0.78rem',
-                       fontWeight: 800,
-                       border: '1px solid var(--border)',
-                       flexShrink: 0
-                    }}>
-                      {initials}
-                    </div>
+                    {!isMe && (
+                      <div style={{ 
+                        width: 32, 
+                        height: 32, 
+                        borderRadius: 10, 
+                        background: 'rgba(255, 255, 255, 0.07)', 
+                        color: 'var(--accent)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        border: '1px solid var(--border)',
+                        flexShrink: 0,
+                        marginTop: 2
+                      }}>
+                        {initials}
+                      </div>
+                    )}
 
                     {/* Content */}
-                    <div>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 8, 
-                        marginBottom: 4,
-                        justifyContent: isMe ? 'flex-end' : 'flex-start',
-                        flexWrap: 'wrap'
-                      }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                          {isMe ? 'You' : msg.sender?.name}
-                        </span>
-                        {!isMe && (
-                          <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
-                            {msg.sender?.company?.name || 'Unassigned'}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                      {!isMe && (
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 6, 
+                          marginBottom: 4,
+                          paddingLeft: 2
+                        }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            {msg.sender?.name}
                           </span>
-                        )}
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
+                          {msg.sender?.company?.name && (
+                            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', padding: '1px 5px', borderRadius: 4 }}>
+                              {msg.sender?.company?.name}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       
                       <div style={{ 
-                        background: isMe ? 'var(--accent)' : 'var(--bg-secondary)',
+                        background: isMe 
+                          ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' 
+                          : 'var(--bg-secondary)',
                         color: isMe ? '#ffffff' : 'var(--text-primary)',
                         padding: '10px 14px',
-                        borderRadius: 12,
+                        borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                         fontSize: '0.85rem',
-                        lineHeight: 1.4,
+                        lineHeight: 1.45,
                         whiteSpace: 'pre-wrap',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        wordBreak: 'break-word',
+                        boxShadow: isMe ? '0 2px 10px rgba(79, 70, 229, 0.25)' : '0 1px 3px rgba(0,0,0,0.12)',
                         border: isMe ? 'none' : '1px solid var(--border)'
                       }}>
                         {msg.receiverId ? (
                           <DecryptedMessage 
                             rawMessage={msg.message} 
                             privateKeyJwk={privateKeyJwk} 
-                            isSender={msg.senderId === user?.id} 
+                            isSender={isMe} 
                           />
                         ) : (
                           msg.message
                         )}
+
+                        {/* Message Timestamp & Delivery Indicator */}
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'flex-end', 
+                          gap: 4, 
+                          marginTop: 4, 
+                          fontSize: '0.65rem',
+                          color: isMe ? 'rgba(255, 255, 255, 0.75)' : 'var(--text-muted)'
+                        }}>
+                          <span>{timeString}</span>
+                          {isMe && <RiCheckDoubleLine style={{ fontSize: '0.8rem', opacity: 0.85 }} />}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -520,25 +769,56 @@ const ChatPage = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Send Input form */}
+          {/* Send Input Composer */}
           <form onSubmit={handleSend} style={{ 
-            padding: 16, 
+            padding: '12px 18px', 
             borderTop: '1px solid var(--border)', 
             background: 'var(--bg-secondary)',
             display: 'flex',
-            gap: 12
+            alignItems: 'center',
+            gap: 10
           }}>
-            <input 
-              type="text" 
-              className="form-control" 
-              placeholder={placeholderText}
-              value={messageText}
-              onChange={e => setMessageText(e.target.value)}
-              disabled={!selectedChannel || sending}
-              style={{ flexGrow: 1 }}
-            />
-            <button type="submit" className="btn btn-primary" disabled={!selectedChannel || !messageText.trim() || sending} style={{ padding: '0 20px' }}>
-              <RiSendPlane2Line /> Send
+            <div style={{ position: 'relative', flexGrow: 1 }}>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder={placeholderText}
+                value={messageText}
+                onChange={e => setMessageText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={!selectedChannel || sending}
+                style={{ 
+                  width: '100%',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontSize: '0.85rem',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)'
+                }}
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={!selectedChannel || !messageText.trim() || sending} 
+              style={{ 
+                padding: '10px 18px', 
+                borderRadius: 10,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                flexShrink: 0
+              }}
+            >
+              {sending ? (
+                <div className="spinner" style={{ width: 14, height: 14 }} />
+              ) : (
+                <>
+                  <RiSendPlane2Line /> <span>Send</span>
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -549,3 +829,4 @@ const ChatPage = () => {
 };
 
 export default ChatPage;
+

@@ -194,7 +194,7 @@ const StaffSummaryPage = () => {
         </div>
 
         {/* Aggregate KPI Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 16, marginBottom: 24 }}>
           
           {/* Total Employees */}
           <div className="card" style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -605,7 +605,7 @@ const StaffSummaryPage = () => {
                   </div>
 
                   {/* Leave Quota Grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 100px), 1fr))', gap: 10 }}>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
                         Casual Leaves

@@ -432,78 +432,101 @@ const PermissionsPage = () => {
                     )}
                   </div>
 
-                  {/* Screen Rows Table */}
-                  <div>
-                    {screens.map((screen, idx) => {
-                      const screenPerm = modulePerm[screen] || {};
-                      const isAllRowOn = ACTIONS.every(a => screenPerm[a.key]);
-
-                      return (
-                        <div
-                          key={screen}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr repeat(4, 110px)',
-                            padding: '12px 20px',
-                            borderBottom: idx < screens.length - 1 ? '1px solid rgba(129, 140, 248, 0.05)' : 'none',
-                            alignItems: 'center',
-                            transition: 'background 0.15s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(129, 140, 248, 0.03)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          {/* Screen Name + Toggle All Row */}
-                          <div className="flex items-center gap-2">
-                            {canEditPerms && (
-                              <button
-                                onClick={() => toggleAllScreen(module, screen)}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  color: isAllRowOn ? 'var(--accent)' : 'var(--text-muted)',
-                                  fontSize: '1.1rem',
-                                  display: 'flex',
-                                  padding: 0
-                                }}
-                                title="Toggle all actions for this screen"
-                                id={`all-${module}-${screen}`}
-                              >
-                                {isAllRowOn ? <RiCheckboxLine /> : <RiCheckboxBlankLine />}
-                              </button>
-                            )}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                                {SCREEN_LABELS[screen] || screen.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                              </span>
-                              {SCREEN_DESCRIPTIONS[screen] && (
-                                <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
-                                  {SCREEN_DESCRIPTIONS[screen]}
-                                </span>
-                              )}
-                            </div>
+                  {/* Screen Rows Table with Horizontal Scroll Support */}
+                  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <div style={{ minWidth: 620 }}>
+                      {/* Sub-header with Column Action Labels */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr repeat(4, 110px)',
+                        padding: '8px 20px',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        borderBottom: '1px solid var(--border)',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        <div>Screen / Resource</div>
+                        {ACTIONS.map(a => (
+                          <div key={a.key} style={{ textAlign: 'center', color: a.color }}>
+                            {a.label}
                           </div>
+                        ))}
+                      </div>
 
-                          {/* Action Toggles */}
-                          {ACTIONS.map(a => (
-                            <div key={a.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <label className="toggle" id={`toggle-${module}-${screen}-${a.key}`}>
-                                <input
-                                  type="checkbox"
-                                  checked={!!screenPerm[a.key]}
-                                  disabled={!canEditPerms}
-                                  onChange={() => toggle(module, screen, a.key)}
-                                />
-                                <span
-                                  className="toggle-slider"
-                                  style={{ '--toggle-on-color': a.color }}
-                                />
-                              </label>
+                      {screens.map((screen, idx) => {
+                        const screenPerm = modulePerm[screen] || {};
+                        const isAllRowOn = ACTIONS.every(a => screenPerm[a.key]);
+
+                        return (
+                          <div
+                            key={screen}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr repeat(4, 110px)',
+                              padding: '12px 20px',
+                              borderBottom: idx < screens.length - 1 ? '1px solid rgba(129, 140, 248, 0.05)' : 'none',
+                              alignItems: 'center',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(129, 140, 248, 0.03)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          >
+                            {/* Screen Name + Toggle All Row */}
+                            <div className="flex items-center gap-2">
+                              {canEditPerms && (
+                                <button
+                                  onClick={() => toggleAllScreen(module, screen)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: isAllRowOn ? 'var(--accent)' : 'var(--text-muted)',
+                                    fontSize: '1.1rem',
+                                    display: 'flex',
+                                    padding: 0
+                                  }}
+                                  title="Toggle all actions for this screen"
+                                  id={`all-${module}-${screen}`}
+                                >
+                                  {isAllRowOn ? <RiCheckboxLine /> : <RiCheckboxBlankLine />}
+                                </button>
+                              )}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                  {SCREEN_LABELS[screen] || screen.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                </span>
+                                {SCREEN_DESCRIPTIONS[screen] && (
+                                  <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
+                                    {SCREEN_DESCRIPTIONS[screen]}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      );
-                    })}
+
+                            {/* Action Toggles */}
+                            {ACTIONS.map(a => (
+                              <div key={a.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <label className="toggle" id={`toggle-${module}-${screen}-${a.key}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!screenPerm[a.key]}
+                                    disabled={!canEditPerms}
+                                    onChange={() => toggle(module, screen, a.key)}
+                                  />
+                                  <span
+                                    className="toggle-slider"
+                                    style={{ '--toggle-on-color': a.color }}
+                                  />
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               );

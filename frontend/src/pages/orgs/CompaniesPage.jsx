@@ -135,9 +135,9 @@ const CompaniesPage = () => {
 
       <div className="card">
         <div className="card-header">
-          <div className="input-wrapper">
+          <div className="input-wrapper" style={{ width: '100%', maxWidth: 280 }}>
             <RiSearchLine className="input-icon" />
-            <input className="form-control" placeholder="Search companies..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} style={{ width: 260 }} id="company-search" />
+            <input className="form-control" placeholder="Search companies..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} style={{ width: '100%' }} id="company-search" />
           </div>
         </div>
         {loading ? (

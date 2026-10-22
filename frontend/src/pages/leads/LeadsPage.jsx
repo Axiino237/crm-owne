@@ -54,7 +54,7 @@ const MODAL_INPUT_STYLE = { width: '100%', background: 'var(--bg-secondary)', bo
 const MODAL_LABEL_STYLE = { fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' };
 
 const MoveToDesignRow = ({ children }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+  <div className="form-grid-2" style={{ gap: 14, marginBottom: 14 }}>
     {children}
   </div>
 );
@@ -296,7 +296,7 @@ const LeadModal = ({ lead, users, onClose, onSaved }) => {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1.25rem', display: 'flex' }}><RiCloseLine /></button>
         </div>
         <form onSubmit={handleSubmit} style={{ padding: '24px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div className="form-grid-2" style={{ gap: 16, marginBottom: 16 }}>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Contact Person *</label>
               <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Full name" required /></div>
             <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>Company Name</label>
@@ -385,7 +385,7 @@ const ViewLeadModal = ({ lead, onClose }) => {
               <div style={{ color: 'var(--text-primary)' }}>{lead.companyName}</div>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-grid-2" style={{ gap: 12 }}>
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Email</div>
               <div style={{ color: 'var(--text-primary)' }}>{lead.email || '—'}</div>
@@ -401,7 +401,7 @@ const ViewLeadModal = ({ lead, onClose }) => {
               <div style={{ color: 'var(--text-primary)' }}>{lead.alternatePhone}</div>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-grid-2" style={{ gap: 12 }}>
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Expo Type</div>
               <div style={{ color: 'var(--text-primary)' }}>{lead.expoType || EXPO_LABELS[lead.expo] || lead.expo || '—'}</div>
@@ -411,7 +411,7 @@ const ViewLeadModal = ({ lead, onClose }) => {
               <div style={{ color: 'var(--text-primary)' }}>{lead.expoName ? `${lead.expoName} ${lead.expoMode ? `(${lead.expoMode})` : ''}` : '—'}</div>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-grid-2" style={{ gap: 12 }}>
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Last Contacted</div>
               <div style={{ color: 'var(--text-primary)' }}>{lead.lastContactedDate || '—'}</div>
@@ -433,7 +433,7 @@ const ViewLeadModal = ({ lead, onClose }) => {
               <div style={{ color: 'var(--text-primary)', whiteSpace: 'pre-line' }}>{lead.notes}</div>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 6 }}>
+          <div className="form-grid-2" style={{ gap: 12, borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 6 }}>
             <div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>Status</div>
               <span className={`badge ${st.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>

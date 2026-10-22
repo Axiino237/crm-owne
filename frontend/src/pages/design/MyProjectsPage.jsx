@@ -58,7 +58,7 @@ const ViewDesignModal = ({ order, onClose }) => {
 
         {/* Scrollable Content */}
         <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 28px' }}>
+          <div className="form-grid-2" style={{ gap: '0 28px' }}>
             <Field label="Company Name" value={order.companyName} />
             <Field label="Website" value={order.website} />
             <Field label="Exhibition Name" value={order.exhibitionName} />
@@ -302,7 +302,7 @@ const CompleteModelModal = ({ order, onClose, onCompleted }) => {
             <div style={{ fontSize: '0.66rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
               📐 Stall Information
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px 12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '10px 12px' }}>
               {[
                 { label: 'Exhibition', value: order.exhibitionName },
                 { label: 'Stall No.', value: order.stallNo },
@@ -327,7 +327,7 @@ const CompleteModelModal = ({ order, onClose, onCompleted }) => {
               <div style={{ fontSize: '0.66rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
                 🪑 Furniture & Fixtures
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px 12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '10px 12px' }}>
                 {[
                   { label: 'Reception Counter', value: order.receptionCounter },
                   { label: 'Round Table + Bar Stool', value: order.roundTableBarStool },
@@ -375,7 +375,7 @@ const CompleteModelModal = ({ order, onClose, onCompleted }) => {
           )}
 
           {/* Section: Submitted By + Lead */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+          <div className="form-grid-2" style={{ gap: 10, marginBottom: 16 }}>
             {order.submitter && (
               <div style={{ padding: '10px 12px', background: 'rgba(129,140,248,0.05)', borderRadius: 10, border: '1px solid rgba(129,140,248,0.15)' }}>
                 <div style={{ fontSize: '0.62rem', color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>👤 Submitted By</div>
@@ -651,7 +651,7 @@ const MyProjectsPage = () => {
       </div>
 
       {/* Stats summaries */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 16, marginBottom: 24 }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', color: 'var(--accent)' }}>
             <RiPaletteLine />

@@ -100,7 +100,7 @@ const ChatSettingsPage = () => {
     <AppLayout title="Chat Workspace Manager">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 20 }}>
           
           {/* Create Server Form */}
           <div className="card" style={{ padding: 24, height: 'fit-content' }}>
