@@ -95,7 +95,7 @@ const AttendancePage = () => {
   };
 
   // RTK Query hooks
-  const { data: summaryData, isLoading: loadingSummary } = useGetMySummaryQuery({ year: currentYear, month: currentMonth });
+  const { data: summaryData, isLoading: loadingSummary, refetch: refetchSummary } = useGetMySummaryQuery({ year: currentYear, month: currentMonth });
   const logs = summaryData?.logs || [];
   const leaves = summaryData?.leaves || [];
   const holidays = summaryData?.holidays || [];
@@ -283,11 +283,33 @@ const AttendancePage = () => {
   const todayStr = new Date().toLocaleDateString('en-CA');
   const todayLog = logs.find(l => l.date === todayStr) || null;
 
+  // Track if current time is past 09:30 AM shift start cutoff
+  const [isPastShiftStart, setIsPastShiftStart] = useState(() => {
+    const now = new Date();
+    const cutoff = new Date();
+    cutoff.setHours(9, 30, 59, 999);
+    return now > cutoff;
+  });
+
+  useEffect(() => {
+    const checkCutoff = () => {
+      const now = new Date();
+      const cutoff = new Date();
+      cutoff.setHours(9, 30, 59, 999);
+      setIsPastShiftStart(now > cutoff);
+    };
+    checkCutoff();
+    const timer = setInterval(checkCutoff, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Handle check-in
   const handleCheckIn = async () => {
     try {
       const res = await checkIn().unwrap();
       toast.success(res.message || 'Checked in successfully!');
+      if (refetchSummary) refetchSummary();
+      if (refetchTeamData) refetchTeamData();
     } catch (err) {
       toast.error(err.data?.message || 'Check-in failed');
     }
@@ -474,11 +496,20 @@ const AttendancePage = () => {
               <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <RiTimeLine style={{ color: 'var(--accent)' }} /> Mark Attendance
               </h3>
-              <div style={{ background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: 6, fontSize: '0.78rem', color: 'var(--accent)', fontWeight: 700, marginBottom: 12, border: '1px solid var(--border)', display: 'inline-block' }}>
-                ⏰ Office Shift: 09:30 AM - 06:30 PM
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: 6, fontSize: '0.78rem', color: 'var(--accent)', fontWeight: 700, border: '1px solid var(--border)' }}>
+                  ⏰ Office Shift: 09:30 AM - 06:30 PM
+                </div>
+                {!todayLog && (
+                  <span className={`badge ${isPastShiftStart ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem', padding: '4px 8px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    {isPastShiftStart ? '⚠️ Late Window (> 09:30 AM)' : '✅ On-Time Window'}
+                  </span>
+                )}
               </div>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 20 }}>
-                Check-in daily before 09:30 AM to avoid late check-in marking.
+                {isPastShiftStart && !todayLog 
+                  ? 'Current time has exceeded 09:30 AM. Checking in now will be recorded as Late arrival.'
+                  : 'Check-in daily before 09:30 AM to avoid late check-in marking.'}
               </p>
             </div>
 
@@ -493,8 +524,8 @@ const AttendancePage = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Status:</span>
-                    <span className={`badge ${todayLog.status === 'present' ? 'badge-success' : todayLog.status === 'late' ? 'badge-warning' : 'badge-info'}`} style={{ textTransform: 'uppercase' }}>
-                      {todayLog.status}
+                    <span className={`badge ${todayLog.status === 'present' ? 'badge-success' : todayLog.status === 'late' ? 'badge-warning' : 'badge-info'}`} style={{ textTransform: 'uppercase', fontWeight: 700 }}>
+                      {todayLog.status === 'late' ? '⚠️ LATE' : todayLog.status}
                     </span>
                   </div>
                   {todayLog.checkOut ? (
@@ -557,9 +588,42 @@ const AttendancePage = () => {
                   )}
                 </div>
               ) : (
-                <button className="btn btn-primary" onClick={handleCheckIn} style={{ width: '100%', padding: '14px' }}>
-                  <RiLoginBoxLine /> Check In Now
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {isPastShiftStart && (
+                    <div style={{
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      background: 'rgba(245, 158, 11, 0.1)',
+                      border: '1.5px solid rgba(245, 158, 11, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      fontSize: '0.8rem',
+                      color: '#f59e0b',
+                      fontWeight: 600
+                    }}>
+                      <span style={{ fontSize: '1.1rem' }}>⏰</span>
+                      <div>
+                        <strong>Shift started at 09:30 AM.</strong>
+                        <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Check-in will be marked as <span style={{ fontWeight: 800, textDecoration: 'underline' }}>LATE</span>.</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={handleCheckIn} 
+                    style={{ 
+                      width: '100%', 
+                      padding: '14px',
+                      background: isPastShiftStart ? 'linear-gradient(135deg, #f59e0b, #d97706)' : undefined,
+                      borderColor: isPastShiftStart ? '#f59e0b' : undefined,
+                      boxShadow: isPastShiftStart ? '0 4px 14px rgba(245, 158, 11, 0.3)' : undefined
+                    }}
+                  >
+                    <RiLoginBoxLine /> {isPastShiftStart ? 'Check In Now (Late Check-in)' : 'Check In Now'}
+                  </button>
+                </div>
               )}
 
               {/* Missed Punch / Regularization Button */}

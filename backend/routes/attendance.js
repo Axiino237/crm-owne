@@ -8,12 +8,29 @@ const { getDeptHeadScope } = require('../utils/departmentScope');
 
 router.use(protect);
 
-// ── Helper: Get today's local date string (YYYY-MM-DD) ──
-const getLocalDateString = () => {
-  const d = new Date();
-  const offset = d.getTimezoneOffset();
-  const localDate = new Date(d.getTime() - (offset * 60 * 1000));
-  return localDate.toISOString().split('T')[0];
+// ── Timezone & IST Helpers ──
+const TIMEZONE = process.env.TIMEZONE || 'Asia/Kolkata';
+
+// ── Helper: Get today's local date string in IST (YYYY-MM-DD) ──
+const getLocalDateString = (d = new Date()) => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(d);
+};
+
+// ── Helper: Check if check-in is late (Shift start cutoff: 09:30 AM IST) ──
+const isLateCheckIn = (d = new Date(), cutoffTime = '09:30:59') => {
+  const timeStr = d.toLocaleTimeString('en-GB', {
+    timeZone: TIMEZONE,
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  return timeStr > cutoffTime;
 };
 
 // @desc   Check-in for today
@@ -31,12 +48,10 @@ router.post('/check-in', async (req, res) => {
       return res.status(400).json({ success: false, message: 'You have already checked in for today' });
     }
 
-    // Determine status (grace limit: 09:30 AM local time)
+    // Determine status (Shift cutoff: 09:30 AM IST)
     const now = new Date();
-    const cutoff = new Date();
-    cutoff.setHours(9, 30, 0, 0); // 9:30 AM cutoff
-
-    const status = now > cutoff ? 'late' : 'present';
+    const isLate = isLateCheckIn(now, '09:30:59');
+    const status = isLate ? 'late' : 'present';
 
     const attendance = await Attendance.create({
       userId: req.user.id,
@@ -46,7 +61,8 @@ router.post('/check-in', async (req, res) => {
       organizationId: req.user.organizationId
     });
 
-    res.status(201).json({ success: true, message: `Checked in successfully as ${status}`, attendance });
+    const statusMsg = isLate ? 'Checked in successfully (Marked as Late - after 09:30 AM)' : 'Checked in successfully as present';
+    res.status(201).json({ success: true, message: statusMsg, attendance });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error during check-in', error: error.message });
   }
