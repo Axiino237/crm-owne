@@ -180,7 +180,7 @@ const ChatPage = () => {
   
   // Selected Channel state
   const [selectedChannel, setSelectedChannel] = useState(null);
-  const [showMobileList, setShowMobileList] = useState(false);
+  const [showMobileList, setShowMobileList] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
 
   // Message input state
   const [messageText, setMessageText] = useState('');
@@ -319,7 +319,6 @@ const ChatPage = () => {
         <div className="chat-sidebar" style={{ 
           borderRight: '1px solid var(--border)', 
           padding: '16px 14px', 
-          display: 'flex', 
           flexDirection: 'column', 
           gap: 14, 
           background: 'var(--bg-secondary)',
@@ -533,23 +532,23 @@ const ChatPage = () => {
         </div>
 
         {/* Center - Message Log Panel */}
-        <div className="chat-main" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-card)' }}>
+        <div className="chat-main" style={{ flexDirection: 'column', height: '100%', background: 'var(--bg-card)' }}>
           {/* Header */}
           <div style={{ 
-            padding: '14px 20px', 
+            padding: '12px 16px', 
             borderBottom: '1px solid var(--border)', 
             background: 'var(--bg-secondary)', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'space-between',
-            gap: 12 
+            gap: 10 
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
               <button
                 type="button"
-                className="btn btn-outline btn-sm mobile-chat-back-btn"
+                className="btn btn-primary btn-sm mobile-chat-back-btn"
                 onClick={() => setShowMobileList(true)}
-                style={{ padding: '4px 8px', fontSize: '0.8rem', alignItems: 'center', gap: 4 }}
+                style={{ padding: '6px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
                 title="Back to Conversations"
               >
                 <RiArrowLeftLine /> Chats

@@ -651,24 +651,24 @@ const AttendancePage = () => {
             {loadingSummary ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '24px', flexGrow: 1 }}><div className="spinner" /></div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 12 }}>
-                <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)', display: 'block' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                <div style={{ background: 'var(--bg-secondary)', padding: '10px 6px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)', display: 'block' }}>
                     {logs.filter(l => l.status === 'present').length}
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Present Days</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'block' }}>Present</span>
                 </div>
-                <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f59e0b', display: 'block' }}>
+                <div style={{ background: 'var(--bg-secondary)', padding: '10px 6px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f59e0b', display: 'block' }}>
                     {logs.filter(l => l.status === 'late').length}
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Late Arrivals</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'block' }}>Late</span>
                 </div>
-                <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8', display: 'block' }}>
+                <div style={{ background: 'var(--bg-secondary)', padding: '10px 6px', borderRadius: 8, textAlign: 'center', border: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8', display: 'block' }}>
                     {logs.filter(l => l.status === 'on_leave' || l.status === 'half_day').length}
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>On Leave</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'block' }}>Leave</span>
                 </div>
               </div>
             )}
@@ -677,7 +677,7 @@ const AttendancePage = () => {
         </div>
 
         {/* Tab Selection */}
-        <div className="flex border-b" style={{ borderBottom: '1px solid var(--border)', gap: 16, overflowX: 'auto' }}>
+        <div className="tab-scroll-container" style={{ borderBottom: '1px solid var(--border)', gap: 8, paddingBottom: 6 }}>
           {[
             { id: 'my-attendance', label: 'My Attendance Calendar', show: true },
             { id: 'my-regularizations', label: 'My Correction Requests', show: true },
@@ -690,15 +690,16 @@ const AttendancePage = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                background: 'none',
-                border: 'none',
-                padding: '12px 8px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
+                background: activeTab === tab.id ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                border: activeTab === tab.id ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
+                borderRadius: 8,
+                padding: '8px 14px',
+                fontSize: '0.82rem',
+                fontWeight: activeTab === tab.id ? 800 : 600,
                 color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)',
-                borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : 'none',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
               {tab.label}
@@ -1178,13 +1179,13 @@ const AttendancePage = () => {
 
         {/* My Correction Requests Tab */}
         {activeTab === 'my-regularizations' && (
-          <div className="card" style={{ padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div>
+          <div className="card" style={{ padding: '20px 18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>My Attendance Correction Requests</h3>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Requests submitted to convert absent days to present with approval from your manager.</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>Requests submitted to convert absent days to present with approval from your manager.</p>
               </div>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowRegularizeModal(true)}>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowRegularizeModal(true)} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <RiEditBoxLine /> Apply New Correction
               </button>
             </div>

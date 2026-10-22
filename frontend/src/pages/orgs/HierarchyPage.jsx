@@ -512,7 +512,7 @@ const HierarchyPage = () => {
         </div>
 
         {/* ── Main View Selector Tabs ── */}
-        <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div className="tab-scroll-container" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
           <button
             className={`btn ${activeTab === 'layers' ? 'btn-primary' : 'btn-outline'} btn-sm`}
             onClick={() => setActiveTab('layers')}
@@ -560,13 +560,13 @@ const HierarchyPage = () => {
                 
                 {/* Information banner */}
                 <div style={{
-                  padding: '12px 18px', background: 'rgba(99,102,241,0.08)',
+                  padding: '14px 16px', background: 'rgba(99,102,241,0.08)',
                   border: '1px solid rgba(99,102,241,0.22)', borderRadius: 10,
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12
+                  display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.85rem' }}>
-                    <RiInformationLine style={{ color: 'var(--accent)', fontSize: '1.2rem', flexShrink: 0 }} />
-                    <span>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: '0.85rem', flex: '1 1 240px', minWidth: 0 }}>
+                    <RiInformationLine style={{ color: 'var(--accent)', fontSize: '1.2rem', flexShrink: 0, marginTop: 2 }} />
+                    <span style={{ lineHeight: 1.45 }}>
                       <strong>Layer Rules:</strong> <strong>Layer 1 (HOD)</strong> has primary supervisory control over daily attendance, leave approvals, and lead allocations. Higher layers automatically oversee members in subordinate tiers.
                     </span>
                   </div>
@@ -574,7 +574,7 @@ const HierarchyPage = () => {
                     <button
                       className="btn btn-outline btn-sm"
                       onClick={handleAddLayer}
-                      style={{ borderColor: 'rgba(99,102,241,0.4)', color: '#818cf8', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+                      style={{ borderColor: 'rgba(99,102,241,0.4)', color: '#818cf8', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
                       <RiAddLine /> + Add Hierarchy Layer
                     </button>
@@ -606,7 +606,7 @@ const HierarchyPage = () => {
                               : 'rgba(255, 255, 255, 0.08)'
                           }`,
                           borderRadius: 16,
-                          padding: '22px 24px',
+                          padding: '20px 18px',
                           boxShadow: isTopLayer
                             ? '0 10px 30px -10px rgba(79, 70, 229, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08)'
                             : '0 4px 20px -5px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
@@ -614,8 +614,8 @@ const HierarchyPage = () => {
                         }}
                       >
                         {/* Layer Header Row */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: '1 1 200px', minWidth: 0 }}>
                             {/* Tier Badge */}
                             <span
                               style={{
@@ -633,6 +633,7 @@ const HierarchyPage = () => {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: 6,
+                                flexShrink: 0,
                                 boxShadow: isTopLayer
                                   ? '0 2px 12px rgba(99, 102, 241, 0.45)'
                                   : idx === 1
@@ -651,14 +652,15 @@ const HierarchyPage = () => {
                               onChange={e => handleLayerNameChange(idx, e.target.value)}
                               placeholder="e.g. Technical Leads, Supervisors, Associates..."
                               style={{
-                                height: 40,
-                                maxWidth: 360,
+                                height: 38,
+                                flex: '1 1 180px',
+                                minWidth: 0,
                                 fontWeight: 700,
-                                fontSize: '0.92rem',
+                                fontSize: '0.9rem',
                                 background: 'rgba(0, 0, 0, 0.35)',
                                 borderColor: 'rgba(255, 255, 255, 0.12)',
                                 borderRadius: 10,
-                                padding: '0 14px'
+                                padding: '0 12px'
                               }}
                               disabled={!isAdmin}
                             />
