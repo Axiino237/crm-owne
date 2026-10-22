@@ -350,6 +350,7 @@ router.get('/members', async (req, res) => {
         id: u.id,
         name: u.name,
         email: u.email,
+        avatar: u.avatar,
         companyName: u.company?.name || 'Unassigned',
         roleName: u.role?.name || 'User',
         deptName: u.department?.name || 'Unassigned',

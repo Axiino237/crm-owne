@@ -782,9 +782,14 @@ const HierarchyPage = () => {
                                       width: 26, height: 26, borderRadius: '50%',
                                       background: isPrimaryHOD ? 'linear-gradient(135deg, #4f46e5, #7c3aed)' : '#3b82f6',
                                       color: '#fff', fontSize: '0.72rem', fontWeight: 800,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      overflow: 'hidden'
                                     }}>
-                                      {u.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                      {u.avatar ? (
+                                        <img src={u.avatar} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      ) : (
+                                        u.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                                      )}
                                     </div>
 
                                     <span style={{ fontWeight: 600 }}>{u.name}</span>
@@ -1023,9 +1028,14 @@ const HierarchyPage = () => {
                                     width: 32, height: 32, borderRadius: '50%',
                                     background: 'linear-gradient(135deg, #4f46e5, #818cf8)',
                                     color: '#fff', fontSize: '0.75rem', fontWeight: 700,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    overflow: 'hidden'
                                   }}>
-                                    {emp.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                    {emp.avatar ? (
+                                      <img src={emp.avatar} alt={emp.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                      emp.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                                    )}
                                   </div>
                                   <div>
                                     <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{emp.name}</div>
@@ -1228,9 +1238,14 @@ const HierarchyPage = () => {
                                         width: 36, height: 36, borderRadius: '50%',
                                         background: isPrimaryHOD ? 'linear-gradient(135deg, #4f46e5, #a855f7)' : '#334155',
                                         color: '#fff', fontSize: '0.8rem', fontWeight: 800,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        overflow: 'hidden'
                                       }}>
-                                        {u.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                        {u.avatar ? (
+                                          <img src={u.avatar} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                          u.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                                        )}
                                       </div>
 
                                       {isPrimaryHOD && (

@@ -485,9 +485,14 @@ const ChatPage = () => {
                             color: isSelected ? '#ffffff' : 'var(--accent)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: '0.78rem', fontWeight: 800,
-                            boxShadow: isSelected ? '0 2px 8px rgba(79, 70, 229, 0.35)' : 'none'
+                            boxShadow: isSelected ? '0 2px 8px rgba(79, 70, 229, 0.35)' : 'none',
+                            overflow: 'hidden'
                           }}>
-                            {member.name.charAt(0).toUpperCase()}
+                            {member.avatar ? (
+                              <img src={member.avatar} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              member.name.charAt(0).toUpperCase()
+                            )}
                           </div>
                           <div style={{
                             width: 9, height: 9, borderRadius: '50%',
@@ -562,9 +567,14 @@ const ChatPage = () => {
                     color: '#ffffff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '0.85rem', fontWeight: 800,
-                    boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)'
+                    boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)',
+                    overflow: 'hidden'
                   }}>
-                    {activeDMRecipient.name.charAt(0).toUpperCase()}
+                    {activeDMRecipient.avatar ? (
+                      <img src={activeDMRecipient.avatar} alt={activeDMRecipient.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      activeDMRecipient.name.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div style={{
                     width: 10, height: 10, borderRadius: '50%',
@@ -695,9 +705,37 @@ const ChatPage = () => {
                         fontWeight: 800,
                         border: '1px solid var(--border)',
                         flexShrink: 0,
-                        marginTop: 2
+                        marginTop: 2,
+                        overflow: 'hidden'
                       }}>
-                        {initials}
+                        {msg.sender?.avatar ? (
+                          <img src={msg.sender.avatar} alt={msg.sender.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          initials
+                        )}
+                      </div>
+                    )}
+                    {isMe && (
+                      <div style={{ 
+                        width: 32, 
+                        height: 32, 
+                        borderRadius: 10, 
+                        background: 'linear-gradient(135deg, #4f46e5, #6366f1)', 
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        flexShrink: 0,
+                        marginTop: 2,
+                        overflow: 'hidden'
+                      }}>
+                        {user?.avatar ? (
+                          <img src={user.avatar} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'ME'
+                        )}
                       </div>
                     )}
 

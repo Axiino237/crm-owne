@@ -413,8 +413,12 @@ const UsersPage = () => {
                   <tr key={u.id}>
                     <td>
                       <div className="flex items-center gap-2">
-                        <div className="avatar avatar-sm">
-                          {u.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        <div className="avatar avatar-sm" style={{ overflow: 'hidden', flexShrink: 0 }}>
+                          {u.avatar ? (
+                            <img src={u.avatar} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            u.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                          )}
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>

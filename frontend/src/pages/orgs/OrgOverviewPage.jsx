@@ -39,9 +39,14 @@ const MemberRow = ({ member }) => {
         width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
         background: 'linear-gradient(135deg, #4f46e5, #818cf8)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '0.875rem', fontWeight: 700, color: '#fff'
+        fontSize: '0.875rem', fontWeight: 700, color: '#fff',
+        overflow: 'hidden'
       }}>
-        {member.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+        {member.avatar ? (
+          <img src={member.avatar} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          member.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        )}
       </div>
 
       {/* Info */}

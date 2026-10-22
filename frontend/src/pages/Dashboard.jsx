@@ -223,8 +223,12 @@ const Dashboard = () => {
       }}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="avatar avatar-lg" style={{ background: 'linear-gradient(135deg, #4f46e5, #818cf8)', fontSize: '1.25rem' }}>
-              {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+            <div className="avatar avatar-lg" style={{ background: 'linear-gradient(135deg, #4f46e5, #818cf8)', fontSize: '1.25rem', overflow: 'hidden', flexShrink: 0 }}>
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+              )}
             </div>
             <div>
               <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
